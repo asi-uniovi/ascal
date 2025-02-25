@@ -1,0 +1,49 @@
+# Simple configuration file with 1 application and ideal transition
+
+# All available autoscalers
+autoscalers:
+  h_reactive: # Horizontal+reactive autoscaling
+    time_period: 60 # Time period to evaluate autoscaling
+    desired_cpu_utilization: 0.7  # Desired CPU utilization
+    node_utilization_threshold: 0.5 # Below this utilization, node removal is tried
+  hv_reactive: # Horizontal/vertical+reactive autoscaling
+    time_period: 60 # Time period to evaluate autoscaling
+    desired_cpu_utilization: 0.7  # Desired CPU utilization
+    algorithm: fcma
+  hv_predictive: # Horizontal/vertical+predictive autoscaling
+    time_period: 60 # Time period to evaluate autoscaling
+    prediction_percentil: 95
+    prediction_window: 3600 # Prediction period in seconds
+    algorithm: fcma
+
+# Select autoscaler
+autoscaler: h_reactive
+
+# Times in seconds. Transition time is zero because all the times are zero
+node_creation_time: 0
+node_removal_time: 0
+container_creation_time: 0
+container_removal_time: 0
+
+# Define applications
+apps:
+  app0:
+    load:
+      file: ../trace-triangle.csv # Integer load samples in req/s
+      time_interval: 1 # Integer time in seconds between two consecutive samples
+      repeat: 1 # The whole set of samples in the file is repeated this number of times
+      load_mult: 4 # Multiplier for the load samples
+      load_offset: 10 # Integer value to be added to every load sample
+      time_offset: 0 # Advance this number of samples and complete with the last value
+    container:
+      cpu: 260 mcores
+      mem: 0.420 GiB
+      perf: 1 req/s
+      aggs: [1, 2]
+
+# Simulation time in seconds.
+# If application traces are short, the last load in the trace is repeated.
+# If application traces are too long, they are truncated at the end.
+simulation_time: 3600
+
+
