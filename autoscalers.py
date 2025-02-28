@@ -3,6 +3,7 @@ from enum import Enum
 from math import ceil
 from abc import ABC, abstractmethod
 from copy import copy
+from numpy import percentile as percentile
 from fcma import App, Fcma, SolvingPars
 from fcma.model import (
     Allocation,
@@ -34,15 +35,11 @@ class Autoscaler(ABC):
         self.node_creation_time = 0       # Node creation time in seconds
         self.node_removal_time = 0        # Node removal time in seconds
         self.system = None                # Application performances on instances class families
-        self.time = 0                     # Current time in seconds
-        self.apps = None                 # Applications
+        self.time = -1                     # Current time in seconds
+        self.apps = None                  # Applications
         self.allocation = None            # Current allocation
         self._changed_allocation = False  # True if allocation changed in the last autoscaling
         self._changed_nodes = False       # True if the nodes changed in the last allocation
-
-    @abstractmethod
-    def _initial_allocation(self, workloads: dict[App, RequestsPerTime]) -> Allocation:
-        pass
 
     @abstractmethod
     def run(self, workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
@@ -244,7 +241,8 @@ class HReactiveAutoscaler(Autoscaler):
                 }
                 # Simulate the allocation of the replicas in other nodes
                 for other_node in other_nodes_free_capacity:
-                    for app in self.apps:
+                    apps = {app for app in replicas_to_allocate.keys()}
+                    for app in apps:
                         cc = self._app_cc[app]
                         allocatable_replicas = min(other_nodes_free_capacity[other_node][0] // cc.cores,
                                                    other_nodes_free_capacity[other_node][1] // cc.mem[0]).magnitude
@@ -260,7 +258,8 @@ class HReactiveAutoscaler(Autoscaler):
                 if len(replicas_to_allocate) == 0:
                     replicas_to_allocate = {app: self._get_replicas(app, node) for app in self.apps}
                     for other_node in [other_node for other_node in node_list if other_node != node]:
-                        for app in self.apps:
+                        apps = {app for app in replicas_to_allocate.keys()}
+                        for app in apps:
                             if replicas_to_allocate[app] > 0:
                                 allocated_replicas = other_node.allocate(self._app_cc[app], replicas_to_allocate[app])
                                 replicas_to_allocate[app] -= allocated_replicas
@@ -281,8 +280,8 @@ class HReactiveAutoscaler(Autoscaler):
 
         initial_time = current_time()
         self.time += 1
-        if self.time == 1:
-            self._app_load_sum = {app: workloads[app].to_base_units().magnitude for app in workloads}
+        if self.time == 0:
+            self._app_load_sum = {app: workloads[app] for app in workloads}
             self._icf = list(self.system.keys())[0][1]
             for app in self.apps:
                 cc = ContainerClass(
@@ -300,7 +299,7 @@ class HReactiveAutoscaler(Autoscaler):
         else:
             # Update average loads
             for app in self._app_load_sum:
-                self._app_load_sum[app] += workloads[app].magnitude
+                self._app_load_sum[app] += workloads[app]
             # If not at the time period
             if self.time  % self.time_period > 0:
                 return False, False, 0 # Changes may appear only at every time period
@@ -310,10 +309,10 @@ class HReactiveAutoscaler(Autoscaler):
                 reduced_replicas_apps = []
                 increased_replicas_apps = []
                 for app, icf in self.system:
-                    replica_perf = self.system[(app, icf)].perf.magnitude
+                    replica_perf = self.system[(app, icf)].perf
                     current_replicas = self._get_replicas(app)
                     average_load = self._app_load_sum[app] / self.time_period
-                    average_cpu_utilization = average_load / (replica_perf * current_replicas)
+                    average_cpu_utilization = (average_load / (replica_perf * current_replicas)).magnitude
                     desired_replicas = ceil(current_replicas * average_cpu_utilization / self.desired_cpu_utilization)
                     if desired_replicas > current_replicas:
                         increased_replicas_apps.append((app, desired_replicas - current_replicas))
@@ -336,7 +335,7 @@ class HReactiveAutoscaler(Autoscaler):
 
                 # Reset load averages
                 for app in self._app_load_sum:
-                    self._app_load_sum[app] = 0
+                    self._app_load_sum[app] = RequestsPerTime('0 req/hour')
 
                 return changes[0], changes[1], current_time() - initial_time
 
@@ -346,75 +345,103 @@ class HVReactiveAutoscaler(Autoscaler):
         Constructor for the horizontal and reactive autoscaler.
         :param time_period: Time period to evaluate a new autoscaling.
         :param desired_cpu_utilization: Desired CPU utilization for the application containers.
-        less than or equl to 1.
         """
         super().__init__()
         self.time_period = time_period
         self.desired_cpu_utilization = desired_cpu_utilization
         self._app_load_sum = {}
-        self._icf = None # Instance class family
-        self._app_cc = {} # Application container classes
         self._fcma_speed_level = 1
         if algorithm == AutoscalerTypes.FCMA2:
             self._fcma_speed_level = 2
         elif algorithm == AutoscalerTypes.FCMA3:
             self._fcma_speed_level = 3
 
-
-    def _initial_allocation(self, workloads: dict[App, RequestsPerTime]) -> tuple[int, Allocation]:
-        """
-        Initial allocation for all the applications, based on their first workload.
-        :param workloads: First workload sample for each application.
-        :return: The time in seconds required to calculate the allocation and the initial allocation.
-        """
-
-        # Workloads are artificially incremented to obtain the desired CPU utilization
-        incremented_workloads = {key: value /self.desired_cpu_utilization for key, value in workloads.items()}
-
-        # Use FCMA algorithm to get the initial allocation
-        fcma_problem = Fcma(self.system, workloads=incremented_workloads)
-        solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
-        solution = fcma_problem.solve(solving_pars)
-        return solution.allocation
-
-    def run(self, workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
+    def run(self, app_workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
         """
         Simulate horizontal/vertical and reactive autoscaling of containers and nodes.
-        :param workloads: Workload for all the applications at the current time.
+        :param app_workloads: Workload for all the applications at the current time.
         :return: A tuple with boolean values for allocation changes, node changes and allocation calculation time.
         """
 
         initial_time = current_time()
         self.time += 1
-        if self.time == 1:
-            self._app_load_sum = {app: workloads[app].to_base_units().magnitude for app in workloads}
-            self._icf = list(self.system.keys())[0][1]
-            for app in self.apps:
-                cc = ContainerClass(
-                    app=app,
-                    ic=None,
-                    fm=self._icf,
-                    cores=self.system[(app, self._icf)].cores,
-                    mem=self.system[(app, self._icf)].mem[0],
-                    perf=self.system[(app, self._icf)].perf,
-                    aggs=(1,)
-                )
-                self._app_cc[app] = cc
-                self.allocation = self._initial_allocation(workloads)
-            return True, True, current_time() - initial_time
+        if self.time == 0:
+            self._app_load_sum = {app: app_workloads[app] for app in app_workloads}
         else:
             # Update average loads
             for app in self._app_load_sum:
-                self._app_load_sum[app] += workloads[app].magnitude
-            # If not at the time period
-            if self.time  % self.time_period > 0:
-                return False, False, 0 # Changes may appear only at every time period
-            else:
-                # Workloads are artificially incremented to obtain the desired CPU utilization
-                incremented_workloads = {key: value / self.desired_cpu_utilization for key, value in workloads.items()}
-                # Use FCMA algorithm to get the initial allocation
-                fcma_problem = Fcma(self.system, workloads=incremented_workloads)
-                solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
-                self.allocation = fcma_problem.solve(solving_pars).allocation
-                return True, True, current_time() - initial_time
+                self._app_load_sum[app] += app_workloads[app]
+        # If not at the time period
+        if self.time % self.time_period > 0:
+            return False, False, 0  # Changes may appear only at every time period
+        else:
+            # Average workloads are artificially incremented to obtain the desired CPU utilization
+            incremented_workloads = {}
+            for app in self._app_load_sum:
+                incremented_workloads[app] = self._app_load_sum[app] / self.desired_cpu_utilization
+                if self.time > 0:
+                    incremented_workloads[app] /= self.time_period
+            # Use FCMA algorithm to get the initial allocation
+            fcma_problem = Fcma(self.system, workloads=incremented_workloads)
+            solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
+            self.allocation = fcma_problem.solve(solving_pars).allocation
+            # Reset load averages
+            for app in self._app_load_sum:
+                self._app_load_sum[app] = RequestsPerTime('0 req/hour')
+            return True, True, current_time() - initial_time
+
+
+class HVPredictiveAutoscaler(Autoscaler):
+    def __init__(self, prediction_window = 3600, prediction_percentile = 95, algorithm = AutoscalerTypes.FCMA):
+        """
+        Constructor for the horizontal and reactive autoscaler.
+        :param prediction_percentile: Load prediction percentile.
+        :param, prediction_window: prediction window in seconds.
+        """
+        super().__init__()
+        self.prediction_percentile = prediction_percentile
+        self.prediction_window = prediction_window
+        self._icf = None # Instance class family
+        self._fcma_speed_level = 1
+        if algorithm == AutoscalerTypes.FCMA2:
+            self._fcma_speed_level = 2
+        elif algorithm == AutoscalerTypes.FCMA3:
+            self._fcma_speed_level = 3
+        self._workloads_at_percentil = None
+
+    def workload_predictions(self, app_workloads: dict[App, [RequestsPerTime]]):
+        """
+        Calculate the load predictions at times multiple of the configured time period and percentil.
+        :param app_workloads: Application workloads.
+        """
+
+        self._workloads_at_percentil = {app: {} for app in app_workloads}
+        n_seconds = len(list(app_workloads.values())[0])
+        time = 0
+        while time < n_seconds:
+            for app, workload_values in app_workloads.items():
+                workload = percentile(workload_values[time: min(time + self.prediction_window, n_seconds)],
+                                      self.prediction_percentile)
+                self._workloads_at_percentil[app][time] = RequestsPerTime(f'{workload} req/s')
+            time += self.prediction_window
+
+    def run(self, dummy) -> tuple[bool, bool, float]:
+        """
+        Simulate horizontal/vertical and predictive autoscaling of containers and nodes.
+        :param dummy: This parameter is ignored.
+        :return: A tuple with boolean values for allocation changes, node changes and allocation calculation time.
+        """
+
+        initial_time = current_time()
+        self.time += 1
+        if self.time % self.prediction_window == 0:
+            # Use FCMA algorithm to get the initial allocation
+            app_workloads = {app: self._workloads_at_percentil[app][self.time] for app in self.apps}
+            fcma_problem = Fcma(self.system, workloads=app_workloads)
+            solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
+            self.allocation = fcma_problem.solve(solving_pars).allocation
+            return True, True, current_time() - initial_time
+        else:
+            return False, False, 0
+
 

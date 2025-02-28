@@ -11,13 +11,12 @@ autoscalers:
     desired_cpu_utilization: 0.7  # Desired CPU utilization
     algorithm: fcma
   hv_predictive: # Horizontal/vertical+predictive autoscaling
-    time_period: 60 # Time period to evaluate autoscaling
-    prediction_percentil: 95
-    prediction_window: 3600 # Prediction period in seconds
+    prediction_window: 1200 # Prediction period in seconds
+    prediction_percentile: 95
     algorithm: fcma
 
 # Select autoscaler
-autoscaler: h_reactive
+autoscaler: hv_predictive
 
 # Times in seconds. Transition time is zero because all the times are zero
 node_creation_time: 0
@@ -32,8 +31,8 @@ apps:
       file: ../trace-triangle.csv # Integer load samples in req/s
       time_interval: 1 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
-      load_mult: 4 # Multiplier for the load samples
       load_offset: 10 # Integer value to be added to every load sample
+      load_mult: 4 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
       cpu: 260 mcores

@@ -20,7 +20,8 @@ from fcma.model import (
 from autoscalers import (
     AutoscalerTypes,
     HReactiveAutoscaler,
-    HVReactiveAutoscaler
+    HVReactiveAutoscaler,
+    HVPredictiveAutoscaler
 )
 
 
@@ -43,6 +44,9 @@ class AscalConfig:
             self.autoscaler = HReactiveAutoscaler()
         elif autoscaler_type == AutoscalerTypes.HV_REACTIVE:
             self.autoscaler = HVReactiveAutoscaler()
+        elif autoscaler_type == AutoscalerTypes.HV_PREDICTIVE:
+            self.autoscaler = HVPredictiveAutoscaler()
+
 
     @staticmethod
     def get_from_config_yaml(yaml_file:str, ic_family: InstanceClassFamily):
@@ -71,6 +75,17 @@ class AscalConfig:
                     algorithm = AutoscalerTypes.FCMA3
                 config.autoscaler = HVReactiveAutoscaler(data['autoscalers']['h_reactive']['time_period'],
                                                          data['autoscalers']['h_reactive']['desired_cpu_utilization'],
+                                                         algorithm)
+            elif data['autoscaler'] == 'hv_predictive':
+                algorithm = AutoscalerTypes.FCMA
+                if data['autoscalers']['hv_predictive']['algorithm'] == 'fcma1':
+                    algorithm = AutoscalerTypes.FCMA1
+                elif  data['autoscalers']['hv_predictive']['algorithm'] == 'fcma2':
+                    algorithm = AutoscalerTypes.FCMA2
+                elif data['autoscalers']['hv_predictive']['algorithm'] == 'fcma3':
+                    algorithm = AutoscalerTypes.FCMA3
+                config.autoscaler = HVPredictiveAutoscaler(data['autoscalers']['hv_predictive']['prediction_window'],
+                                                         data['autoscalers']['hv_predictive']['prediction_percentile'],
                                                          algorithm)
             config.autoscaler.container_creation_time = data['container_creation_time']
             config.autoscaler.container_removal_time = data['container_removal_time']
@@ -103,7 +118,8 @@ class AscalConfig:
             # to achieve the desired number of samples.
             config.workload_vectors = {}
             max_time = data['simulation_time'] - 1
-            for app_name in data['apps']:
+            for app in config.apps:
+                app_name = app.name
                 processed_load = [] # Application load after being processed
                 time_interval = data['apps'][app_name]['load']['time_interval']
                 repeat = data['apps'][app_name]['load']['repeat']
@@ -128,7 +144,7 @@ class AscalConfig:
                     processed_load.extend([last_processed_load] * (max_time - time_index + 1))
                 if time_index >= max_time:
                     processed_load = processed_load[0: max_time + 1]
-            config.workload_vectors[app] = processed_load
+                config.workload_vectors[app] = processed_load
         return config
 
 
@@ -163,6 +179,8 @@ class Ascal:
             break_point = self.last_time
         while self.time < break_point:
             self.time += 1
+            if self.time == 0 and hasattr(self._autoscaler, 'prediction_window'):
+                self._autoscaler.workload_predictions(self._workload_vectors)
             if self.time % 100 == 0:
                 print(f'Time: {self.time} s')
             workloads = {}
@@ -181,14 +199,14 @@ class Ascal:
 
     def get_workloads(self) -> dict[str, list[int]]:
         """
-        Get the application workloads.
+        Get application workloads.
         :return: For each application the workloads in req/s at every second, starting from 0 seconds.
         """
         return {str(key): value for key, value in self._workload_vectors.items()}
 
     def get_performances(self) -> dict[str, list[int]]:
         """
-        Gets the application performances.
+        Gets application performances.
         :return: For each application the performances in req/s at every second, starting at 0 seconds.
         """
         app_perfs = {str(app): [] for app in self._workload_vectors}
