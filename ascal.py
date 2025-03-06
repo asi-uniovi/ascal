@@ -7,7 +7,7 @@ from yaml import safe_load
 import matplotlib.pyplot as plt
 
 import csv
-from fcma.model import (
+from fcma import (
     RequestsPerTime,
     InstanceClassFamily,
     ComputationalUnits,
@@ -23,6 +23,7 @@ from autoscalers import (
     HVReactiveAutoscaler,
     HVPredictiveAutoscaler
 )
+from nodestates import NodeStates
 
 
 class AscalConfig:
@@ -164,8 +165,8 @@ class Ascal:
         self._autoscaler.apps = ascal_config.apps
         self.time = -1
         self.last_time = len(next(iter(self._workload_vectors.values()))) - 1
-        self.allocation_changes: list[(int, Allocation)] = [] # Pairs time and allocation
-        self.node_changes: list[(int, Allocation)] = [] # Pairs time and allocation
+        self.performance_changes: list[(int, Allocation)] = [] # Pairs time and allocation
+        self.billing_changes: list[(int, Allocation)] = [] # Pairs time and allocation
         self.calc_times: list[float] = [] # Calculation times
 
     def run(self, break_point: int = None) -> bool:
@@ -187,14 +188,15 @@ class Ascal:
             for app in self._workload_vectors:
                 workload = RequestsPerTime(f"{self._workload_vectors[app][self.time] * 3600}  req/hour")
                 workloads[app] = workload
-            # Save the current allocation as an allocation change or a node change
-            allocation_changes, node_changes, calculation_time = self._autoscaler.run(workloads)
-            if allocation_changes or node_changes or self.time == break_point:
+            # Save the current allocation as an allocation change or a node change. Nodes are considered to change
+            # onece it begin to be billed, even if they can not allocate contaoners yet
+            performance_changed, billing_changed, calculation_time = self._autoscaler.run(workloads)
+            if performance_changed or billing_changed or self.time == break_point:
                 allocation_copy = (self.time, deepcopy(self._autoscaler.allocation))
-                if allocation_changes or self.time == break_point:
-                    self.allocation_changes.append(allocation_copy)
-                if node_changes or self.time == break_point:
-                    self.node_changes.append(allocation_copy)
+                if performance_changed or self.time == break_point:
+                    self.performance_changes.append(allocation_copy)
+                if billing_changed or self.time == break_point:
+                    self.billing_changes.append(allocation_copy)
             self.calc_times.append(calculation_time)
 
     def get_workloads(self) -> dict[str, list[int]]:
@@ -210,25 +212,26 @@ class Ascal:
         :return: For each application the performances in req/s at every second, starting at 0 seconds.
         """
         app_perfs = {str(app): [] for app in self._workload_vectors}
-        cont_perfs = {f'{str(app)}-{str(icf)}': self._system[(app, icf)].perf for app, icf in self._system}
+        cont_perfs = {f'{str(app)}': self._system[(app, icf)].perf for app, icf in self._system}
 
         previous_time = -1
-        for current_allocation in self.allocation_changes:
+        for current_allocation in self.performance_changes:
             current_time = current_allocation[0]
+            current_nodes = current_allocation[1]
             # Repeat the previous allocation performances
             if current_time - previous_time > 1:
                 for app_name, perf in app_perfs.items():
                     app_perfs[app_name].extend([perf[-1]] * (current_time - previous_time - 1))
             # Get application performances for the current allocation
             current_perfs = {str(app): 0 for app in self._workload_vectors}
-            for icf, nodes in current_allocation[1].items():
-                for node in nodes:
-                    for cg in node.cgs:
-                        app = cg.cc.app
-                        cont_name = f'{str(app)}-{str(icf)}'
-                        current_perfs[str(app)] += \
-                            cont_perfs[cont_name].to('req/s').magnitude * cg.replicas * cg.cc.agg_level
-            # Add the current allocation performances
+            for node in current_nodes:
+                for cg in node.cgs:
+                    app = cg.cc.app
+                    cont_name = f'{str(app)}'
+                    current_perfs[str(app)] += \
+                        cont_perfs[cont_name].to('req/s').magnitude * cg.replicas
+
+            # Append the current allocation performances
             for app_name in app_perfs:
                 app_perfs[app_name].append(current_perfs[app_name])
             # Prepare for the next allocation change
@@ -242,14 +245,19 @@ class Ascal:
         """
         node_costs = []
         previous_time = -1
-        for current_nodes in self.node_changes:
-            current_time = current_nodes[0]
-            # Repeat the previous cost when tere is a gap between the current and previous times
+        for current_allocation in self.billing_changes:
+            current_time = current_allocation[0]
+            current_nodes = current_allocation[1]
+            # Repeat the previous cost when there is a gap between the current and previous times
             if current_time - previous_time > 1:
                 node_costs.extend([node_costs[-1]] * (current_time - previous_time - 1))
             # Append the current cost
-            nodes = sum(current_nodes[1].values(), [])
-            node_costs.append(sum(node.ic.price.magnitude for node in nodes))
+            billed_nodes = [
+                node
+                for node in current_nodes
+                if NodeStates.get_state(node) in [NodeStates.BILLED, NodeStates.READY, NodeStates.REMOVING]
+            ]
+            node_costs.append(sum(node.ic.price.magnitude for node in billed_nodes))
             previous_time = current_time
         return node_costs
 

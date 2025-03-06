@@ -2,17 +2,19 @@ from time import time as current_time
 from enum import Enum
 from math import ceil
 from abc import ABC, abstractmethod
-from copy import copy
 from numpy import percentile as percentile
-from fcma import App, Fcma, SolvingPars
-from fcma.model import (
+from fcma import (
+    Fcma,
+    App,
+    SolvingPars,
     Allocation,
     Vm,
     ContainerClass,
     ContainerGroup,
-    InstanceClassFamily,
     RequestsPerTime
 )
+from timedops import TimedOps
+from nodestates import NodeStates
 
 
 class AutoscalerTypes(Enum):
@@ -29,50 +31,58 @@ class Autoscaler(ABC):
     """
     Abstract class for autoscalers.
     """
-    def __init__(self):
-        self.container_creation_time = 0  # Container creation time in seconds
-        self.container_removal_time = 0   # Container removal time in seconds
-        self.node_creation_time = 0       # Node creation time in seconds
-        self.node_removal_time = 0        # Node removal time in seconds
-        self.system = None                # Application performances on instances class families
-        self.time = -1                     # Current time in seconds
+    def __init__(self, timing_args: TimedOps.TimingArgs | None = None):
+        """
+        Constructor for the abstract autoscaler. It sets properties common to all the autoscalers.
+        :param timing_args: Timings for creation/removal of nodes and containers.
+        """
+        self.system = None                # Application performances of containers on instances class families
+        self.time = -1                    # Current time in seconds. Times start at zero
         self.apps = None                  # Applications
         self.allocation = None            # Current allocation
-        self._changed_allocation = False  # True if allocation changed in the last autoscaling
-        self._changed_nodes = False       # True if the nodes changed in the last allocation
+        if timing_args is None:
+            self.timing_args = TimedOps.TimingArgs(0, 0, 0, 0, 0) # All the creation/removal times are zero
+        self._timedops = TimedOps(self.timing_args) # Set the timings for creation/removal of containers and nodes
 
     @abstractmethod
     def run(self, workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
+        """
+        Run autoscaling for 1 second.
+        :param workloads: Workload for the applications at the last second.
+        """
         pass
-
 
 class HReactiveAutoscaler(Autoscaler):
     """
     Horizontal and reactive autoscaler for containers and nodes.
     """
-    def __init__(self, time_period = 60, desired_cpu_utilization = 0.6, node_utilization_threshold = 0.5):
+    def __init__(self, time_period:int = 60, desired_cpu_utilization: float = 0.6,
+                 node_utilization_threshold:float = 0.5, timing_args: TimedOps.TimingArgs | None = None):
         """
         Constructor for the horizontal and reactive autoscaler.
         :param time_period: Time period to evaluate a new autoscaling.
         :param desired_cpu_utilization: Desired CPU utilization for the application containers.
-        :param node_utilization_threshold: Below this threshold, containers in a node are tried to be allocated
-        in other nodes.
+        :param node_utilization_threshold: Below this threshold, a node is tried to be removed.
+        :param timing_args: Timings for creation/removal of nodes and containers.
         """
-        super().__init__()
+        super().__init__(timing_args)
         self.time_period = time_period
         self.desired_cpu_utilization = desired_cpu_utilization
         self.node_utilization_threshold = node_utilization_threshold
-        self._app_load_sum = {}
+        self._app_load_sum = {} # Sum of application workloads in a time period
         self._icf = None # Instance class family
         self._app_cc = {} # Application container classes
+        self._desired_app_replicas = {} # Desired application replicas
 
     def _initial_allocation(self, workloads: dict[App, RequestsPerTime]) -> Allocation:
         """
         Initial allocation for all the applications, based on their first workload.
+        Creation/removal times for nodes and containers are assumed to be zero in the initial alocation.
         :param workloads: First workload sample for each application.
-        :return: The initial allocation
+        :return: The initial allocation.
         """
-
+        self._changed_nodes = True
+        self._changed_allocation = True
         cgs = []
         for app in workloads:
             cc = self._app_cc[app]
@@ -81,53 +91,56 @@ class HReactiveAutoscaler(Autoscaler):
             if replicas * cc.perf < workloads[app]:
                 replicas += 1
             cgs.append(ContainerGroup(cc, replicas))
-        return self._allocate_cgs_new_nodes(cgs)
+        required_nodes = self._get_required_nodes(cgs, allocate=True)
+        for node in required_nodes:
+            NodeStates.set_state(node, NodeStates.READY)
+        return required_nodes
 
     def _get_replicas(self, app: App, node: Vm = None) -> int:
         """
         Get the number of replicas of an application in the current allocation.
+        Exclude replicas that are in the process of being removed.
         :param app: Application.
         :param node: Restrict to this node.
         :return: Number of replicas.
         """
         if node is None:
-            nodes = list(self.allocation.values())[0]
+            nodes = [n for n in self.allocation if NodeStates.get_state(n) == NodeStates.READY]
+        elif NodeStates.get_state(node) != NodeStates.READY:
+            return 0
         else:
             nodes = [node]
         return sum(
             cg.replicas
-            for _ in self.allocation
             for node in nodes
             for cg in node.cgs
-            if cg.cc.app == app
+            if cg.cc.app == app and cg.cc.app is not None
         )
 
-    def _allocate_cgs_new_nodes(self, cgs: list[ContainerGroup]) -> Allocation:
+    def _get_required_nodes(self, cgs: list[ContainerGroup], allocate:bool = False) -> Allocation:
         """
-        Allocate the container groups in nodes of the instance class family.
-        :param cgs: Container groups, defined by a container classes and number of replicas.
-        :return: An allocation in new nodes.
+        Get the required nodes to allocate the containers.
+        :param cgs: Container groups, defined by container classes and number of replicas.
+        :param allocate: In addition to get the required nodes, allocate containers on the nodes.
+        :return: A list with the required nodes.
         """
-
-        self._changed_nodes = True
-        self._changed_allocation = True
-        allocation = {self._icf:[]}
+        required_nodes = []
 
         # Sort available instance classes by decreasing number of resources
         ics = [ic for ic in self._icf.ics]
         ics_value = {ic: ic.cores.magnitude * ic.mem.magnitude for ic in self._icf.ics}
         ics.sort(key=lambda ic: ics_value[ic], reverse=True)
 
-        # Allocate using the minimum number of the biggest instance class
+        # Simulate allocation using the minimum number of the biggest instance class
         new_node = Vm(ics[0])
-        allocation[self._icf].append(new_node)
+        required_nodes.append(new_node)
         for cg in cgs:
             replicas = cg.replicas
             while replicas > 0:
                 allocated_replicas = new_node.allocate(cg.cc, replicas)
                 if allocated_replicas == 0:
                     new_node = Vm(ics[0])
-                    allocation[self._icf].append(new_node)
+                    required_nodes.append(new_node)
                 else:
                     replicas -= allocated_replicas
         # Try to reduce the cost of the latest added virtual machine
@@ -143,95 +156,121 @@ class HReactiveAutoscaler(Autoscaler):
             last_node.cgs = new_node.cgs
             last_node.free_cores = last_node.ic.cores - cpu_usage
             last_node.free_mem = last_node.ic.mem - mem_usage
-            allocation[self._icf][-1] = last_node
+            required_nodes[-1] = last_node
+        # Remove all the containers of the required nodes when allocation is not required
+        if not allocate:
+            for node in required_nodes:
+                node.cgs = []
+                node.free_cores = node.ic.cores
+                node.free_mem = node.ic.mem
 
-        return allocation
+        return required_nodes
 
-    def _remove_replicas(self, reduced_replicas_app: list[tuple[App, InstanceClassFamily, int]]) -> None:
+    def _remove_excess_of_replicas(self):
         """
-        Reduce the number of replicas of the given applications.
-        :param reduced_replicas_app: A list with the number of replicas to reduce for each application.
+        Reduce the number of replicas for those applications with an excess.
         """
-
-        if len(reduced_replicas_app) == 0:
+        replicas_to_remove = {
+            app: self._get_replicas(app) - self._desired_app_replicas[app]
+            for app in self.apps
+            if self._get_replicas(app) - self._desired_app_replicas[app] > 0
+        }
+        if len(replicas_to_remove) == 0:
             return
-
-        # First, sort the nodes by increasing size, so replicas are tried to be removed from the
+        # Firstly, sort the nodes by increasing size, so replicas are tried to be removed from the
         # smallest nodes to reduce cluster fragmentation
-        nodes = self.allocation[self._icf]
-        sorted_nodes = copy(nodes)
-        nodes_size = {node: node.ic.cores.magnitude * node.ic.mem.magnitude for node in sorted_nodes}
-        sorted_nodes.sort(key=lambda node: nodes_size[node])
+        nodes = [node for node in self.allocation if NodeStates.get_state(node) == NodeStates.READY]
+        nodes_size = {node: node.ic.cores.magnitude * node.ic.mem.magnitude for node in nodes}
+        nodes.sort(key=lambda node: nodes_size[node])
 
-        for app, replicas_to_remove in reduced_replicas_app:
-            for node in sorted_nodes:
-                for cg in copy(node.cgs):
-                    cc = cg.cc
-                    if app == cc.app:
-                        if cg.replicas > 0 and replicas_to_remove > 0:
-                            self._changed_allocation = True
-                        if cg.replicas > replicas_to_remove:
-                            node.free_cores += cc.cores * replicas_to_remove
-                            node.free_mem += cc.mem[0] * replicas_to_remove
-                            cg.replicas -= replicas_to_remove
-                            replicas_to_remove = 0
-                        else:
-                            node.free_cores += cc.cores * cg.replicas
-                            node.free_mem += cc.mem[0] * cg.replicas
-                            replicas_to_remove -= cg.replicas
-                            node.cgs.remove(cg)
-                        if replicas_to_remove == 0:
-                            break
-                if replicas_to_remove == 0:
+        for app, replicas in replicas_to_remove.items():
+            for node in nodes:
+                removed_replicas = \
+                    self._timedops.remove_container_replicas(self.time, self._app_cc[app], replicas, node)
+                replicas -= removed_replicas
+                if replicas == 0:
                     break
 
-    def _allocate_replicas(self, increased_replicas_app: list[tuple[App, InstanceClassFamily, int]]) -> None:
+    def _allocate_deficit_replicas(self) -> list[ContainerGroup]:
         """
-        Allocate application replicas.
-        :param increased_replicas_app: A list with the number of replicas to increase for each application.
+        Increment the number of replicas for those applications with a deficit.
+        :return: The replicas that can not be allocated.
         """
+        replicas_to_add = {
+            app: self._desired_app_replicas[app] - self._get_replicas(app)
+            for app in self.apps
+            if self._desired_app_replicas[app] - self._get_replicas(app) > 0
+        }
+        if len(replicas_to_add) == 0:
+            return []
 
-        if len(increased_replicas_app) == 0:
-            return
-
-        cgs = [] # List of container groups, pairs container class and replicas, that can not be allocated
-        for app, replicas_to_allocate in increased_replicas_app:
+        cgs = [] # List of container groups that can not be allocated with the current nodes
+        nodes = [node for node in self.allocation if NodeStates.get_state(node) == NodeStates.READY]
+        for app, replicas in replicas_to_add.items():
             cc = self._app_cc[app]
-            for node in self.allocation[self._icf]:
-                if replicas_to_allocate > 0:
-                    self._changed_allocation = True
-                    allocated_replicas = node.allocate(cc, replicas_to_allocate)
-                    replicas_to_allocate -= allocated_replicas
+            replicas_to_allocate = replicas
+            for node in nodes:
+                allocated_replicas = self._timedops.allocate_container_replicas(self.time, self._app_cc[app],
+                                                                                replicas_to_allocate, node)
+                replicas_to_allocate -= allocated_replicas
                 if replicas_to_allocate == 0:
                     break
             if replicas_to_allocate > 0:
                 cgs.append(ContainerGroup(cc, replicas_to_allocate))
-        # Allocate the remainder container groups using new nodes
-        if len(cgs) > 0:
-            new_nodes_allocation = self._allocate_cgs_new_nodes(cgs)
-            self.allocation[self._icf].extend(new_nodes_allocation[self._icf])
+        return cgs
 
-    def _try_remove_nodes(self) -> None:
+    def _create_required_nodes(self, cgs: list[ContainerGroup]):
+        """
+        Create new nodes to allocate the remaining container replicas.
+        :param cgs: Container groups with the replicas to allocate
+        """
+        # Ignore those containers that can be allocated in booting nodes once they become ready
+        cgs_to_allocate = [cg for cg in cgs]
+        booting_nodes = [node for node  in self.allocation if NodeStates.get_state(node) == NodeStates.BOOTING]
+        cgs_allocated = []
+        for cg in cgs:
+            cc = cg.cc
+            replicas = cg.replicas
+            for node in booting_nodes:
+                cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude)
+                mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[cc.agg_level].magnitude)
+                allocatable_replicas = min(cpu_allocatable_replicas, mem_allocatable_replicas, replicas)
+                replicas -= allocatable_replicas
+                cg.replicas -= allocatable_replicas
+                node.free_cores -= allocatable_replicas * cc.cores
+                node.free_mem -= allocatable_replicas * cc.mem[0]
+                cgs_allocated.append((node, ContainerGroup(cc, allocatable_replicas)))
+                if cg.replicas == 0:
+                    cgs_to_allocate.remove(cg)
+                    break
+        for node, cg in cgs_allocated:
+            node.cgs.remove(cg)
+
+        # Create the nodes
+        if len(cgs_to_allocate) > 0:
+            new_nodes = self._get_required_nodes(cgs)
+            for new_node in new_nodes:
+                self._timedops.create_node(self.time, new_node)
+            self.allocation.extend(new_nodes)
+
+    def _remove_low_utilization_nodes(self) -> None:
         """
         Try to remove nodes with CPU and memory utilization below the utilization threshold.
         """
-
         # First, try to remove the smallest nodes to reduce cluster fragmentation
-        nodes = self.allocation[self._icf]
+        # Only nodes in the ready state are elegible
+        nodes = [node for node in self.allocation if NodeStates.get_state(node) == NodeStates.READY]
         nodes_size = {node: node.ic.cores.magnitude * node.ic.mem.magnitude for node in nodes}
         nodes.sort(key=lambda node: nodes_size[node])
 
-        node_list = copy(nodes)
-        for node in node_list:
+        for node in nodes:
+            # Check the threshold utilization condition
             if node.free_cores / node.ic.cores > self.node_utilization_threshold and \
                     node.free_mem / node.ic.mem > self.node_utilization_threshold:
                 # If the node is empty
                 if len(node.cgs) == 0:
-                    nodes.remove(node)
-                    self._changed_allocation = True
-                    self._changed_nodes = True
+                    self._timedops.remove_node(self.time, node)
                     continue
-
                 # If the node is not empty, try to allocate its containers into other nodes
                 replicas_to_allocate = {app: self._get_replicas(app, node) for app in self.apps}
                 # Free capacity in other nodes and replicas to allocate
@@ -240,49 +279,80 @@ class HReactiveAutoscaler(Autoscaler):
                     for other_node in nodes if other_node != node
                 }
                 # Simulate the allocation of the replicas in other nodes
-                for other_node in other_nodes_free_capacity:
-                    apps = {app for app in replicas_to_allocate.keys()}
-                    for app in apps:
+                apps = {app for app in replicas_to_allocate.keys()}
+                for app in apps:
+                    for other_node in other_nodes_free_capacity:
                         cc = self._app_cc[app]
-                        allocatable_replicas = min(other_nodes_free_capacity[other_node][0] // cc.cores,
-                                                   other_nodes_free_capacity[other_node][1] // cc.mem[0]).magnitude
+                        allocatable_replicas = int(
+                            min(other_nodes_free_capacity[other_node][0] // cc.cores,
+                                other_nodes_free_capacity[other_node][1] // cc.mem[0]).magnitude)
                         if allocatable_replicas > 0:
                             allocated_replicas = int(min(allocatable_replicas, replicas_to_allocate[app]))
                             other_nodes_free_capacity[other_node][0] -= allocated_replicas * cc.cores
                             other_nodes_free_capacity[other_node][1] -= allocated_replicas * cc.mem[0]
                             if allocated_replicas == replicas_to_allocate[app]:
                                 del replicas_to_allocate[app]
+                                break
                             else:
                                 replicas_to_allocate[app] -= allocated_replicas
-                # If all the node replicas can be allocated in other nodes, then allocate them and remove the node
+                # If all the node replicas can be allocated in other nodes, then allocate the replicas
+                # and remove the node
                 if len(replicas_to_allocate) == 0:
                     replicas_to_allocate = {app: self._get_replicas(app, node) for app in self.apps}
-                    for other_node in [other_node for other_node in node_list if other_node != node]:
-                        apps = {app for app in replicas_to_allocate.keys()}
-                        for app in apps:
+                    apps = {app for app in replicas_to_allocate.keys()}
+                    for app in apps:
+                        for other_node in [other_node for other_node in nodes if other_node != node]:
                             if replicas_to_allocate[app] > 0:
-                                allocated_replicas = other_node.allocate(self._app_cc[app], replicas_to_allocate[app])
+                                allocated_replicas = \
+                                    self._timedops.allocate_container_replicas(self.time, self._app_cc[app],
+                                                                               replicas_to_allocate[app], other_node)
                                 replicas_to_allocate[app] -= allocated_replicas
                             if replicas_to_allocate[app] == 0:
                                 del replicas_to_allocate[app]
-                        if len(replicas_to_allocate) == 0:
-                            break
-                    nodes.remove(node)
-                    self._changed_allocation = True
-                    self._changed_nodes = True
+                                break
+                    # Remove all the container groups in the node
+                    cgs = [cg for cg in node.cgs]
+                    for cg in cgs:
+                        new_time = self.time + self.timing_args.container_creation_time
+                        self._timedops.remove_container_replicas(new_time, cg.cc, cg.replicas, node)
+                    # Start the node removal after the allocation of the moved containers
+                    new_time = (self.time + self.timing_args.container_creation_time +
+                                self.timing_args.container_removal_time)
+                    self._timedops.remove_node(new_time, node)
+
+    def _clear_removed_nodes(self):
+        """
+        Clear the removed nodes.
+        """
+        nodes_to_clear = [node for node in self.allocation if NodeStates.get_state(node) == NodeStates.REMOVED]
+        for node in nodes_to_clear:
+            self.allocation.remove(node)
+
+    def _set_desired_replicas(self):
+        """
+        Set the desired number of replicas for each application.
+        """
+        for app, icf in self.system:
+            replica_perf = self.system[(app, icf)].perf
+            current_replicas = self._get_replicas(app)
+            average_load = self._app_load_sum[app] / self.time_period
+            average_cpu_utilization = (average_load / (replica_perf * current_replicas)).magnitude
+            self._desired_app_replicas[app] = \
+                ceil(current_replicas * average_cpu_utilization / self.desired_cpu_utilization)
 
     def run(self, workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
         """
-        Simulate horizontal and reactive autoscaling of containers and nodes.
+        Simulate horizontal and reactive autoscaling of containers and nodes in the next second.
         :param workloads: Workload for all the applications at the current time.
-        :return: A tuple with boolean values for allocation changes, node changes and allocation calculation time.
+        :return: A tuple with boolean values for performance changes, billing changes and calculation time.
         """
-
-        initial_time = current_time()
-        self.time += 1
-        if self.time == 0:
+        initial_time = current_time() # Reference to calculate processing times
+        # If it is the first execution
+        if self.time < 0:
+            self.time = 0 # First time is zero
+            # Prepare data required in the nex times
             self._app_load_sum = {app: workloads[app] for app in workloads}
-            self._icf = list(self.system.keys())[0][1]
+            self._icf = list(self.system.keys())[0][1] # The instance class family used
             for app in self.apps:
                 cc = ContainerClass(
                     app=app,
@@ -293,51 +363,41 @@ class HReactiveAutoscaler(Autoscaler):
                     perf=self.system[(app, self._icf)].perf,
                     aggs=(1,)
                 )
-                self._app_cc[app] = cc
+                self._app_cc[app] = cc # Set a container class for each application
+            # Node and container creation times are assumed to be zero for the initial allocation
             self.allocation = self._initial_allocation(workloads)
             return True, True, current_time() - initial_time
         else:
+            self.time += 1
+            # Dispatch events until the current time
+            self._timedops.dispatch_events(self.time)
+            # Clear nodes that may have being removed from the allocation
+            self._clear_removed_nodes()
             # Update average loads
             for app in self._app_load_sum:
                 self._app_load_sum[app] += workloads[app]
-            # If not at the time period
-            if self.time  % self.time_period > 0:
-                return False, False, 0 # Changes may appear only at every time period
-            else:
-                # Get the applications that require a number of replicas lower or higher than
-                # the current number
-                reduced_replicas_apps = []
-                increased_replicas_apps = []
-                for app, icf in self.system:
-                    replica_perf = self.system[(app, icf)].perf
-                    current_replicas = self._get_replicas(app)
-                    average_load = self._app_load_sum[app] / self.time_period
-                    average_cpu_utilization = (average_load / (replica_perf * current_replicas)).magnitude
-                    desired_replicas = ceil(current_replicas * average_cpu_utilization / self.desired_cpu_utilization)
-                    if desired_replicas > current_replicas:
-                        increased_replicas_apps.append((app, desired_replicas - current_replicas))
-                    elif desired_replicas < current_replicas:
-                        reduced_replicas_apps.append((app, current_replicas - desired_replicas))
 
-                # Remove replicas
-                self._remove_replicas(reduced_replicas_apps)
-
-                # Allocate new replicas
-                self._allocate_replicas(increased_replicas_apps)
-
-                # Try to remove nodes with a low utilization
-                self._try_remove_nodes()
-
-                # Get and reset changes
-                changes = (self._changed_allocation, self._changed_nodes)
-                self._changed_allocation = False
-                self._changed_nodes = False
-
+            # At the beginning of each time period
+            if self.time % self.time_period == 0:
+                self._set_desired_replicas()
+                self._remove_excess_of_replicas()
+                unallocatable_replicas = self._allocate_deficit_replicas()
+                self._create_required_nodes(unallocatable_replicas)
+                self._allocate_deficit_replicas() #---- Try again because new ready nodes may be available
+                self._remove_low_utilization_nodes()
                 # Reset load averages
                 for app in self._app_load_sum:
                     self._app_load_sum[app] = RequestsPerTime('0 req/hour')
 
-                return changes[0], changes[1], current_time() - initial_time
+            # At any other time try to allocate replicas in applications with deficit if
+            # new nodes are available or the allocation has changed
+            if self.time % self.time_period > 0 and \
+                    (self._timedops.nodes_ready_changed or self._timedops.allocation_changed):
+                self._allocate_deficit_replicas()
+
+            return (self._timedops.allocation_changed, self._timedops.node_billing_changed,
+                    current_time() - initial_time)
+
 
 class HVReactiveAutoscaler(Autoscaler):
     def __init__(self, time_period = 60, desired_cpu_utilization = 0.6, algorithm = AutoscalerTypes.FCMA):
@@ -360,7 +420,7 @@ class HVReactiveAutoscaler(Autoscaler):
         """
         Simulate horizontal/vertical and reactive autoscaling of containers and nodes.
         :param app_workloads: Workload for all the applications at the current time.
-        :return: A tuple with boolean values for allocation changes, node changes and allocation calculation time.
+        :return: If some relevant changes have occurred.
         """
 
         initial_time = current_time()
@@ -373,7 +433,10 @@ class HVReactiveAutoscaler(Autoscaler):
                 self._app_load_sum[app] += app_workloads[app]
         # If not at the time period
         if self.time % self.time_period > 0:
-            return False, False, 0  # Changes may appear only at every time period
+            if self._timedops.node_billing_changed:
+                return False, True, 0
+            else:
+                return False, False, 0
         else:
             # Average workloads are artificially incremented to obtain the desired CPU utilization
             incremented_workloads = {}
@@ -429,7 +492,7 @@ class HVPredictiveAutoscaler(Autoscaler):
         """
         Simulate horizontal/vertical and predictive autoscaling of containers and nodes.
         :param dummy: This parameter is ignored.
-        :return: A tuple with boolean values for allocation changes, node changes and allocation calculation time.
+        :return: If some relevant changes have occurred.
         """
 
         initial_time = current_time()
