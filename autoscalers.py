@@ -2,6 +2,7 @@ from time import time as current_time
 from enum import Enum
 from math import ceil
 from abc import ABC, abstractmethod
+
 from numpy import percentile as percentile
 from fcma import (
     Fcma,
@@ -42,7 +43,33 @@ class Autoscaler(ABC):
         self.allocation = None            # Current allocation
         if timing_args is None:
             self.timing_args = TimedOps.TimingArgs(0, 0, 0, 0, 0) # All the creation/removal times are zero
+        else:
+            self.timing_args = timing_args
         self._timedops = TimedOps(self.timing_args) # Set the timings for creation/removal of containers and nodes
+        self._log_path = None
+        self._log_f = None
+
+    @property
+    def log_path(self):
+        return self._log_path
+
+    @log_path.setter
+    def log_path(self, new_value):
+        self._log_path = new_value
+        if self._log_path is None:
+            self._log_f = None
+        else:
+            self._log_f = open(self.log_path, "w")
+        self._timedops.log = self.log
+
+    def log_allocation_summary(self):
+        """
+        Log a summary with the current allocation.
+        """
+        self.log(f'Current allocation with {tuple(str(node) for node in self.allocation)}')
+        for node in self.allocation:
+            for cg in node.cgs:
+                self.log(f'  - Allocated {cg.replicas} replicas of {cg.cc.app} on node {str(node)}')
 
     @abstractmethod
     def run(self, workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
@@ -51,6 +78,23 @@ class Autoscaler(ABC):
         :param workloads: Workload for the applications at the last second.
         """
         pass
+
+    def log(self, message: str):
+        """
+        Print the message in the log file.
+        :param message: Message to print.
+        """
+        if self._log_f is not None:
+            self._log_f.write(f'{self.time}:  {message}\n')
+        #print(f'{self.time}: {message}', flush=True)
+
+    def __del__(self):
+        """
+        Close the log file at the exit
+        """
+        if self._log_f is not None:
+            self._log_f.close()
+
 
 class HReactiveAutoscaler(Autoscaler):
     """
@@ -94,6 +138,11 @@ class HReactiveAutoscaler(Autoscaler):
         required_nodes = self._get_required_nodes(cgs, allocate=True)
         for node in required_nodes:
             NodeStates.set_state(node, NodeStates.READY)
+        self.log(f'Initial allocation with {tuple(str(node) for node in required_nodes)}')
+        for node in required_nodes:
+            for cg in node.cgs:
+                self.log(f'  - Allocated {cg.replicas} replicas of {cg.cc.app} on node {str(node)}')
+
         return required_nodes
 
     def _get_replicas(self, app: App, node: Vm = None) -> int:
@@ -177,6 +226,7 @@ class HReactiveAutoscaler(Autoscaler):
         }
         if len(replicas_to_remove) == 0:
             return
+
         # Firstly, sort the nodes by increasing size, so replicas are tried to be removed from the
         # smallest nodes to reduce cluster fragmentation
         nodes = [node for node in self.allocation if NodeStates.get_state(node) == NodeStates.READY]
@@ -224,16 +274,20 @@ class HReactiveAutoscaler(Autoscaler):
         Create new nodes to allocate the remaining container replicas.
         :param cgs: Container groups with the replicas to allocate
         """
-        # Ignore those containers that can be allocated in booting nodes once they become ready
+        # Ignore those containers that can be allocated on nodes that are not ready yet
         cgs_to_allocate = [cg for cg in cgs]
-        booting_nodes = [node for node  in self.allocation if NodeStates.get_state(node) == NodeStates.BOOTING]
+        no_ready_nodes = [
+            node
+            for node  in self.allocation
+            if NodeStates.get_state(node) in [NodeStates.BOOTING, NodeStates.BILLED]
+        ]
         cgs_allocated = []
         for cg in cgs:
             cc = cg.cc
             replicas = cg.replicas
-            for node in booting_nodes:
+            for node in no_ready_nodes:
                 cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude)
-                mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[cc.agg_level].magnitude)
+                mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude)
                 allocatable_replicas = min(cpu_allocatable_replicas, mem_allocatable_replicas, replicas)
                 replicas -= allocatable_replicas
                 cg.replicas -= allocatable_replicas
@@ -243,8 +297,12 @@ class HReactiveAutoscaler(Autoscaler):
                 if cg.replicas == 0:
                     cgs_to_allocate.remove(cg)
                     break
-        for node, cg in cgs_allocated:
-            node.cgs.remove(cg)
+
+        # Recover the allocation state of no ready nodes
+        for node in no_ready_nodes:
+            node.cgs = []
+            node.free_cores = node.ic.cores
+            node.free_mem = node.ic.mem
 
         # Create the nodes
         if len(cgs_to_allocate) > 0:
@@ -252,11 +310,23 @@ class HReactiveAutoscaler(Autoscaler):
             for new_node in new_nodes:
                 self._timedops.create_node(self.time, new_node)
             self.allocation.extend(new_nodes)
+            # Try to allocate replicas, since new ready nodes may be available inmediately
+            self._allocate_deficit_replicas()
 
     def _remove_low_utilization_nodes(self) -> None:
         """
         Try to remove nodes with CPU and memory utilization below the utilization threshold.
         """
+
+        if self.time == 2580:
+            a = 1
+
+        # Nodes can not be removed while creating new nodes
+        for node in self.allocation:
+            node_state = NodeStates.get_state(node)
+            if node_state == NodeStates.BOOTING or node_state == NodeStates.BILLED:
+                return 0
+
         # First, try to remove the smallest nodes to reduce cluster fragmentation
         # Only nodes in the ready state are elegible
         nodes = [node for node in self.allocation if NodeStates.get_state(node) == NodeStates.READY]
@@ -269,6 +339,7 @@ class HReactiveAutoscaler(Autoscaler):
                     node.free_mem / node.ic.mem > self.node_utilization_threshold:
                 # If the node is empty
                 if len(node.cgs) == 0:
+                    NodeStates.set_state(node, NodeStates.REMOVING)
                     self._timedops.remove_node(self.time, node)
                     continue
                 # If the node is not empty, try to allocate its containers into other nodes
@@ -298,6 +369,11 @@ class HReactiveAutoscaler(Autoscaler):
                 # If all the node replicas can be allocated in other nodes, then allocate the replicas
                 # and remove the node
                 if len(replicas_to_allocate) == 0:
+                    # Prevent node from being used
+                    NodeStates.set_state(node, NodeStates.REMOVING)
+                    self._timedops.timed_log(self.time, f'Moving containers of node {node} to other nodes')
+                    # Get application replicas, including those that are starting and ignoring those
+                    # that are being removed
                     replicas_to_allocate = {app: self._get_replicas(app, node) for app in self.apps}
                     apps = {app for app in replicas_to_allocate.keys()}
                     for app in apps:
@@ -310,14 +386,16 @@ class HReactiveAutoscaler(Autoscaler):
                             if replicas_to_allocate[app] == 0:
                                 del replicas_to_allocate[app]
                                 break
-                    # Remove all the container groups in the node
+                    # Remove containers in the node
                     cgs = [cg for cg in node.cgs]
                     for cg in cgs:
-                        new_time = self.time + self.timing_args.container_creation_time
-                        self._timedops.remove_container_replicas(new_time, cg.cc, cg.replicas, node)
+                        # If the application is not being removed at this time
+                        if cg.cc.app is not None:
+                            new_time = self.time + self.timing_args.container_creation_time
+                            self._timedops.remove_container_replicas(new_time, cg.cc, cg.replicas, node)
                     # Start the node removal after the allocation of the moved containers
-                    new_time = (self.time + self.timing_args.container_creation_time +
-                                self.timing_args.container_removal_time)
+                    new_time = self.time + self.timing_args.container_creation_time + \
+                                self.timing_args.container_removal_time
                     self._timedops.remove_node(new_time, node)
 
     def _clear_removed_nodes(self):
@@ -339,6 +417,8 @@ class HReactiveAutoscaler(Autoscaler):
             average_cpu_utilization = (average_load / (replica_perf * current_replicas)).magnitude
             self._desired_app_replicas[app] = \
                 ceil(current_replicas * average_cpu_utilization / self.desired_cpu_utilization)
+            self._timedops.timed_log(self.time, f'Current replicas of {app} {current_replicas}, '
+                                                 f'desired {self._desired_app_replicas[app]}')
 
     def run(self, workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
         """
@@ -369,21 +449,19 @@ class HReactiveAutoscaler(Autoscaler):
             return True, True, current_time() - initial_time
         else:
             self.time += 1
-            # Dispatch events until the current time
+        # Dispatch events until the current time
             self._timedops.dispatch_events(self.time)
             # Clear nodes that may have being removed from the allocation
             self._clear_removed_nodes()
             # Update average loads
             for app in self._app_load_sum:
                 self._app_load_sum[app] += workloads[app]
-
             # At the beginning of each time period
             if self.time % self.time_period == 0:
                 self._set_desired_replicas()
                 self._remove_excess_of_replicas()
                 unallocatable_replicas = self._allocate_deficit_replicas()
                 self._create_required_nodes(unallocatable_replicas)
-                self._allocate_deficit_replicas() #---- Try again because new ready nodes may be available
                 self._remove_low_utilization_nodes()
                 # Reset load averages
                 for app in self._app_load_sum:
@@ -392,21 +470,23 @@ class HReactiveAutoscaler(Autoscaler):
             # At any other time try to allocate replicas in applications with deficit if
             # new nodes are available or the allocation has changed
             if self.time % self.time_period > 0 and \
-                    (self._timedops.nodes_ready_changed or self._timedops.allocation_changed):
+                    (self._timedops.new_nodes_ready or self._timedops.perf_changed):
                 self._allocate_deficit_replicas()
 
-            return (self._timedops.allocation_changed, self._timedops.node_billing_changed,
+            return (self._timedops.perf_changed, self._timedops.node_billing_changed,
                     current_time() - initial_time)
 
 
 class HVReactiveAutoscaler(Autoscaler):
-    def __init__(self, time_period = 60, desired_cpu_utilization = 0.6, algorithm = AutoscalerTypes.FCMA):
+    def __init__(self, time_period = 60, desired_cpu_utilization = 0.6, algorithm = AutoscalerTypes.FCMA,
+                 timing_args: TimedOps.TimingArgs | None = None):
         """
         Constructor for the horizontal and reactive autoscaler.
         :param time_period: Time period to evaluate a new autoscaling.
         :param desired_cpu_utilization: Desired CPU utilization for the application containers.
+        :param timing_args: Timings for creation/removal of nodes and containers.
         """
-        super().__init__()
+        super().__init__(timing_args)
         self.time_period = time_period
         self.desired_cpu_utilization = desired_cpu_utilization
         self._app_load_sum = {}
@@ -455,13 +535,15 @@ class HVReactiveAutoscaler(Autoscaler):
 
 
 class HVPredictiveAutoscaler(Autoscaler):
-    def __init__(self, prediction_window = 3600, prediction_percentile = 95, algorithm = AutoscalerTypes.FCMA):
+    def __init__(self, prediction_window = 3600, prediction_percentile = 95, algorithm = AutoscalerTypes.FCMA,
+                 timing_args: TimedOps.TimingArgs | None = None):
         """
         Constructor for the horizontal and reactive autoscaler.
         :param prediction_percentile: Load prediction percentile.
         :param, prediction_window: prediction window in seconds.
+        :param timing_args: Timings for creation/removal of nodes and containers.
         """
-        super().__init__()
+        super().__init__(timing_args)
         self.prediction_percentile = prediction_percentile
         self.prediction_window = prediction_window
         self._icf = None # Instance class family

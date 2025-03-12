@@ -1,5 +1,5 @@
 from enum import Enum
-from fcma import Vm
+from fcma import Vm, ContainerClass, RequestsPerTime
 
 class NodeStates(Enum):
     BOOTING  = 1 # The node is not running, so it is not billed
@@ -10,6 +10,7 @@ class NodeStates(Enum):
 
     @staticmethod
     def get_state(node: Vm) -> 'NodeStates':
+        assert node is not None, "Invalid node"
         if len(node.history) == 0:
             return NodeStates.BOOTING
         if node.history[0] not in [state for state in NodeStates]:
