@@ -284,7 +284,6 @@ class Ascal:
             self.calc_times.append(calculation_time)
         self._autoscaler.log_allocation_summary()
 
-
     def get_workloads(self) -> dict[str, list[int]]:
         """
         Get application workloads.

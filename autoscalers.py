@@ -16,6 +16,7 @@ from fcma import (
 )
 from timedops import TimedOps
 from nodestates import NodeStates
+from transition import Transition, Command
 
 
 class AutoscalerTypes(Enum):
@@ -318,9 +319,6 @@ class HReactiveAutoscaler(Autoscaler):
         Try to remove nodes with CPU and memory utilization below the utilization threshold.
         """
 
-        if self.time == 2580:
-            a = 1
-
         # Nodes can not be removed while creating new nodes
         for node in self.allocation:
             node_state = NodeStates.get_state(node)
@@ -495,6 +493,8 @@ class HVReactiveAutoscaler(Autoscaler):
             self._fcma_speed_level = 2
         elif algorithm == AutoscalerTypes.FCMA3:
             self._fcma_speed_level = 3
+        self.transition = None
+        self.time_commands: list[tuple[int, Command]] = []
 
     def run(self, app_workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
         """
@@ -527,10 +527,21 @@ class HVReactiveAutoscaler(Autoscaler):
             # Use FCMA algorithm to get the initial allocation
             fcma_problem = Fcma(self.system, workloads=incremented_workloads)
             solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
-            self.allocation = fcma_problem.solve(solving_pars).allocation
+            new_allocation = fcma_problem.solve(solving_pars).allocation
+
+            if self.allocation is None:
+                self.allocation = new_allocation
+                self.transition = Transition(self.timing_args, self.system)
+            else:
+                self.transition.calculate(self.allocation, new_allocation)
+
             # Reset load averages
             for app in self._app_load_sum:
                 self._app_load_sum[app] = RequestsPerTime('0 req/hour')
+
+            # Execute commands from transition at the current time
+            #self.execute_transition_commands()
+
             return True, True, current_time() - initial_time
 
 
