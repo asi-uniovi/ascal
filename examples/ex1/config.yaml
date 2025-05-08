@@ -16,7 +16,7 @@ autoscalers:
     algorithm: fcma
 
 # Select autoscaler
-autoscaler: h_reactive
+autoscaler: hv_reactive
 
 # Times in seconds
 node_time_to_billing: 20 # Time from the request of creating a node, until it starts to be billed.

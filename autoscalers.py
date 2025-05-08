@@ -329,7 +329,7 @@ class HReactiveAutoscaler(Autoscaler):
         # Only nodes in the ready state are elegible
         nodes = [node for node in self.allocation if NodeStates.get_state(node) == NodeStates.READY]
         nodes_size = {node: node.ic.cores.magnitude * node.ic.mem.magnitude for node in nodes}
-        nodes.sort(key=lambda node: nodes_size[node])
+        nodes.sort(key=lambda n: nodes_size[n])
 
         for node in nodes:
             # Check the threshold utilization condition
@@ -476,8 +476,8 @@ class HReactiveAutoscaler(Autoscaler):
 
 
 class HVReactiveAutoscaler(Autoscaler):
-    def __init__(self, time_period = 60, desired_cpu_utilization = 0.6, algorithm = AutoscalerTypes.FCMA,
-                 timing_args: TimedOps.TimingArgs | None = None):
+    def __init__(self, time_period = 60, desired_cpu_utilization = 0.6, timing_args: TimedOps.TimingArgs = None,
+                 algorithm = AutoscalerTypes.FCMA):
         """
         Constructor for the horizontal and reactive autoscaler.
         :param time_period: Time period to evaluate a new autoscaling.
@@ -524,16 +524,18 @@ class HVReactiveAutoscaler(Autoscaler):
                 incremented_workloads[app] = self._app_load_sum[app] / self.desired_cpu_utilization
                 if self.time > 0:
                     incremented_workloads[app] /= self.time_period
-            # Use FCMA algorithm to get the initial allocation
+            # Use FCMA algorithm to get the new allocation
             fcma_problem = Fcma(self.system, workloads=incremented_workloads)
             solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
-            new_allocation = fcma_problem.solve(solving_pars).allocation
+            fcma_allocation = fcma_problem.solve(solving_pars).allocation
+            new_allocation = [node for family, nodes in fcma_allocation.items() for node in nodes]
 
             if self.allocation is None:
-                self.allocation = new_allocation
                 self.transition = Transition(self.timing_args, self.system)
+                commands = []
             else:
-                self.transition.calculate(self.allocation, new_allocation)
+                commands = self.transition.calculate(self.allocation, new_allocation)
+            self.allocation = new_allocation
 
             # Reset load averages
             for app in self._app_load_sum:
