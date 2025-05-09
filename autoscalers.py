@@ -534,7 +534,7 @@ class HVReactiveAutoscaler(Autoscaler):
                 self.transition = Transition(self.timing_args, self.system)
                 commands = []
             else:
-                commands = self.transition.calculate(self.allocation, new_allocation)
+                commands = self.transition.calculate_sync(self.allocation, new_allocation)
             self.allocation = new_allocation
 
             # Reset load averages
