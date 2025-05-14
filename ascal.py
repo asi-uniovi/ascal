@@ -81,9 +81,10 @@ class AscalConfig:
                     algorithm = AutoscalerTypes.FCMA2
                 elif data['autoscalers']['hv_reactive']['algorithm'] == 'fcma3':
                     algorithm = AutoscalerTypes.FCMA3
-                config.autoscaler = HVReactiveAutoscaler(data['autoscalers']['h_reactive']['time_period'],
-                                                         data['autoscalers']['h_reactive']['desired_cpu_utilization'],
-                                                         timing_args, algorithm)
+                config.autoscaler = HVReactiveAutoscaler(data['autoscalers']['hv_reactive']['time_period'],
+                                                         data['autoscalers']['hv_reactive']['desired_cpu_utilization'],
+                                                         timing_args, algorithm,
+                                                         data['autoscalers']['hv_reactive']['transition_time_budget'])
             elif data['autoscaler'] == 'hv_predictive':
                 algorithm = AutoscalerTypes.FCMA
                 if data['autoscalers']['hv_predictive']['algorithm'] == 'fcma1':
@@ -189,8 +190,8 @@ class AscalConfig:
                              [int, float, float])
             elif key == "hv_reactive":
                 check_fields(config["autoscalers"][key],
-                            ["time_period", "desired_cpu_utilization", "algorithm"],
-                             [int, float, str])
+                            ["time_period", "desired_cpu_utilization", "algorithm", "transition_time_budget"],
+                             [int, float, str, int])
                 if config["autoscalers"]["hv_reactive"]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
             elif key == "hv_predictive":
@@ -297,12 +298,10 @@ class Ascal:
         :return: For each application the performances in req/s at every second, starting at 0 seconds.
         """
         app_perfs = {str(app): [] for app in self._workload_vectors}
-        cont_perfs = {str(app): self._system[(app, icf)].perf for app, icf in self._system}
 
         previous_time = -1
         for current_allocation in self.performance_changes:
-            current_time = current_allocation[0]
-            current_nodes = current_allocation[1]
+            current_time, current_nodes = current_allocation
             # Repeat the previous allocation performances
             if current_time - previous_time > 1:
                 for app_name, perf in app_perfs.items():
@@ -314,13 +313,12 @@ class Ascal:
                     app = cg.cc.app
                     if app is None:
                         continue
-                    cont_name = str(app)
-                    current_perfs[str(app)] += \
-                        cont_perfs[cont_name].to('req/s').magnitude * cg.replicas
+                    current_perfs[str(app)] += cg.cc.perf.to('req/s').magnitude * cg.replicas
 
             # Append the current allocation performances
             for app_name in app_perfs:
                 app_perfs[app_name].append(current_perfs[app_name])
+
             # Prepare for the next allocation change
             previous_time = current_time
         return app_perfs
@@ -333,8 +331,7 @@ class Ascal:
         node_costs = []
         previous_time = -1
         for current_allocation in self.billing_changes:
-            current_time = current_allocation[0]
-            current_nodes = current_allocation[1]
+            current_time, current_nodes = current_allocation
             # Repeat the previous cost when there is a gap between the current and previous times
             if current_time - previous_time > 1:
                 node_costs.extend([node_costs[-1]] * (current_time - previous_time - 1))

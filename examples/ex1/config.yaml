@@ -10,6 +10,7 @@ autoscalers:
     time_period: 60 # Time period to evaluate autoscaling
     desired_cpu_utilization: 0.7  # Desired CPU utilization
     algorithm: fcma
+    transition_time_budget: 100 # Approximate time budget for the transition
   hv_predictive: # Horizontal/vertical+predictive autoscaling
     prediction_window: 1200 # Prediction period in seconds
     prediction_percentile: 95
@@ -25,7 +26,7 @@ node_creation_time: 100 # Total time from the request of creating a node until t
                       # seconds being ready to allocate any container.
 node_removal_time: 10  # Time from the request of node removal until it is removed. Meanwhile, it is billed.
 container_creation_time: 1 # Time from the request of container creation until it can process load.
-container_removal_time: 1 # Time from the request of container removal until it is removed from the node.
+container_removal_time: 5 # Time from the request of container removal until it is removed from the node.
                           # Meanwhile. it can not process new load, but consumes computational resources.
 
 # Define applications

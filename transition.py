@@ -405,18 +405,24 @@ class Transition:
             for node, size in sorted(zip(self.current_alloc, free_capacities), key=lambda x: x[1], reverse=True)
         ]
 
-    def remove_obsoletes(self, command: Command):
+    def remove_obsolete_containers(self, command: Command):
         """
-        Check if there are obsolete containers or nodes that can be removed. Applications's obsolete containers
-        can be removed when all the application's new containers have been allocated. Obsolete nodes can be removed
-        they do not allocate containers.
-        :param command: A command with the removal of containers and nodes.
+        Check if there are obsolete containers that can be removed. Applications's obsolete containers
+        can be removed when all the application's new containers have been allocated.
+        :param command: A command with the removal of containers.
         """
         for node, removed_cc_replicas in self.recycling.removed_containers.items():
             for cc, replicas in dict(removed_cc_replicas.items()).items():
                 if self._app_unalloc_perf[cc.app].magnitude < Transition._DELTA:
                     replicas_count = self._remove_obsolete_replicas(cc, replicas, node, command)
                     assert replicas_count == replicas, "All the replicas must be removable"
+
+    def remove_obsolete_nodes(self, command: Command):
+        """
+        Check if there are obsolete nodes that can be removed. Obsolete nodes can be removed
+        they do not allocate containers.
+        :param command: A command with the removal of nodes.
+        """
         for node in self.recycling.removed_nodes[:]:
             if node.is_empty():
                 assert (node.free_cores - node.ic.cores).magnitude < Transition._DELTA, "Can not remove the node"
@@ -494,8 +500,8 @@ class Transition:
         """
         command = Command()
 
-        # Firstly, check if some node can be removed and update the command
-        self.remove_obsoletes(command)
+        # Firstly, check if obsolete containers can be removed and update the command
+        self.remove_obsolete_containers(command)
 
         # Allocate container replicas prepared in a previous copy phase of the algorithm. They must be allocatable
         for node, cc, allocatable_replicas in self._allocatable_cs:
@@ -517,6 +523,8 @@ class Transition:
                 if replicas_to_allocate > 0:
                     self._unalloc_node_cs.insert(node_cc_replicas_index, (node, cc, replicas_to_allocate))
         if len(self._unalloc_node_cs) == 0:
+            # Check if obsolete nodes can be removed and update the command
+            self.remove_obsolete_nodes(command)
             return command
 
         # Nodes are sorted by decreasing available capacity, including the capacity that can be freed
@@ -612,6 +620,9 @@ class Transition:
                     self._unalloc_node_cs.pop(index)
                 command.extend(command2)
 
+        # Check if obsolete nodes can be removed and update the command
+        self.remove_obsolete_nodes(command)
+
         return command
 
     def get_allocation(self, app_performance: dict[App, RequestsPerTime]) -> list[Vm]:
@@ -674,15 +685,35 @@ class Transition:
         for command in self._commands:
             command.vmt_to_vm()
 
+    def _get_transition_time_sync(self) -> int:
+        """
+        Get the transition time from the current list of commands.
+        :return: The transition time.
+        """
+        transition_time = 0
+        last_node_removal_time = -1
+        for command in self._commands:
+            if len(command.create_nodes) > 0:
+                assert self._commands.index(command) == 0, "Nodes must be created in the first command"
+            if command.sync_on_nodes_creation and len(self._commands[0].create_nodes) > 0:
+                assert self._commands.index(command) > 0, "Invalid sync on first command"
+                transition_time = max(transition_time, self.timing_args.node_creation_time)
+            if len(command.remove_containers) > 0:
+                transition_time += self.timing_args.container_removal_time
+            if len(command.remove_nodes) > 0:
+                last_node_removal_time = transition_time + self.timing_args.node_removal_time
+            if len(command.allocate_containers) > 0:
+                transition_time += self.timing_args.container_creation_time
+        return max(transition_time, last_node_removal_time)
 
-    def calculate_sync(self, initial_alloc: Allocation, final_alloc: Allocation) -> list[Command]:
+    def calculate_sync(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
         """
         Calculate a synchronous transition from the initial allocation to the final allocation, while fulfilling the
         application's minimum performance requirement.
 
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
-        :return: A list of commands.
+        :return: A list of commands and the time to perform the transition.
         """
 
         # Increment the debug variable with each transition calculation
@@ -828,18 +859,18 @@ class Transition:
         # Check whether the commands implement a valid transition between the initial and the final allocations
         Transition.check_transition(initial_alloc, final_alloc, self._commands)
 
-        return self._commands
+        return self._commands, self._get_transition_time_sync()
 
-    def calculate_async(self, initial_alloc: Allocation, final_alloc: Allocation) -> list[Command]:
+    def calculate_async(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
         """
         Calculate an asynchronous transition from the initial allocation to the final allocation,
         while fulfilling the application's minimum performance requirement.
 
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
-        :return: A list of commands.
+        :return: A list of commands and the worst-case time to perform the transition.
         """
-        sync_commands = self.calculate_sync(initial_alloc, final_alloc)[:]
+        sync_commands, worst_case_time = self.calculate_sync(initial_alloc, final_alloc)[:]
         for command in sync_commands:
             if command.sync_on_nodes_creation:
                 new_first_command = Command()
@@ -849,7 +880,7 @@ class Transition:
                 sync_commands.pop(0)
                 sync_commands.insert(0, new_first_command)
                 break
-        return sync_commands
+        return sync_commands, worst_case_time
 
 
     def _debug_perf_surplus_balance(self) -> dict[Vmt, RequestsPerTime]:
@@ -906,7 +937,9 @@ class Transition:
             app_perf_increment = defaultdict(lambda: 0)
 
             # Remove container commands
+            removed_cc_replicas = []
             for node, cc, replicas in command.remove_containers:
+                removed_cc_replicas.append((node, cc))
                 op_str = f'Command #{command_index}. Remove containers ({node}, {cc}, {replicas})'
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
@@ -938,6 +971,8 @@ class Transition:
             # Add container commands
             for node, cc, replicas in command.allocate_containers:
                 op_str = f'Command #{command_index}. Allocate containers ({node}, {cc}, {replicas})'
+                if (node, cc) in removed_cc_replicas:
+                    raise ValueError(f'{op_str} -> Removing and adding identical containers in same command')
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
@@ -957,7 +992,6 @@ class Transition:
                 if node_vmt not in initial_alloc_vmt:
                     raise ValueError(f'{op_str} -> Invalid node')
                 for cc in node_vmt.replicas:
-                    if node_vmt.replicas[cc] > 0:
                         raise ValueError(f'{op_str} -> Node allocates containers')
                 initial_alloc_vmt.remove(node_vmt)
 

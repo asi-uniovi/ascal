@@ -30,6 +30,10 @@ class AutoscalerTypes(Enum):
     FCMA3 = 7          # FCMA algorithm with speed level 3
 
 class Autoscaler(ABC):
+
+    # Constant used to deal with numerical approximations
+    _DELTA = 0.000001
+
     """
     Abstract class for autoscalers.
     """
@@ -87,7 +91,7 @@ class Autoscaler(ABC):
         """
         if self._log_f is not None:
             self._log_f.write(f'{self.time}:  {message}\n')
-        #print(f'{self.time}: {message}', flush=True)
+        print(f'{self.time}: {message}', flush=True)
 
     def __del__(self):
         """
@@ -96,6 +100,36 @@ class Autoscaler(ABC):
         if self._log_f is not None:
             self._log_f.close()
 
+    def _transition_execute_sync(self, commands: list[Command]):
+        """
+        Transition between two allocations executing a list of commands. The execution consists of adding
+        new events to the event list.
+        :param commands: Commands that implement the transition.
+        """
+
+        # Execute the transition
+        curr_time = self.time
+        for command in commands:
+            if command.sync_on_nodes_creation:
+                curr_time = max(curr_time, self.time + self.timing_args.node_creation_time)
+            if len(command.create_nodes) > 0:
+                for node in command.create_nodes:
+                    node.free_cores = node.ic.cores
+                    node.free_mem = node.ic.mem
+                    node.cgs.clear()
+                    self._timedops.create_node(curr_time, node)
+                    self.allocation.append(node)
+            if len(command.remove_containers) > 0:
+                for node, cc, replicas in command.remove_containers:
+                    self._timedops.remove_container_replicas(curr_time, cc, replicas, node)
+                curr_time += self.timing_args.container_removal_time
+            if len(command.remove_nodes) > 0:
+                for node in command.remove_nodes:
+                    self._timedops.remove_node(curr_time, node)
+            if len(command.allocate_containers) > 0:
+                for node, cc, replicas in command.allocate_containers:
+                    self._timedops.allocate_container_replicas(curr_time, cc, replicas, node)
+                curr_time += self.timing_args.container_creation_time
 
 class HReactiveAutoscaler(Autoscaler):
     """
@@ -218,7 +252,7 @@ class HReactiveAutoscaler(Autoscaler):
 
     def _remove_excess_of_replicas(self):
         """
-        Reduce the number of replicas for those applications with an excess.
+        Reduce the surplus number of application's replicas.
         """
         replicas_to_remove = {
             app: self._get_replicas(app) - self._desired_app_replicas[app]
@@ -244,7 +278,7 @@ class HReactiveAutoscaler(Autoscaler):
 
     def _allocate_deficit_replicas(self) -> list[ContainerGroup]:
         """
-        Increment the number of replicas for those applications with a deficit.
+        Try allocating replicas for those applications with a deficit.
         :return: The replicas that can not be allocated.
         """
         replicas_to_add = {
@@ -273,7 +307,7 @@ class HReactiveAutoscaler(Autoscaler):
     def _create_required_nodes(self, cgs: list[ContainerGroup]):
         """
         Create new nodes to allocate the remaining container replicas.
-        :param cgs: Container groups with the replicas to allocate
+        :param cgs: Container groups with the replicas to allocate.
         """
         # Ignore those containers that can be allocated on nodes that are not ready yet
         cgs_to_allocate = [cg for cg in cgs]
@@ -287,8 +321,8 @@ class HReactiveAutoscaler(Autoscaler):
             cc = cg.cc
             replicas = cg.replicas
             for node in no_ready_nodes:
-                cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude)
-                mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude)
+                cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude + Autoscaler._DELTA)
+                mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude + Autoscaler._DELTA)
                 allocatable_replicas = min(cpu_allocatable_replicas, mem_allocatable_replicas, replicas)
                 replicas -= allocatable_replicas
                 cg.replicas -= allocatable_replicas
@@ -428,7 +462,7 @@ class HReactiveAutoscaler(Autoscaler):
         # If it is the first execution
         if self.time < 0:
             self.time = 0 # First time is zero
-            # Prepare data required in the nex times
+            # Prepare data required in the next times
             self._app_load_sum = {app: workloads[app] for app in workloads}
             self._icf = list(self.system.keys())[0][1] # The instance class family used
             for app in self.apps:
@@ -447,7 +481,7 @@ class HReactiveAutoscaler(Autoscaler):
             return True, True, current_time() - initial_time
         else:
             self.time += 1
-        # Dispatch events until the current time
+            # Dispatch events until the current time
             self._timedops.dispatch_events(self.time)
             # Clear nodes that may have being removed from the allocation
             self._clear_removed_nodes()
@@ -465,7 +499,7 @@ class HReactiveAutoscaler(Autoscaler):
                 for app in self._app_load_sum:
                     self._app_load_sum[app] = RequestsPerTime('0 req/hour')
 
-            # At any other time try to allocate replicas in applications with deficit if
+            # At any other time try to allocate replicas of applications with deficit if
             # new nodes are available or the allocation has changed
             if self.time % self.time_period > 0 and \
                     (self._timedops.new_nodes_ready or self._timedops.perf_changed):
@@ -476,13 +510,16 @@ class HReactiveAutoscaler(Autoscaler):
 
 
 class HVReactiveAutoscaler(Autoscaler):
-    def __init__(self, time_period = 60, desired_cpu_utilization = 0.6, timing_args: TimedOps.TimingArgs = None,
-                 algorithm = AutoscalerTypes.FCMA):
+    def __init__(self, time_period: int = 60, desired_cpu_utilization: float = 0.6,
+                 timing_args: TimedOps.TimingArgs = None, algorithm: AutoscalerTypes = AutoscalerTypes.FCMA,
+                 transition_time_budget: int = 0):
         """
         Constructor for the horizontal and reactive autoscaler.
         :param time_period: Time period to evaluate a new autoscaling.
         :param desired_cpu_utilization: Desired CPU utilization for the application containers.
         :param timing_args: Timings for creation/removal of nodes and containers.
+        :param algorithm: Allocation algorithm.
+        :param transition_time_budget: Approximate transition time budget. The real transition time can be higher.
         """
         super().__init__(timing_args)
         self.time_period = time_period
@@ -495,6 +532,9 @@ class HVReactiveAutoscaler(Autoscaler):
             self._fcma_speed_level = 3
         self.transition = None
         self.time_commands: list[tuple[int, Command]] = []
+        self.transition_time_budget = transition_time_budget
+        self._new_allocation = None
+        self._timedops = TimedOps(self.timing_args, priorize_events=True)
 
     def run(self, app_workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
         """
@@ -505,50 +545,70 @@ class HVReactiveAutoscaler(Autoscaler):
 
         initial_time = current_time()
         self.time += 1
+
         if self.time == 0:
-            self._app_load_sum = {app: app_workloads[app] for app in app_workloads}
-        else:
-            # Update average loads
-            for app in self._app_load_sum:
-                self._app_load_sum[app] += app_workloads[app]
-        # If not at the time period
-        if self.time % self.time_period > 0:
-            if self._timedops.node_billing_changed:
-                return False, True, 0
-            else:
-                return False, False, 0
-        else:
-            # Average workloads are artificially incremented to obtain the desired CPU utilization
-            incremented_workloads = {}
-            for app in self._app_load_sum:
-                incremented_workloads[app] = self._app_load_sum[app] / self.desired_cpu_utilization
-                if self.time > 0:
-                    incremented_workloads[app] /= self.time_period
-            # Use FCMA algorithm to get the new allocation
+            # Start with average loads equal to the first loads. Loads are incremented to obtain
+            # the desired utilization
+            incremented_workloads = {app: app_workloads[app] / self.desired_cpu_utilization for app in app_workloads}
+            # Initialize the transition
+            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget)
+            # Calculate the first allocation
             fcma_problem = Fcma(self.system, workloads=incremented_workloads)
             solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
             fcma_allocation = fcma_problem.solve(solving_pars).allocation
-            new_allocation = [node for family, nodes in fcma_allocation.items() for node in nodes]
-
-            if self.allocation is None:
-                self.transition = Transition(self.timing_args, self.system)
-                commands = []
-            else:
-                commands = self.transition.calculate_sync(self.allocation, new_allocation)
-            self.allocation = new_allocation
-
-            # Reset load averages
-            for app in self._app_load_sum:
-                self._app_load_sum[app] = RequestsPerTime('0 req/hour')
-
-            # Execute commands from transition at the current time
-            #self.execute_transition_commands()
-
+            self._new_allocation = [node for family, nodes in fcma_allocation.items() for node in nodes]
+            # Reset the sum to calculate average loads at the end of the first period
+            self._app_load_sum = {app: RequestsPerTime("0 req/s") for app in app_workloads}
+            self.allocation = self._new_allocation
+            for node in self.allocation + self._new_allocation:
+                NodeStates.set_state(node, NodeStates.READY)
             return True, True, current_time() - initial_time
+        else:
+            # Update the sum of loads to obtain average loads in the next period
+            for app in self._app_load_sum:
+                self._app_load_sum[app] += app_workloads[app]
+
+            # A new allocation is calculated every time period if there are no pending transitions
+            if self.time % self.time_period == 0:
+                # Average workloads are artificially incremented to obtain the desired CPU utilization
+                incremented_workloads = {}
+                for app in self._app_load_sum:
+                    incremented_workloads[app] = self._app_load_sum[app] / self.desired_cpu_utilization
+                    incremented_workloads[app] /= self.time_period
+                # If any transition is completed
+                if self._timedops.is_event_list_empty():
+                    self.allocation = self._new_allocation
+                    # Use FCMA algorithm to calculate the new allocation
+                    fcma_problem = Fcma(self.system, workloads=incremented_workloads)
+                    solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
+                    fcma_allocation = fcma_problem.solve(solving_pars).allocation
+                    self._new_allocation = [node for family, nodes in fcma_allocation.items() for node in nodes]
+                    for node in self.allocation + self._new_allocation:
+                        NodeStates.set_state(node, NodeStates.READY)
+                    # Calculate the transition between the previous allocation and the new one
+                    commands, transition_time = self.transition.calculate_sync(self.allocation, self._new_allocation)
+                    self.log(f"Transition time: {transition_time} seconds")
+                    # Generate transition events from the current time
+                    self._transition_execute_sync(commands)
+
+                # Reset the sum to calculate average loads in the next period
+                for app in self._app_load_sum:
+                    self._app_load_sum[app] = RequestsPerTime("0 req/s")
+
+        # Dispatch events until the current time
+        self._timedops.dispatch_events(self.time)
+
+        # Complete the removal of nodes
+        for node in self.allocation:
+            if NodeStates.get_state(node) == NodeStates.REMOVED:
+                self.allocation.remove(node)
+
+        return self._timedops.perf_changed, self._timedops.node_billing_changed, current_time() - initial_time
 
 
 class HVPredictiveAutoscaler(Autoscaler):
-    def __init__(self, prediction_window = 3600, prediction_percentile = 95, algorithm = AutoscalerTypes.FCMA,
+    def __init__(self, prediction_window: int = 3600, prediction_percentile: int = 95,
+                 algorithm: AutoscalerTypes = AutoscalerTypes.FCMA,
                  timing_args: TimedOps.TimingArgs | None = None):
         """
         Constructor for the horizontal and reactive autoscaler.

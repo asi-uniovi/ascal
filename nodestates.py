@@ -23,4 +23,5 @@ class NodeStates(Enum):
         if len(node.history) == 0:
             node.history.append(new_state)
         else:
-            node.history.insert(0, new_state)
+            if node.history[0] != new_state:
+                node.history.insert(0, new_state)

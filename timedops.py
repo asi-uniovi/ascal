@@ -10,18 +10,22 @@ class TimedOps:
     taking into account the time required for these operations.
     """
 
+    # Constant used to deal with numerical approximations
+    _DELTA = 0.000001
+
     class EventTypes(Enum):
+        # Number express event priorities
         LOG_MESSAGE = 0
-        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 1
-        ALLOCATE_CONTAINER_REPLICAS_END = 2
-        START_REPLICAS_GRACE_PERIOD = 3
-        REMOVE_CONTAINER_REPLICAS_BEGIN = 4
-        REMOVE_CONTAINER_REPLICAS_END = 5
-        CREATE_NODE_BEGIN = 6
-        CREATE_NODE_BILLED = 7
-        CREATE_NODE_END = 8
-        REMOVE_NODE_BEGIN = 9
-        REMOVE_NODE_END = 10
+        CREATE_NODE_BEGIN = 1
+        CREATE_NODE_BILLED = 2
+        CREATE_NODE_END = 3
+        START_REPLICAS_GRACE_PERIOD = 4
+        REMOVE_CONTAINER_REPLICAS_BEGIN = 5
+        REMOVE_CONTAINER_REPLICAS_END = 6
+        REMOVE_NODE_BEGIN = 7
+        REMOVE_NODE_END = 8
+        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 9
+        ALLOCATE_CONTAINER_REPLICAS_END = 10
 
     @dataclass
     class Event:
@@ -46,10 +50,11 @@ class TimedOps:
         container_creation_time: int = 0 # Time required to create a container
         container_removal_time: int = 0 # Time required to remove a container
 
-    def __init__(self, time_args: TimingArgs):
+    def __init__(self, time_args: TimingArgs, priorize_events: bool=False):
         """
         Create an event-driven timing system for creation/removal of nodes and containers.
         :param time_args: Times required to create/remove nodes and containers.
+        :param priorize_events: Set to priorize events released at the same time.
         """
         self.time_args = time_args # Times required to create/remove containers and nodes
         self._event_list: list[tuple[int, TimedOps.Event]] = [] # List of events to handle in the form (time, event)
@@ -59,6 +64,14 @@ class TimedOps:
         self.perf_changed = False # True if containers are removed or allocated at the current time
         self._last_dispatched_time = -1 # Time of the last dispatched event
         self.log: Callable[[...], None] = lambda _: None # Method used to print a log message
+        self._priorize_events = priorize_events # Set to priorize events released at the same time
+
+    def is_event_list_empty(self) -> bool:
+        """
+        Check if the event list is empty.
+        :return: True when the event list is empty
+        """
+        return len(self._event_list) == 0
 
     def add_event(self, at_time: int, event: Event):
         """
@@ -66,13 +79,13 @@ class TimedOps:
         :param at_time: Time of addition.
         :param event: Event.
         """
-        assert at_time >=self._last_dispatched_time, "Can not dispatch events in the past"
+        assert at_time >= self._last_dispatched_time, "Can not dispatch events in the past"
 
-        # Check if the event is previous to the las event in the list. Events must be dispatched in order.
+        # Check if the event is previous to the last event in the list. Events must be dispatched in order.
         if len(self._event_list) > 0 and at_time < self._event_list[-1][0]:
             self._sorting_required = True
         self._event_list.append((at_time, event))
-        # If the event occurs at the last disptached time, it is dispatched to avoid unnecesary delays
+        # If the event occurs at the last dispatched time, it is dispatched to avoid unnecesary delays
         if at_time == self._last_dispatched_time:
             self.dispatch_at_last_time()
 
@@ -100,10 +113,18 @@ class TimedOps:
             # Sort events by increasing fire time
             self._event_list.sort(key=lambda event: event[0])
         while len(self._event_list) > 0 and self._event_list[0][0] == self._last_dispatched_time:
-            # Get the first even in the event list and execute its callback function
-            _, next_event = self._event_list.pop(0)
-            next_event.callback(next_event)
-            self._update_changes(next_event.type)
+            # Get the first even in the event list and those with the same release time
+            release_time, next_event = self._event_list.pop(0)
+            next_events = [next_event]
+            if self._priorize_events:
+                while len(self._event_list) > 0 and self._event_list[0][0] == release_time:
+                    next_events.append(self._event_list.pop(0)[1])
+            # Sort events using priorities
+            next_events.sort(key=lambda ev: ev.type.value)
+            # Execute the callback functions
+            for next_event in next_events:
+                next_event.callback(next_event)
+                self._update_changes(next_event.type)
 
     def dispatch_events(self, until_time: int) -> bool:
         """
@@ -142,12 +163,20 @@ class TimedOps:
             # Check if the earliest event is later than the maximum time
             if self._event_list[0][0] > until_time:
                 return dispatched_some_event
-            # Get the first event in the event list and execute its callback function
-            _, next_event = self._event_list.pop(0)
+            # Get the first event in the event list and the events with the same time
             dispatched_some_event = True
-            if next_event.callback is not None:
-                next_event.callback(next_event)
-                self._update_changes(next_event.type)
+            release_time, next_event = self._event_list.pop(0)
+            next_events = [next_event]
+            if self._priorize_events:
+                while len(self._event_list) > 0 and self._event_list[0][0] == release_time:
+                    next_events.append(self._event_list.pop(0)[1])
+            # Sort events using priorities
+            next_events.sort(key=lambda ev: ev.type.value)
+            # Execute the callback functions
+            for next_event in next_events:
+                if next_event.callback is not None:
+                    next_event.callback(next_event)
+                    self._update_changes(next_event.type)
 
     def timed_log(self, at_time: int, message: str):
         """
@@ -187,8 +216,8 @@ class TimedOps:
 
         # If allocation occurs just now
         if at_time == self._last_dispatched_time:
-            cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude)
-            mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude)
+            cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude + TimedOps._DELTA)
+            mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude + TimedOps._DELTA)
             allocatable_replicas = min(cpu_allocatable_replicas, mem_allocatable_replicas, replicas)
             if allocatable_replicas == 0:
                 return 0
@@ -207,16 +236,15 @@ class TimedOps:
         Start the allocation of container replicas when the event is fired.
         :param event: Event that has just being fired.
         """
-        replicas = event.containers[0] # The exact number of replicas to allocate, unless allocation is aborted
-        node = event.containers[1]
-        cc = event.containers[2]
+        replicas, node, cc = event.containers
+
         assert NodeStates.get_state(node) == NodeStates.READY, "Can not allocate on nodes that are not ready"
 
         # Firstly, allocate containers with zero performance
         zero_perf_cc = ContainerClass(cc.app, cc.ic, cc.fm, cc.cores, cc.mem,
                                       RequestsPerTime("0 req/s"), cc.aggs, cc.agg_level)
-        cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude)
-        mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude)
+        cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude + TimedOps._DELTA)
+        mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude + TimedOps._DELTA)
         allocatable_replicas = min(cpu_allocatable_replicas, mem_allocatable_replicas, replicas)
         assert allocatable_replicas == replicas, "Can not allocate the required replicas"
         node.cgs.append(ContainerGroup(zero_perf_cc, allocatable_replicas))
@@ -235,10 +263,7 @@ class TimedOps:
         Complete the allocation of replicas when the event is fired.
         :param event: Event that has just being fired.
         """
-        replicas = event.containers[0]
-        node = event.containers[1]
-        cc = event.containers[2]
-        zero_perf_cc = event.containers[3]
+        replicas, node, cc, zero_perf_cc = event.containers
 
         # The container replicas with zero performance will become active.
         # Firstly, remove the zero performance container replicas.
@@ -309,9 +334,7 @@ class TimedOps:
         Start the removal of container replicas when the event is fired.
         :param event: Event that has just being fired.
         """
-        replicas = event.containers[0] # The exact number of replicas to remove
-        node = event.containers[1]
-        cc = event.containers[2]
+        replicas, node, cc = event.containers # The exact number of replicas to remove
 
         # Check the number of replicas that can be removed and get the related container group
         removable_replicas = 0
@@ -347,10 +370,7 @@ class TimedOps:
         Complete the removal of replicas when the event is fired.
         :param event: Event that has just being fired.
         """
-        replicas = event.containers[0]
-        node = event.containers[1]
-        cc = event.containers[2]
-        zero_perf_cc = event.containers[3]
+        replicas, node, cc, zero_perf_cc = event.containers
 
         # Update free computational resources in the node
         node.free_cores += replicas * cc.cores
@@ -420,7 +440,6 @@ class TimedOps:
         """
         assert at_time >= self._last_dispatched_time, "Can not crete nodes in the past"
         assert node is not None, "Can not remove an invalid node"
-        assert NodeStates.get_state(node) == NodeStates.REMOVING, "A node is not labelled as removable"
         event = TimedOps.Event(TimedOps.EventTypes.REMOVE_NODE_BEGIN, node=node,
                                callback=self._at_remove_node_begin)
         self.add_event(at_time, event)
@@ -435,6 +454,7 @@ class TimedOps:
             # Complete the removal of containers that are finally removed at the current time
             self.dispatch_at_last_time()
         assert len(node.cgs) == 0, "Can not remove a node with containers"
+        NodeStates.set_state(node, NodeStates.REMOVING)
         event = TimedOps.Event(TimedOps.EventTypes.REMOVE_NODE_END, node=node,
                                callback=self._at_remove_node_end)
         self.add_event(self._last_dispatched_time + self.time_args.node_removal_time, event)
