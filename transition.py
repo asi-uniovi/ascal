@@ -36,83 +36,10 @@ from dataclasses import dataclass, field
 from fcma import (Fcma, SolvingPars, System, Allocation, App, Vm, ContainerClass, RequestsPerTime)
 from timedops import TimedOps
 from recycling import Recycling
+from helper import get_min_max_perf, Vmt, RecyclingVmt
 
 # Variable used to debug a selected transition
 _debug_count = 0
-
-class Vmt:
-    """
-    Node class for transitions, with direct access to the number of replicas of a container class.
-    """
-    def __init__(self, vm: Vm):
-        """
-        Create a node for transitions from a standard node.
-        :param vm: A standard node.
-        """
-        self.vm = vm
-        self.ic = vm.ic
-        self.id = vm.id
-        self.free_mem = vm.free_mem
-        self.free_cores = vm.free_cores
-        self.replicas = defaultdict(lambda: 0, {cg.cc: cg.replicas for cg in vm.cgs})
-
-    def __str__(self) -> str:
-        return f"Vmt-{self.ic.name}[{self.id}]"
-
-    def clear(self) -> 'Vmt':
-        """
-        Remove all the containers allocated in the node.
-        """
-        self.free_cores = self.ic.cores
-        self.free_mem = self.ic.mem
-        self.replicas = defaultdict(lambda: 0)
-        return self
-
-    def is_empty(self) -> bool:
-        """
-        Check wether the node is empty.
-        """
-        for cc, replicas in self.replicas.items():
-            if replicas > 0:
-                return False
-        return True
-
-class RecyclingVmt:
-    """
-    Recycling class using Vmt nodes.
-    """
-    def __init__(self, recycling: Recycling, vm_to_vmt: dict[Vm, Vmt]):
-        """
-        Create a recycling object with Vmt nodes from a recycling with Vm node.
-        :param recycling: A recycling in the Vm format.
-        :param vm_to_vmt: A dictionary with Vm keys and Vmt values.
-        """
-        self.removed_nodes: list[Vmt] = [
-            vm_to_vmt[vm]
-            for vm in recycling.removed_nodes
-        ]
-        self.recycled_node_pairs: dict[Vmt, Vmt] = {
-            vm_to_vmt[vm1]: vm_to_vmt[vm2]
-            for vm1, vm2 in recycling.recycled_node_pairs.items()
-        }
-        self.new_nodes: list[Vmt] = [
-            vm_to_vmt[vm]
-            for vm in recycling.new_nodes
-        ]
-        self.removed_containers: dict[Vmt, dict[ContainerClass, int]] = {
-            vm_to_vmt[vm]: cc_replicas
-            for vm, cc_replicas in recycling.removed_containers.items()
-        }
-        self.recycled_containers: dict[Vmt, dict[ContainerClass, int]] = {
-            vm_to_vmt[vm]: cc_replicas
-            for vm, cc_replicas in recycling.recycled_containers.items()
-        }
-        self.new_containers: dict[Vmt, dict[ContainerClass, int]] = {
-            vm_to_vmt[vm]: cc_replicas
-            for vm, cc_replicas in recycling.new_containers.items()
-        }
-        self.node_recycling_level: float = recycling.node_recycling_level
-        self.container_recycling_level: float = recycling.container_recycling_level
 
 @dataclass
 class Command:
@@ -122,14 +49,15 @@ class Command:
     """
     allocate_containers: list[tuple[Vm|Vmt, ContainerClass, int]] = field(default_factory=list)
     remove_containers: list[tuple[Vm|Vmt, ContainerClass, int]] = field(default_factory=list)
-    create_nodes: list[Vm|Vmt] = field(default_factory=list)
+    create_nodes: list[Vm|Vmt] = field(default_factory=list) # Only the first command can crete nodes
     remove_nodes: list[Vm|Vmt] = field(default_factory=list)
+    # Field to delay command execution until completing node creations in the first command
     sync_on_nodes_creation: bool = False
 
     def extend(self, command: 'Command'):
         """
-        Add a new command, mixing all the container and node operations.
-        :param command: Command to append.
+        Extend with a new command, appending all the container and node operations.
+        :param command: Command to extend.
         """
         self.allocate_containers.extend(command.allocate_containers)
         self.remove_containers.extend(command.remove_containers)
@@ -155,87 +83,58 @@ class Command:
 
     def get_container_command_time(self, timing_args: TimedOps.TimingArgs) -> int:
         """
-        Get the worst-case time required to carry out a command ignoring creation and removal of nodes.
+        Get the time required to complete a command ignoring node operations.
         :param timing_args: Times for creation/removal of nodes/containers.
-        :return: The worst-case time.
+        :return: The time to complete the command.
         """
         container_command_time = 0
-        if self.remove_containers is not None and len(self.remove_containers) > 0:
+        if len(self.remove_containers) > 0:
             container_command_time += timing_args.container_removal_time
-        if self.allocate_containers is not None and len(self.allocate_containers) > 0:
+        if len(self.allocate_containers) > 0:
             container_command_time += timing_args.container_creation_time
         return container_command_time
 
 class Transition:
     """
-    Class to perform transitions between initial allocation and final allocations for a given system and load.
+    Class to perform transitions between initial allocation and final allocations for a given system.
     """
 
     # Constant used to deal with numerical approximations
     _DELTA = 0.000001
 
-    @staticmethod
-    def _get_min_perf(alloc1: Allocation, alloc2: Allocation) -> dict[App, RequestsPerTime]:
-        """
-        Calculate the minimum performance per application between two allocations.
-        :param alloc1: One allocation.
-        :param alloc2: Another allocation.
-        :return: A dictionary with the minimum performance per application.
-        """
-
-        def get_alloc_perf(alloc: Allocation) -> dict[App, RequestsPerTime]:
-            """
-            Calculate the performance per application in a given allocation.
-            :param alloc: Allocation.
-            :return: A dictionary with performance per application.
-            """
-            perf = defaultdict(lambda: RequestsPerTime("0 req/s"))
-            for n in alloc:
-                for cgg in n.cgs:
-                    perf[cgg.cc.app] += cgg.replicas * cgg.cc.perf
-            return perf
-
-        perf1 = get_alloc_perf(alloc1)
-        perf2 = get_alloc_perf(alloc2)
-        zero_perf = RequestsPerTime("0 req/s")
-        return {app: min(perf1.get(app, zero_perf), perf2.get(app, zero_perf)) for app in perf1}
-
     def __init__(self, timing_args: TimedOps.TimingArgs, system: System, time_limit: int = None):
         """
-        Creates an object for transition between two allocations. Once the transition object is created,
-        method calculate() can be called any number of times to obtain the commands required to transtion between
-        two allocations.
+        Creates an object for transition between two allocations.
         :param timing_args: Creation and removal times for containers and nodes.
-        :param system: Performance and computational requirements all the instance classes.
+        :param system: System performance and computational requirements.
         :param time_limit: Maximum time to carry out transitions. By default, this is set to the node creation time.
-        Anyway, transition times can be longer, specially when it is set to a value less than the node creation
+        Anyway, transition times can be longer, specially when they are set to a value less than the node creation
         time and new nodes need to be created.
         """
-        self.timing_args = timing_args
-        self.system = system
-        self.recycling = None
-        self.current_alloc: list[Vmt] = None
+        self._timing_args = timing_args
+        self._system = system
+        self._recycling = None
+        self._current_alloc: list[Vmt] = None
         self._unalloc_node_cs: list[tuple[Vmt, ContainerClass, int]]  = None
-        self._app_unalloc_perf: defaultdict[App, RequestsPerTime]  = defaultdict(lambda : RequestsPerTime("0 req/s"))
-        self._app_perf_surplus:  defaultdict[App, RequestsPerTime]  = defaultdict(lambda : RequestsPerTime("0 req/s"))
-        self._app_perf_increment: defaultdict[App, RequestsPerTime]  = defaultdict(lambda : RequestsPerTime("0 req/s"))
-        self._allocatable_cs: list[tuple[Vm, ContainerClass, int]] = None
-        self._time_limit = time_limit or self.timing_args.node_creation_time
-        self._commands: list[Command] = []
+        self._app_unalloc_perf: defaultdict[App, RequestsPerTime]  = None
+        self._app_perf_surplus:  defaultdict[App, RequestsPerTime]  = None
+        self._app_perf_increment: defaultdict[App, RequestsPerTime]  = None
+        self._allocatable_cs_next_step: list[tuple[Vm, ContainerClass, int]] = None
+        self._time_limit = time_limit or self._timing_args.node_creation_time
+        self._commands: list[Command] = None
 
     def _remove_allocate(self, cc: ContainerClass, replicas: int, node: Vmt,
                          command: Command, obsolete: bool=False) -> int:
         """
         Allocate the container replicas to the node, freeing up computational resources in the node
-        coming from obsolete containers if necessary, while ensuring application's minimum performance
+        coming from obsolete containers if necessary, while ensuring that application's minimum performance
         constraints are met. The node state does not change when no replicas are allocated.
         :param cc: Container class.
         :param replicas: The number of replicas to allocate.
         :param node: Node.
         :param command: Command with (obsolete) containers to be removed and containers to be allocated.
         :param obsolete: True if the containers to allocate are obsolete, coming from another node.
-        :return: A tuple with the number of replicas allocated and a dicitonary with the number of
-        replicas removed for each instance class.
+        :return: The number of actually allocated replicas.
         """
 
         # Required computational resources to allocate the replicas
@@ -244,43 +143,48 @@ class Transition:
 
         # Obsolete replicas in the node to be removed in order to allocate the replicas
         obsolete_replicas = []
-        if node in self.recycling.removed_containers:
+        if node in self._recycling.obsolete_containers:
+            # A deep copy of application's performance surplus
             available_perf_surplus = dict(self._app_perf_surplus)
-            for obsolete_cc in self.recycling.removed_containers[node]:
+            for obsolete_cc in self._recycling.obsolete_containers[node]:
+                # Number of required obsolete replicas of the container class to remove
                 required_replicas = max(
                     ceil((required_cores - node.free_cores) / obsolete_cc.cores),
                     ceil((required_mem - node.free_mem) / obsolete_cc.mem[0])
                 )
                 if required_replicas == 0:
                     break
+
                 """
-                A mejorar: no se tiene en cuenta la posibilidad de que existan varias familias. 
+                To be improved. It assumes a single family of container classes. 
                 """
+
+                # Get the number of replicas of the obsolete container that could be removed
                 obsolete_replicas_count = self._get_removable_replicas(obsolete_cc, node, required_replicas,
                                                                        available_perf_surplus[obsolete_cc.app])
-                available_perf_surplus[obsolete_cc.app] -= obsolete_cc.perf * obsolete_replicas_count
                 if obsolete_replicas_count > 0:
+                    available_perf_surplus[obsolete_cc.app] -= obsolete_cc.perf * obsolete_replicas_count
                     obsolete_replicas.append((obsolete_cc, obsolete_replicas_count))
                     required_cores -= obsolete_replicas_count * obsolete_cc.cores
                     required_mem -= obsolete_replicas_count * obsolete_cc.mem[0]
 
-        # Calculate the number of cores and memory obtained from the removal
+        # Calculate the number of cores and memory obtained from the removal of obsolete containers in the node
         removed_cores = replicas * cc.cores - required_cores
         removed_mem = replicas * cc.mem[0] - required_mem
 
-        # Calculate how many new container replicas can be allocated
+        # Calculate how many new container replicas could be allocated after the removals
         allocatable_replicas = min(
             replicas,
             int((node.free_cores.magnitude + removed_cores.magnitude + Transition._DELTA) / cc.cores.magnitude),
             int((node.free_mem.magnitude + removed_mem.magnitude + Transition._DELTA) / cc.mem[0].magnitude)
         )
 
-        # Allocate the replicas
+        # Allocate the replicas. At this point, the removals and allocations are actually performed
         if allocatable_replicas > 0:
             for obsolete_cc, obsolete_replicas_count in obsolete_replicas:
                 self._remove_obsolete_replicas(obsolete_cc, obsolete_replicas_count, node, command)
             allocated_replicas = self._allocate(cc, allocatable_replicas, node, command, obsolete)
-            assert allocatable_replicas == allocated_replicas, "The number of replicas must agree"
+            assert allocatable_replicas == allocated_replicas, "The replicas must be allocatable"
 
         return allocatable_replicas
 
@@ -291,7 +195,7 @@ class Transition:
         :param replicas: The number of replicas to allocate.
         :param node: Node.
         :param command: Allocation command.
-        :param obsolete: Set to True if the replicas to allocate are removable.
+        :param obsolete: Set to True if the replicas to allocate will be obsolete once allocated.
         :return: The number of actually allocated replicas.
         """
         allocatable_replicas = min(
@@ -310,14 +214,13 @@ class Transition:
                 self._app_unalloc_perf[cc.app] -= allocatable_replicas * cc.perf
                 assert self._app_unalloc_perf[cc.app].magnitude > -Transition._DELTA, "Invalid performance"
             else:
-                if node not in self.recycling.removed_containers:
-                    self.recycling.removed_containers[node] = {cc: allocatable_replicas}
+                if node not in self._recycling.obsolete_containers:
+                    self._recycling.obsolete_containers[node] = {cc: allocatable_replicas}
                 else:
-                    if cc not in self.recycling.removed_containers[node]:
-                        self.recycling.removed_containers[node][cc] = allocatable_replicas
+                    if cc not in self._recycling.obsolete_containers[node]:
+                        self._recycling.obsolete_containers[node][cc] = allocatable_replicas
                     else:
-                        self.recycling.removed_containers[node][cc] += allocatable_replicas
-
+                        self._recycling.obsolete_containers[node][cc] += allocatable_replicas
             self._app_perf_increment[cc.app] += allocatable_replicas * cc.perf
         return allocatable_replicas
 
@@ -328,7 +231,7 @@ class Transition:
         :param replicas: Replicas to remove.
         :param node: Node.
         :param command: Command with container removals.
-        :return: Number of replicas that were actually removed.
+        :return: Number of replicas that are actually removed.
         """
         if cc not in node.replicas:
             return 0
@@ -340,52 +243,62 @@ class Transition:
         else:
             assert node.replicas[cc] >= 0, "Invalid number of replicas"
         node.free_cores += cc.cores * removed_replicas
-        assert (node.ic.cores - node.free_cores).magnitude > -Transition._DELTA, "Invalid node free cores"
+        assert (node.free_cores - node.ic.cores).magnitude < Transition._DELTA, "Invalid node free cores"
         node.free_mem += cc.mem[0] * removed_replicas
-        assert (node.ic.mem - node.free_mem).magnitude > -Transition._DELTA, "Invalid node free mem"
+        assert (node.free_mem - node.ic.mem).magnitude < Transition._DELTA, "Invalid node free mem"
         self._app_perf_surplus[cc.app] -= cc.perf * removed_replicas
         assert self._app_perf_surplus[cc.app].magnitude > -Transition._DELTA, "Performance deficit"
-        self.recycling.removed_containers[node][cc] -= removed_replicas
-        if self.recycling.removed_containers[node][cc] == 0:
-            del self.recycling.removed_containers[node][cc]
+        self._recycling.obsolete_containers[node][cc] -= removed_replicas
+        if self._recycling.obsolete_containers[node][cc] == 0:
+            del self._recycling.obsolete_containers[node][cc]
         else:
-            assert self.recycling.removed_containers[node][cc] >= 0, "Invalid number of replicas"
+            assert self._recycling.obsolete_containers[node][cc] >= 0, "Invalid number of replicas"
         return removed_replicas
 
     def _get_removable_replicas(self, cc: ContainerClass, node: Vmt, replicas_to_remove: int,
                                 available_perf_surplus: RequestsPerTime) -> int:
         """
-        Get the number of containers of a container class in a node to free up the required CPU and memory resources,
-        while ensuring the application's minimum performance constraint.
+        Get the number of replicas of a container class in a node that can be removed while ensuring
+        the application's minimum performance constraint.
         :param cc: Container class.
         :param node: Node.
-        :param replicas_to_remove: The number of replicas that should be removed.
+        :param replicas_to_remove: The number of replicas to remove.
         :param available_perf_surplus: The available performance surplus for the container application.
-        :return: The number of removable replicas.
+        :return: The actual number of removable replicas.
         """
         n_removable = min(
             node.replicas[cc],
             int(available_perf_surplus / cc.perf),
             replicas_to_remove,
-            self.recycling.removed_containers[node][cc]
+            self._recycling.obsolete_containers[node][cc]
         )
         return n_removable
 
-    def _get_sorted_nodes_available_capacity(self) -> list[Vmt]:
+    def _get_sorted_nodes(self) -> list[Vmt]:
         """
-        Sort the nodes in descending order of computational capacity that could be freed.
-        Available capacity is calculated considering not only free computational resources, but also
-        obsolete containers that may be removed while fullfiling application minimum performance contraints.
-        :return: A list of nodes sorted by decreasing free size.
+        Sort nodes with allocated containers in descending order of maximum freeable computational capacity.
+        This capacity is calculated considering not only free computational resources, but also
+        obsolete containers that may be removed while fullfiling application's minimum performance contraints.
+        Empty nodes, i.e., nodes that do not allocate containers, are placed at the end of the list sorted by
+        increasing price.
+        :return: A list of sorted nodes.
         """
         free_cores_list = []
         free_mem_list = []
-        for node in self.current_alloc:
+        empty_nodes_list = []
+        allocated_nodes_list = []
+        for node in self._current_alloc:
+            # Check if node is empty
+            if (node.ic.cores - node.free_cores).magnitude < Transition._DELTA and \
+                    (node.ic.mem - node.free_mem).magnitude < Transition._DELTA:
+                empty_nodes_list.append(node)
+                continue
+            allocated_nodes_list.append(node)
             app_perf_surplus = dict(self._app_perf_surplus)
             free_cores = node.free_cores
             free_mem = node.free_mem
             for cc, replicas in node.replicas.items():
-                if node in self.recycling.removed_containers and cc in self.recycling.removed_containers[node]:
+                if node in self._recycling.obsolete_containers and cc in self._recycling.obsolete_containers[node]:
                     app = cc.app
                     cc_perf_surplus = min(app_perf_surplus[app], cc.perf * replicas)
                     surplus_replicas = floor(cc_perf_surplus / cc.perf + Transition._DELTA)
@@ -398,51 +311,52 @@ class Transition:
         total_free_mem = sum(free_mem_list)
         free_capacities = [
             (free_cores_list[i]/total_free_cores).magnitude + (free_mem_list[i]/total_free_mem).magnitude
-            for i in range(len(self.current_alloc))
+            for i in range(len(allocated_nodes_list))
         ]
-        return [
+        allocated_nodes_list = [
             node
-            for node, size in sorted(zip(self.current_alloc, free_capacities), key=lambda x: x[1], reverse=True)
+            for node, size in sorted(zip(allocated_nodes_list, free_capacities), key=lambda x: x[1], reverse=True)
         ]
+        empty_nodes_list.sort(key=lambda n: n.ic.price)
+
+        return allocated_nodes_list + empty_nodes_list
 
     def remove_obsolete_containers(self, command: Command):
         """
-        Check if there are obsolete containers that can be removed. Applications's obsolete containers
-        can be removed when all the application's new containers have been allocated.
+        Check if there are obsolete containers that can be removed. The obsolete containers of an application
+        can be removed when all its new containers have been allocated.
         :param command: A command with the removal of containers.
         """
-        for node, removed_cc_replicas in self.recycling.removed_containers.items():
-            for cc, replicas in dict(removed_cc_replicas.items()).items():
-                if self._app_unalloc_perf[cc.app].magnitude < Transition._DELTA:
-                    replicas_count = self._remove_obsolete_replicas(cc, replicas, node, command)
+        for node, obsolete_cc_replicas in self._recycling.obsolete_containers.items():
+            for obsolete_cc, replicas in dict(obsolete_cc_replicas.items()).items():
+                if self._app_unalloc_perf[obsolete_cc.app].magnitude < Transition._DELTA:
+                    replicas_count = self._remove_obsolete_replicas(obsolete_cc, replicas, node, command)
                     assert replicas_count == replicas, "All the replicas must be removable"
 
     def remove_obsolete_nodes(self, command: Command):
         """
-        Check if there are obsolete nodes that can be removed. Obsolete nodes can be removed
-        they do not allocate containers.
+        Check if there are obsolete nodes that can be removed. Obsolete nodes can be removed when
+        they do not allocate containers. A command with the node removal operation is generated, but the
+        nodes are not actually removed from the allocation, since they may be useful during the transition.
         :param command: A command with the removal of nodes.
         """
-        for node in self.recycling.removed_nodes[:]:
+        for node in self._recycling.obsolete_nodes[:]:
             if node.is_empty():
                 assert (node.free_cores - node.ic.cores).magnitude < Transition._DELTA, "Can not remove the node"
                 assert (node.free_mem - node.ic.mem).magnitude < Transition._DELTA, "Can not remove the node"
                 command.remove_nodes.append(node)
-                del self.recycling.removed_containers[node]
-                self.recycling.removed_nodes.remove(node)
+                del self._recycling.obsolete_containers[node]
+                self._recycling.obsolete_nodes.remove(node)
 
     @staticmethod
-    def _get_app_perf_surplus(min_perf: dict[Vmt, RequestsPerTime], alloc: list[Vmt]) -> dict[App, RequestsPerTime]:
+    def _get_app_perf_surplus(min_perf: dict[App, RequestsPerTime], alloc: list[Vmt]) -> dict[App, RequestsPerTime]:
         """
-        Calculate application's performance surplus for the given allocation.
+        Calculate application's performance surplus.
         :param min_perf: Minimum application's performance.
         :param alloc: Allocation.
         :return: Application's performance surplus.
         """
-        app_perf_surplus = defaultdict(
-            lambda: RequestsPerTime("0 req/s"),
-            {app: -min_perf[app] for app in min_perf}
-        )
+        app_perf_surplus = {app: -min_perf[app] for app in min_perf}
         for node in alloc:
             for cc, replicas in node.replicas.items():
                 app_perf_surplus[cc.app] += replicas * cc.perf
@@ -451,24 +365,24 @@ class Transition:
     def _transition_init(self, min_perf: dict[App, RequestsPerTime]):
         """
         Initialize the transition algorithm.
-        :param min_perf: Minimum application performances to be fulfilled during the transition.
+        :param min_perf: Minimum application performances, to be fulfilled during the transition.
         """
 
         # Calculate the total cores and memory of new containers in recycled nodes.
         # They are necessary to calculate container sizes
         total_new_cpu = 0
         total_new_mem = 0
-        for n, cc_replicas in self.recycling.new_containers.items():
+        for n, cc_replicas in self._recycling.new_containers.items():
             # We focus on new containers in recycled nodes
-            if n in self.recycling.recycled_node_pairs:
+            if n in self._recycling.recycled_node_pairs:
                 total_new_cpu += sum(cc.cores.magnitude * replicas for cc, replicas in cc_replicas.items())
                 total_new_mem += sum(cc.mem[0].magnitude * replicas for cc, replicas in cc_replicas.items())
 
         # Build a list of unallocated containers (new containers) in recycled nodes, sorted by decreasing size
         self._unalloc_node_cs = []
         container_sizes = []
-        for n, cc_replicas in self.recycling.new_containers.items():
-            if n in self.recycling.recycled_node_pairs:
+        for n, cc_replicas in self._recycling.new_containers.items():
+            if n in self._recycling.recycled_node_pairs:
                 for cc, replicas in cc_replicas.items():
                     new_replicas = (n, cc, replicas)
                     container_size = cc.cores.magnitude / total_new_cpu + cc.mem[0].magnitude / total_new_mem
@@ -481,22 +395,30 @@ class Transition:
         ]
 
         # Get unallocated application performances. It is calculated from application containers not allocated yet
-        for _, cc_replicas in self.recycling.new_containers.items():
+        self._app_unalloc_perf = defaultdict(lambda : RequestsPerTime("0 req/s"))
+        for _, cc_replicas in self._recycling.new_containers.items():
             for cc, replicas in cc_replicas.items():
                 self._app_unalloc_perf[cc.app] += replicas * cc.perf
 
-        # Get initial application performance surplus
-        self._app_perf_surplus = Transition._get_app_perf_surplus(min_perf, self.current_alloc)
+        # Get initial application's performance surplus
+        self._app_perf_surplus = Transition._get_app_perf_surplus(min_perf, self._current_alloc)
+
+        # Performance increment to add at the end of the command
+        self._app_perf_increment = defaultdict(lambda : RequestsPerTime("0 req/s"))
+
 
         # List of containers that will be allocatable in the next execution of
         # the remove-allocate-copy algorithm
-        self._allocatable_cs = []
+        self._allocatable_cs_next_step = []
+
+        # The initial list of commands is empty
+        self._commands = []
 
     def _remove_allocate_copy(self) -> Command:
         """
         Perform one transition step by removing obsolete containers and nodes, allocating unallocated new
         containers, and copying obsolete containers to other nodes, in preparation for the next transition step.
-        :return: A command with node removals, containers removal and container allocation.
+        :return: A command with node removals, containers removal and containers allocation.
         """
         command = Command()
 
@@ -504,12 +426,12 @@ class Transition:
         self.remove_obsolete_containers(command)
 
         # Allocate container replicas prepared in a previous copy phase of the algorithm. They must be allocatable
-        for node, cc, allocatable_replicas in self._allocatable_cs:
+        for node, cc, allocatable_replicas in self._allocatable_cs_next_step:
             # Allocate using free computational resources on the same node and removing obsolete
             # containers from the same node if it were necessary
             allocated_replicas = self._remove_allocate(cc, allocatable_replicas, node, command)
             assert allocated_replicas == allocatable_replicas, "Containers must be allocatable"
-        self._allocatable_cs.clear()
+        self._allocatable_cs_next_step.clear()
 
         # Firstly, allocate using free computational resources in the same node and removing obsolete
         # containers from the same node if it were necessary
@@ -527,9 +449,9 @@ class Transition:
             self.remove_obsolete_nodes(command)
             return command
 
-        # Nodes are sorted by decreasing available capacity, including the capacity that can be freed
-        # after removing obsolete containers, while fulfilling application minimum performance contraints
-        dest_nodes = self._get_sorted_nodes_available_capacity()
+        # Nodes are sorted by decreasing freeable capacity, leaving empty nodes at the end, sorted by
+        # increasing price
+        dest_nodes = self._get_sorted_nodes()
 
         # Next, try copying obsolete containers from the node to other nodes (destination nodes),
         # yielding enough application's performance surplus to allocate the replicas of unallocated
@@ -540,7 +462,7 @@ class Transition:
             required_cores = replicas_to_allocate * cc.cores
             required_mem = replicas_to_allocate * cc.mem[0]
 
-            # The state must be recovered when we fail to allocate at least one replica
+            # The state must be recovered when we fail to allocate at least one replica, so create backups
             dest_nodes_modified = []
             dest_nodes_backup = {
                 node: {
@@ -550,19 +472,18 @@ class Transition:
                 }
                 for node in dest_nodes
             }
-            # Backups are necessary to recover the state when not even a container can be allocated
-            app_perf_surplus_backup = dict(self._app_perf_surplus)
-            app_perf_increment_backup = dict(self._app_perf_increment)
+            zero_perf = RequestsPerTime("0 req/s")
+            app_perf_surplus_backup = defaultdict(lambda: zero_perf, self._app_perf_surplus)
+            app_perf_increment_backup = defaultdict(lambda: zero_perf, self._app_perf_increment)
             removed_containers_backup = {
                 node: {cc: replicas for cc, replicas in cc_replicas.items()}
-                for node, cc_replicas in self.recycling.removed_containers.items()
+                for node, cc_replicas in self._recycling.obsolete_containers.items()
             }
             removed_containers_backup = defaultdict(lambda : 0, dict(removed_containers_backup))
 
             # Allocate obsolete container copies in destination nodes
             command2 = Command()
-            self.recycling.removed_containers[node].items()
-            for removable_cc, removable_replicas in self.recycling.removed_containers[node].items():
+            for removable_cc, removable_replicas in self._recycling.obsolete_containers[node].items():
                 # Required obsolete containers to free up enough computational resurces to allocate
                 # replicas_to_allocate replicas in the node, considering rounding errors and the maximum
                 # number of available replicas
@@ -579,7 +500,7 @@ class Transition:
                 # Try copying required_obsolete_replicas to other nodes
                 for dest_node in dest_nodes:
                     if dest_node == node:
-                        # It doesn't make sense to copy obsolete containers to the same node
+                        # Cannot copy obsolete containers to the same node
                         continue
                     allocated_obsolete_replicas = self._remove_allocate(removable_cc, required_obsolete_replicas,
                                                                         dest_node, command2, obsolete=True)
@@ -607,11 +528,11 @@ class Transition:
                     modified_node.replicas = dest_nodes_backup[modified_node]["replicas"]
                 self._app_perf_surplus = app_perf_surplus_backup
                 self._app_perf_increment = app_perf_increment_backup
-                self.recycling.removed_containers = removed_containers_backup
+                self._recycling.obsolete_containers = removed_containers_backup
             else:
                 # Complete the list of containers allocatable in the next transisition step and remove them
                 # from the list of unallocated containers
-                self._allocatable_cs.append((node, cc, allocatable_replicas))
+                self._allocatable_cs_next_step.append((node, cc, allocatable_replicas))
                 index = self._unalloc_node_cs.index((node, cc, replicas_to_allocate))
                 replicas_to_allocate -= allocatable_replicas
                 if replicas_to_allocate > 0:
@@ -631,7 +552,7 @@ class Transition:
         :param app_performance: Application performances.
         :return: An allocation.
         """
-        fcma_problem = Fcma(self.system, workloads=app_performance)
+        fcma_problem = Fcma(self._system, workloads=app_performance)
         solving_pars = SolvingPars(speed_level=3)
         solution = fcma_problem.solve(solving_pars)
         allocation = []
@@ -651,11 +572,12 @@ class Transition:
         if not command.is_null() or append_null_command:
             self._commands.append(command)
 
-    def _commands_post_process(self):
+    def _post_process_commands(self):
         """
-        Perform command list post-processing:
+        Perform post-processing on the comand list:
         - Remove empty commands.
-        - For each obsolete node, remove all except its last remove operation.
+        - For each obsolete node, remove all except its last remove operation. Note that obsolete nodes are not
+        actually removed from the allocation.
         - Replace Vmt nodes by Vm nodes.
         """
 
@@ -679,31 +601,34 @@ class Transition:
                             self._commands.remove(previous_command)
                     last_node_removal_command[node_to_remove] = command
         for node_to_remove in last_node_removal_command:
-            self.current_alloc.remove(node_to_remove)
+            self._current_alloc.remove(node_to_remove)
 
         # Replace Vmt nodes by nodes Vm nodes in the commands
         for command in self._commands:
             command.vmt_to_vm()
 
-    def _get_transition_time_sync(self) -> int:
+    @staticmethod
+    def get_transition_time(commands: list[Command], timing_args: TimedOps.TimingArgs) -> int:
         """
-        Get the transition time from the current list of commands.
+        Get the transition time from a list of commands.
+        :param commands: A list of commands.
+        :param timing_args: Creation/removal times of nodes and containers.
         :return: The transition time.
         """
         transition_time = 0
         last_node_removal_time = -1
-        for command in self._commands:
+        for command in commands:
             if len(command.create_nodes) > 0:
-                assert self._commands.index(command) == 0, "Nodes must be created in the first command"
-            if command.sync_on_nodes_creation and len(self._commands[0].create_nodes) > 0:
-                assert self._commands.index(command) > 0, "Invalid sync on first command"
-                transition_time = max(transition_time, self.timing_args.node_creation_time)
+                assert commands.index(command) == 0, "Nodes must be created in the first command"
+            if command.sync_on_nodes_creation and len(commands[0].create_nodes) > 0:
+                assert commands.index(command) > 0, "Invalid sync on first command"
+                transition_time = max(transition_time, timing_args.node_creation_time)
             if len(command.remove_containers) > 0:
-                transition_time += self.timing_args.container_removal_time
+                transition_time += timing_args.container_removal_time
             if len(command.remove_nodes) > 0:
-                last_node_removal_time = transition_time + self.timing_args.node_removal_time
+                last_node_removal_time = transition_time + timing_args.node_removal_time
             if len(command.allocate_containers) > 0:
-                transition_time += self.timing_args.container_creation_time
+                transition_time += timing_args.container_creation_time
         return max(transition_time, last_node_removal_time)
 
     def calculate_sync(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
@@ -723,18 +648,18 @@ class Transition:
         self._commands = []
 
         # Calculate the minimum application performance during the transition
-        min_perf = Transition._get_min_perf(initial_alloc, final_alloc)
+        min_perf, _ = get_min_max_perf(initial_alloc, final_alloc)
 
         # Now it is time to transition from the initial allocation to the final allocation, so
         # start with the initial allocation. All the nodes are changed to the Vmt format
-        self.current_alloc = [Vmt(node) for node in initial_alloc]
+        self._current_alloc = [Vmt(node) for node in initial_alloc]
         final_alloc_vmt = [Vmt(node) for node in final_alloc]
-        vm_to_vmt = dict(zip(initial_alloc, self.current_alloc)) | \
+        vm_to_vmt = dict(zip(initial_alloc, self._current_alloc)) | \
                     dict(zip(final_alloc, final_alloc_vmt))
 
         # Calculate recycled node pairs, new nodes, nodes to remove, recycled containers, new containers
         # and containers to remove when transitioning from the initial allocation to the final allocation
-        self.recycling = RecyclingVmt(Recycling(initial_alloc, final_alloc), vm_to_vmt)
+        self._recycling = RecyclingVmt(Recycling(initial_alloc, final_alloc), vm_to_vmt)
 
         # Initialize the remove-allocate-copy algorithm, which is executed iteratively during the transition
         self._transition_init(min_perf)
@@ -742,26 +667,25 @@ class Transition:
         # The node creation operation is the most time-consuming one. Therefore, it is the first operation
         # to be performed. This command may be empty if there are no new nodes in the final allocation.
         # Note that the command can be extended later to include the creation of temporal nodes
-        creation_nodes_command = Command(create_nodes=self.recycling.new_nodes)
+        creation_nodes_command = Command(create_nodes=self._recycling.new_nodes)
         self._append_command(creation_nodes_command, append_null_command=True)
 
         # The remove.allocate-copy algorithm is repeated until either it can not advance, or the time limit is reached.
         # Three scenarios will be possible at the end of this code snippet:
         # (a) The transition of recycled nodes has completed.
         # (b) The transition can not advance until new nodes are available.
-        # (c) The transition has been interrupted just before surpassing the node creation time.
+        # (c) The transition has been interrupted just after surpassing the transition time limit.
         transition_time = 0
         while True:
             command = self._remove_allocate_copy()
             # Scenarios (a) or (b)
             if len(command.allocate_containers) == 0:
-                # Commands with only container/node removal are possible
+                # Commands with only container/node removals are possible
                 self._append_command(command)
                 break
             # Scenario (c).
-            command_time = command.get_container_command_time(self.timing_args)
+            command_time = command.get_container_command_time(self._timing_args)
             if transition_time + command_time > self._time_limit:
-                # Commands with container allocation are possible even if the time limit is not fulffiled
                 self._append_command(command)
                 break
             self._append_command(command)
@@ -771,38 +695,38 @@ class Transition:
         # containers in temporal nodes.
         containers_in_new_nodes = [
             (n, cc, replicas)
-            for n, cc_replicas in self.recycling.new_containers.items()
-            if n in self.recycling.new_nodes
+            for n, cc_replicas in self._recycling.new_containers.items()
+            if n in self._recycling.new_nodes
             for cc, replicas in cc_replicas.items()
         ]
         allocate_new_nodes_command = Command(allocate_containers=containers_in_new_nodes)
         allocate_new_nodes_command.sync_on_nodes_creation = True
         # New nodes with allocated containers are added to the current allocation
-        self.current_alloc.extend([new_node for new_node in self.recycling.new_nodes])
+        self._current_alloc.extend(self._recycling.new_nodes)
         # Update application's performance surplus and unallocated performance
         for _, cc, replicas in containers_in_new_nodes:
             self._app_perf_increment[cc.app] += replicas * cc.perf
             self._app_unalloc_perf[cc.app] -= replicas * cc.perf
-            assert self._app_unalloc_perf[cc.app] >= 0, "Invalid performance"
+            assert self._app_unalloc_perf[cc.app].magnitude >= - Transition._DELTA, "Invalid performance"
         self._append_command(allocate_new_nodes_command, append_null_command=True)
 
         # If there are still unallocated containers in recycled nodes
-        if len(self._allocatable_cs) > 0 or len(self._unalloc_node_cs) > 0:
+        if len(self._allocatable_cs_next_step) > 0 or len(self._unalloc_node_cs) > 0:
             # Try to allocate containers again, since new nodes provide new allocation opportunities
             command = self._remove_allocate_copy()
             self._append_command(command)
 
             if len(self._unalloc_node_cs) == 0:
-                if len(self._allocatable_cs) > 0:
+                if len(self._allocatable_cs_next_step) > 0:
                     # Extend a little the transition time instead of creating temporal nodes
                     self._append_command(self._remove_allocate_copy())
             # If new nodes are not enough to complete the transition of recycled nodes, temporal nodes are required
             else:
                 # Add a dummy node with enough capacity to allocate any number of containers
-                dummy_node = Vmt(Vm(self.current_alloc[0].ic, ignore_ic_index=True))
+                dummy_node = Vmt(Vm(self._current_alloc[0].ic, ignore_ic_index=True))
                 dummy_node.free_cores *= 10E12
                 dummy_node.free_mem *= 10E12
-                self.current_alloc.append(dummy_node)
+                self._current_alloc.append(dummy_node)
 
                 # Calculate application's performance provided by temporal nodes to allocate the
                 # remaining containers
@@ -816,8 +740,9 @@ class Transition:
                 # Get an allocation for application's performance on temporal nodes
                 tmp_nodes = [Vmt(node) for node in self.get_allocation(tmp_app_perf)]
                 for tmp_node_index in range(len(tmp_nodes)):
-                    # Change the id of temporal nodes to negative values
+                    # Change the id of temporal nodes to negative values to be easily identified
                     tmp_nodes[tmp_node_index].id = -(tmp_node_index + 1)
+                    tmp_nodes[tmp_node_index].vm.id = -(tmp_node_index + 1)
                 creation_nodes_command.create_nodes.extend(tmp_nodes)
                 containers_in_tmp_nodes = [
                     (node, cc, replicas)
@@ -833,19 +758,20 @@ class Transition:
                 allocate_new_nodes_command.allocate_containers.extend(containers_in_tmp_nodes)
 
                 # Remove obsolete containers and nodes from the recycling object
-                del self.recycling.removed_containers[dummy_node]
+                del self._recycling.obsolete_containers[dummy_node]
                 for tmp_node in tmp_nodes:
-                    self.recycling.removed_containers[tmp_node] = dict(tmp_node.replicas)
-                    self.recycling.removed_nodes.append(tmp_node)
+                    self._recycling.obsolete_containers[tmp_node] = dict(tmp_node.replicas)
+                    self._recycling.obsolete_nodes.append(tmp_node)
 
                 # Replace the dummy node with temporal nodes
-                self.current_alloc.remove(dummy_node)
-                self.current_alloc.extend(tmp_nodes)
+                self._current_alloc.remove(dummy_node)
+                self._current_alloc.extend(tmp_nodes)
 
                 self._append_command(command)
 
-        # Two remove-allocate-copy steps may be necessary to complete the transition.
-        # At most, the second remove-allocate-copy only removes obsolete containers and nodes
+        # Two remove-allocate-copy steps may be necessary to complete the transition. The first
+        # command to remove obsolete containers and next allocate the remaining new containers in recycled nodes.
+        # The second command to remove containers from the temporal nodes and next the temporal nodes
         first_command = self._remove_allocate_copy()
         if not first_command.is_null():
             self._append_command(first_command)
@@ -853,13 +779,13 @@ class Transition:
         if not second_command.is_null():
             self._append_command(second_command)
 
-        # Post-processing operations to obtain the final list commands
-        self._commands_post_process()
+        # Post-processing operations to obtain the final command list
+        self._post_process_commands()
 
         # Check whether the commands implement a valid transition between the initial and the final allocations
         Transition.check_transition(initial_alloc, final_alloc, self._commands)
 
-        return self._commands, self._get_transition_time_sync()
+        return self._commands, Transition.get_transition_time(self._commands, self._timing_args)
 
     def calculate_async(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
         """
@@ -871,17 +797,15 @@ class Transition:
         :return: A list of commands and the worst-case time to perform the transition.
         """
         sync_commands, worst_case_time = self.calculate_sync(initial_alloc, final_alloc)[:]
-        for command in sync_commands:
+        for command in sync_commands[:]:
             if command.sync_on_nodes_creation:
-                new_first_command = Command()
-                new_first_command.create_nodes = sync_commands[0].create_nodes
-                new_first_command.allocate_containers = command.allocate_containers
-                sync_commands.remove(command)
-                sync_commands.pop(0)
-                sync_commands.insert(0, new_first_command)
+                sync_commands[0].allocate_containers.extend(command.allocate_containers)
+                command.allocate_containers.clear()
+                command.sync_on_nodes_creation = False
+                if command.is_null():
+                    sync_commands.remove(command)
                 break
         return sync_commands, worst_case_time
-
 
     def _debug_perf_surplus_balance(self) -> dict[Vmt, RequestsPerTime]:
         """
@@ -892,9 +816,9 @@ class Transition:
         balance = dict(self._app_perf_surplus)
         for app, perf in self._app_perf_increment.items():
             balance[app] += perf
-        for node, cc, replicas in self._unalloc_node_cs + self._allocatable_cs:
+        for node, cc, replicas in self._unalloc_node_cs + self._allocatable_cs_next_step:
             balance[cc.app] += cc.perf * replicas
-        for node, cc_replicas in self.recycling.removed_containers.items():
+        for node, cc_replicas in self._recycling.obsolete_containers.items():
             for cc, replicas in cc_replicas.items():
                 balance[cc.app] -= cc.perf * replicas
         return balance
@@ -913,7 +837,7 @@ class Transition:
         def allocation_signature(alloc: list[Vmt]) -> Counter:
             """
             Get a signature to compare allocations.
-            :param alloc: Allocation
+            :param alloc: Allocation.
             :return: Signature
             """
             serializable_alloc = []
@@ -925,7 +849,7 @@ class Transition:
                 serializable_alloc.append(serializable_node)
             return Counter([dumps(node, sort_keys=True) for node in serializable_alloc])
 
-        min_perf = Transition._get_min_perf(initial_alloc, final_alloc)
+        min_perf, _ = get_min_max_perf(initial_alloc, final_alloc)
         initial_alloc_vmt = [Vmt(node) for node in initial_alloc]
         final_alloc_vmt = [Vmt(node) for node in final_alloc]
         vm_to_vmt = dict(zip(initial_alloc, initial_alloc_vmt))
@@ -937,9 +861,9 @@ class Transition:
             app_perf_increment = defaultdict(lambda: 0)
 
             # Remove container commands
-            removed_cc_replicas = []
+            obsolete_cc_replicas = []
             for node, cc, replicas in command.remove_containers:
-                removed_cc_replicas.append((node, cc))
+                obsolete_cc_replicas.append((node, cc))
                 op_str = f'Command #{command_index}. Remove containers ({node}, {cc}, {replicas})'
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
@@ -971,7 +895,7 @@ class Transition:
             # Add container commands
             for node, cc, replicas in command.allocate_containers:
                 op_str = f'Command #{command_index}. Allocate containers ({node}, {cc}, {replicas})'
-                if (node, cc) in removed_cc_replicas:
+                if (node, cc) in obsolete_cc_replicas:
                     raise ValueError(f'{op_str} -> Removing and adding identical containers in same command')
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
@@ -991,7 +915,7 @@ class Transition:
                 op_str = f'Command #{command_index}. Remove node ({node})'
                 if node_vmt not in initial_alloc_vmt:
                     raise ValueError(f'{op_str} -> Invalid node')
-                for cc in node_vmt.replicas:
+                for _ in node_vmt.replicas:
                         raise ValueError(f'{op_str} -> Node allocates containers')
                 initial_alloc_vmt.remove(node_vmt)
 

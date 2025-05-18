@@ -1,5 +1,5 @@
 """
-Main module of the ascal package. It defines class Ascal to calculate the sequence of deployments for
+Main module of the ascal package. It defines class Ascal to calculate the sequence of allocations for
 a given autoscaler and applications
 """
 from copy import deepcopy
@@ -32,9 +32,9 @@ class AscalConfig:
                  autoscaler_type: AutoscalerTypes = AutoscalerTypes.H_REACTIVE):
         """
         Ascal configuration.
-        :param system: System, made up of applications and containers
-        :param workload_vectors: Application workloads
-        :param autoscaler_type: Autoscaler to be used
+        :param system: System, made up of applications and containers.
+        :param workload_vectors: Application workloads.
+        :param autoscaler_type: Autoscaler to be used.
         """
         self.system = system
         if self.system is None:
@@ -95,7 +95,8 @@ class AscalConfig:
                     algorithm = AutoscalerTypes.FCMA3
                 config.autoscaler = HVPredictiveAutoscaler(data['autoscalers']['hv_predictive']['prediction_window'],
                                                          data['autoscalers']['hv_predictive']['prediction_percentile'],
-                                                         timing_args, algorithm)
+                                                         timing_args, algorithm,
+                                                         data['autoscalers']['hv_predictive']['transition_time_budget'])
             # Set the system
             config.system = {}
             config.apps = []
@@ -163,9 +164,9 @@ class AscalConfig:
         def check_fields(data: dict, keys: list[str], types: list[type]):
             """
             Check the fields type and value for the given data.
-            :param data: Dictionary with the data to check
-            :param keys: List of keys to check
-            :param types: List of epected types for the keys
+            :param data: Dictionary with the data to check.
+            :param keys: List of keys to check.
+            :param types: List of epected types for the keys.
             """
             for i in range(len(keys)):
                 if keys[i] not in data:
@@ -196,8 +197,8 @@ class AscalConfig:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
             elif key == "hv_predictive":
                 check_fields(config["autoscalers"][key],
-                             ["prediction_window", "prediction_percentile", "algorithm"],
-                             [int, int, str])
+                             ["prediction_window", "prediction_percentile", "algorithm", "transition_time_budget"],
+                             [int, int, str, int])
                 if config["autoscalers"]["hv_predictive"]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
         if "autoscaler" not in config:
@@ -235,7 +236,7 @@ class AscalConfig:
 
 class Ascal:
     """
-    This class provides methods to simulate the autoscaling of a system under a given load.
+    This class provides methods to simulate the autoscaling of a system under a given load trace.
     """
 
     def __init__(self, ascal_config: AscalConfig, log=None):

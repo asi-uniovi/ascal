@@ -201,7 +201,7 @@ class Recycling:
         Calculate the node recycling from a list of initial nodes and a list of final nodes.
         :param initial_nodes: Initial nodes.
         :param final_nodes: Final nodes.
-        :return: A dictionary with "removed", "recycled", "new" and "level" keys storing: a list of removed nodes
+        :return: A dictionary with "obsolete", "recycled", "new" and "level" keys storing: a list of obsolete nodes
         (initial nodes not recycled), a list of tuples (initial node, final node) that are recycled, a list of
         new nodes (final nodes not recycled) and a measurement of node recycling.
         """
@@ -225,9 +225,9 @@ class Recycling:
             recycling_node_pairs, recycling_level = Recycling._ilp_solver(initial_nodes, final_nodes)
         # If the combinatorial solver or the ILP solver provide a solution
         if recycling_node_pairs is not None:
-            removed_nodes = [node for node in initial_nodes if node not in [pair[0] for pair in recycling_node_pairs]]
+            obsolete_nodes = [node for node in initial_nodes if node not in [pair[0] for pair in recycling_node_pairs]]
             new_nodes = [node for node in final_nodes if node not in [pair[1] for pair in recycling_node_pairs]]
-            return {"removed": removed_nodes, "recycled_pairs": recycling_node_pairs, "new": new_nodes,
+            return {"obsolete": obsolete_nodes, "recycled_pairs": recycling_node_pairs, "new": new_nodes,
                     "level": recycling_level}
 
         # If the problem was too large for the ILP solver then partition the node recycling problem.
@@ -241,26 +241,26 @@ class Recycling:
             partition_initial_nodes.extend(partition[0])
             partition_final_nodes.extend(partition[1])
             # The recycling calculation is performed on each partition recursively.
-            # Neither new nor removed nodes are possible, since partitions have the
+            # Neither new nor obsolete nodes are possible, since partitions have the
             # same number of initial and final nodes
             recycling = Recycling._calculate_node_recycling(partition[0], partition[1])
             recycling_node_pairs.extend(recycling["recycled_pairs"])
             recycling_sum += recycling["level"] * len(partition[0])
-        removed_nodes = [node for node in initial_nodes if node not in partition_initial_nodes]
+        obsolete_nodes = [node for node in initial_nodes if node not in partition_initial_nodes]
         new_nodes = [node for node in final_nodes if node not in partition_final_nodes]
-        return {"removed": removed_nodes, "recycled_pairs": recycling_node_pairs, "new": new_nodes,
+        return {"obsolete": obsolete_nodes, "recycled_pairs": recycling_node_pairs, "new": new_nodes,
                 "level": recycling_sum / len(initial_nodes)}
 
     def _calculate_container_recycling(self):
         """
-        Calculate the removed containers, new containers and recycled containers from the list of removed nodes,
+        Calculate the obsolete containers, new containers and recycled containers from the list of obsolete nodes,
         new nodes and recycled node pairs.
         """
-        self.removed_containers = {}
-        for node in self.removed_nodes:
-            self.removed_containers[node] = defaultdict(lambda: 0)
+        self.obsolete_containers = {}
+        for node in self.obsolete_nodes:
+            self.obsolete_containers[node] = defaultdict(lambda: 0)
             for cg in node.cgs:
-                self.removed_containers[node][cg.cc] = cg.replicas
+                self.obsolete_containers[node][cg.cc] = cg.replicas
         self.new_containers = {}
         for node in self.new_nodes:
             self.new_containers[node] = defaultdict(lambda: 0)
@@ -273,13 +273,13 @@ class Recycling:
                 found_cc_in_final_node = False
                 for cg2 in final_node.cgs:
                     # Containers in the same container class for both the initial and final nodes
-                    # may be recycled, removed or new, depending on the number
+                    # may be recycled, obsolete or new, depending on the number
                     if str(cg1.cc) == str(cg2.cc):
                         self.recycled_containers[initial_node][cg1.cc] = min(cg1.replicas, cg2.replicas)
                         if cg1.replicas > cg2.replicas:
-                            if initial_node not in self.removed_containers:
-                                self.removed_containers[initial_node] = defaultdict(lambda: 0)
-                            self.removed_containers[initial_node][cg1.cc] += cg1.replicas - cg2.replicas
+                            if initial_node not in self.obsolete_containers:
+                                self.obsolete_containers[initial_node] = defaultdict(lambda: 0)
+                            self.obsolete_containers[initial_node][cg1.cc] += cg1.replicas - cg2.replicas
                         elif cg1.replicas < cg2.replicas:
                             if initial_node not in self.new_containers:
                                 self.new_containers[initial_node] = defaultdict(lambda : 0)
@@ -288,9 +288,9 @@ class Recycling:
                         break
                 # If the container class appears only in the initial node
                 if not found_cc_in_final_node:
-                    if initial_node not in self.removed_containers:
-                        self.removed_containers[initial_node] =  defaultdict(lambda : 0)
-                    self.removed_containers[initial_node][cg1.cc] += cg1.replicas
+                    if initial_node not in self.obsolete_containers:
+                        self.obsolete_containers[initial_node] =  defaultdict(lambda : 0)
+                    self.obsolete_containers[initial_node][cg1.cc] += cg1.replicas
             # Find containers in the final node in container classes that do not appear in the initial nodes
             for cg2 in final_node.cgs:
                 found_cc_in_initial_node = False
@@ -358,14 +358,14 @@ class Recycling:
     def __init__(self, initial_alloc: Allocation, final_alloc: Allocation):
         """
         Constructor for the Recycling class. The Reycling class object defines properties to get the new nodes,
-        removed nodes, node recycling pairs, removed containers, new containers and recycled containers.
+        obsolete nodes, node recycling pairs, obsolete containers, new containers and recycled containers.
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation
         """
-        self.removed_nodes: list[Vm] = [] # Removed nodes. They come from the initial nodes.
+        self.obsolete_nodes: list[Vm] = [] # Obsolete nodes. They come from the initial nodes.
         self.recycled_node_pairs: dict[Vm, Vm] = {} # Recyclings for the initial nodes
         self.new_nodes: list[Vm] = [] # New nodes. They come from the final nodes.
-        self.removed_containers:  dict[Vm, dict[ContainerClass, int]] = {} # From removed and recycled nodes
+        self.obsolete_containers:  dict[Vm, dict[ContainerClass, int]] = {} # From obsolete and recycled nodes
         self.recycled_containers: dict[Vm, dict[ContainerClass, int]] = {} # From recycled nodes
         self.new_containers: dict[Vm, dict[ContainerClass, int]] = {} # From new and recycled nodes
         # All the recycling levels in [0, 1]
@@ -388,13 +388,13 @@ class Recycling:
             else:
                 final_ic_nodes[node.ic].append(node)
 
-        # Some removed and new nodes are known in advance since they come from instance classes that appear
+        # Some obsolete and new nodes are known in advance since they come from instance classes that appear
         # only in the initial or final nodes. In addition, get all the nodes that may be recycled
         initial_recyclable_nodes = {}
         final_recyclable_nodes = {}
         for ic, nodes in initial_ic_nodes.items():
             if ic not in final_ic_nodes:
-                self.removed_nodes.extend(nodes)
+                self.obsolete_nodes.extend(nodes)
             else:
                 initial_recyclable_nodes[ic] = nodes
         for ic, nodes in final_ic_nodes.items():
@@ -404,19 +404,19 @@ class Recycling:
                 final_recyclable_nodes[ic] = nodes
 
         # Nodes that may be recyclable will be divided into:
-        # - Removed => Recyclable initial nodes that are not finally recycled.
+        # - Obsolete => Recyclable initial nodes that are not finally recycled.
         # - New => Recyclable final nodes that do not come from recycling an initial node.
         # - Recycled => Pairs of recyclable initial and final nodes that are finally recycled.
         for ic in initial_recyclable_nodes:
-            # Calculate additional removed and new nodes, recycled nodes and the recycling level
+            # Calculate additional obsolete and new nodes, recycled nodes and the recycling level
             node_recyclings = Recycling._calculate_node_recycling(initial_recyclable_nodes[ic],
                                                                   final_recyclable_nodes[ic])
-            self.removed_nodes.extend(node_recyclings["removed"])
+            self.obsolete_nodes.extend(node_recyclings["obsolete"])
             for recycled_pair in node_recyclings["recycled_pairs"]:
                 self.recycled_node_pairs[recycled_pair[0]] = recycled_pair[1]
             self.new_nodes.extend(node_recyclings["new"])
 
-        # Calculate removed, recycled and new containers
+        # Calculate obsolete, recycled and new containers
         self._calculate_container_recycling()
 
         # Calculate recycling levels
