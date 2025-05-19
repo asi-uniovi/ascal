@@ -10,14 +10,15 @@ autoscalers:
     time_period: 60 # Time period to evaluate autoscaling
     desired_cpu_utilization: 0.7  # Desired CPU utilization
     algorithm: fcma
-    transition_time_budget: 100 # Approximate time budget for the transition
+    transition_time_budget: 100 # Approximate time budget for the transition (0 for simple transaction)
   hv_predictive: # Horizontal/vertical+predictive autoscaling
-    prediction_window: 1200 # Prediction period in seconds
+    prediction_window: 600 # Prediction window in seconds
     prediction_percentile: 95
     algorithm: fcma
+    transition_time_budget: 200 # Approximate time budget for the transition (0 for simple transaction)
 
 # Select autoscaler
-autoscaler: hv_reactive
+autoscaler: hv_predictive
 
 # Times in seconds
 node_time_to_billing: 20 # Time from the request of creating a node, until it starts to be billed.
