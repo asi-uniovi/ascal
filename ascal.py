@@ -22,6 +22,7 @@ from autoscalers import (
     HReactiveAutoscaler,
     HVReactiveAutoscaler,
     HVPredictiveAutoscaler,
+    HReactiveHVReactiveAutoscaler,
     TimedOps
 )
 from nodestates import NodeStates
@@ -48,6 +49,10 @@ class AscalConfig:
             self.autoscaler = HVReactiveAutoscaler()
         elif autoscaler_type == AutoscalerTypes.HV_PREDICTIVE:
             self.autoscaler = HVPredictiveAutoscaler()
+        elif autoscaler_type == AutoscalerTypes.H_REACTIVE_HV_REACTIVE:
+            self.autoscaler = HVPredictiveAutoscaler()
+        elif autoscaler_type == AutoscalerTypes.H_REACTIVE_HV_PREDICTIVE:
+            self.autoscaler = HVPredictiveAutoscaler()
 
 
     @staticmethod
@@ -69,10 +74,12 @@ class AscalConfig:
                                               data['container_removal_time'])
             # Set the autoscaler
             if data['autoscaler'] == 'h_reactive':
-                config.autoscaler = HReactiveAutoscaler(data['autoscalers']['h_reactive']['time_period'],
-                                                        data['autoscalers']['h_reactive']['desired_cpu_utilization'],
-                                                        data['autoscalers']['h_reactive']['node_utilization_threshold'],
-                                                        timing_args)
+                config.autoscaler = HReactiveAutoscaler(
+                    data['autoscalers']['h_reactive']['time_period'],
+                    data['autoscalers']['h_reactive']['desired_cpu_utilization'],
+                    data['autoscalers']['h_reactive']['node_utilization_threshold'],
+                    timing_args
+                )
             elif data['autoscaler'] == 'hv_reactive':
                 algorithm = AutoscalerTypes.FCMA
                 if data['autoscalers']['hv_reactive']['algorithm'] == 'fcma1':
@@ -81,10 +88,13 @@ class AscalConfig:
                     algorithm = AutoscalerTypes.FCMA2
                 elif data['autoscalers']['hv_reactive']['algorithm'] == 'fcma3':
                     algorithm = AutoscalerTypes.FCMA3
-                config.autoscaler = HVReactiveAutoscaler(data['autoscalers']['hv_reactive']['time_period'],
-                                                         data['autoscalers']['hv_reactive']['desired_cpu_utilization'],
-                                                         timing_args, algorithm,
-                                                         data['autoscalers']['hv_reactive']['transition_time_budget'])
+                config.autoscaler = HVReactiveAutoscaler(
+                    data['autoscalers']['hv_reactive']['time_period'],
+                    data['autoscalers']['hv_reactive']['desired_cpu_utilization'],
+                    timing_args,
+                    algorithm,
+                    data['autoscalers']['hv_reactive']['transition_time_budget']
+                )
             elif data['autoscaler'] == 'hv_predictive':
                 algorithm = AutoscalerTypes.FCMA
                 if data['autoscalers']['hv_predictive']['algorithm'] == 'fcma1':
@@ -93,10 +103,31 @@ class AscalConfig:
                     algorithm = AutoscalerTypes.FCMA2
                 elif data['autoscalers']['hv_predictive']['algorithm'] == 'fcma3':
                     algorithm = AutoscalerTypes.FCMA3
-                config.autoscaler = HVPredictiveAutoscaler(data['autoscalers']['hv_predictive']['prediction_window'],
-                                                         data['autoscalers']['hv_predictive']['prediction_percentile'],
-                                                         timing_args, algorithm,
-                                                         data['autoscalers']['hv_predictive']['transition_time_budget'])
+                config.autoscaler = HVPredictiveAutoscaler(
+                    data['autoscalers']['hv_predictive']['prediction_window'],
+                    data['autoscalers']['hv_predictive']['prediction_percentile'],
+                    timing_args,
+                    algorithm,
+                    data['autoscalers']['hv_predictive']['transition_time_budget']
+                )
+            elif data['autoscaler'] == 'h_reactive_hv_reactive':
+                algorithm = AutoscalerTypes.FCMA
+                if data['autoscalers']['h_reactive_hv_reactive']['hv_algorithm'] == 'fcma1':
+                    algorithm = AutoscalerTypes.FCMA1
+                elif  data['autoscalers']['h_reactive_hv_reactive']['hv_algorithm'] == 'fcma2':
+                    algorithm = AutoscalerTypes.FCMA2
+                elif data['autoscalers']['h_reactive_hv_reactive']['hv_algorithm'] == 'fcma3':
+                    algorithm = AutoscalerTypes.FCMA3
+                config.autoscaler = HReactiveHVReactiveAutoscaler(
+                    data['autoscalers']['h_reactive_hv_reactive']['h_time_period'],
+                    data['autoscalers']['h_reactive_hv_reactive']['desired_cpu_utilization'],
+                    data['autoscalers']['h_reactive_hv_reactive']['h_node_utilization_threshold'],
+                    timing_args,
+                    algorithm,
+                    data['autoscalers']['h_reactive_hv_reactive']['hv_time_period'],
+                    data['autoscalers']['h_reactive_hv_reactive']['hv_transition_time_budget']
+                )
+
             # Set the system
             config.system = {}
             config.apps = []
@@ -183,23 +214,53 @@ class AscalConfig:
         for key in config["autoscalers"]:
             if not isinstance(config["autoscalers"][key], dict):
                 raise ValueError("Available autoscalers must be dictionaries")
-            if key not in ["h_reactive", "hv_reactive", "hv_predictive"]:
-                raise ValueError("Valid autoscalers: 'h_reactive', 'hv_reactive', 'hv_predictive'")
+            valid_autoscalers = ["h_reactive", "hv_reactive", "hv_predictive", "h_reactive_hv_reactive"]
+            if key not in valid_autoscalers:
+                raise ValueError(f"Valid autoscalers: {valid_autoscalers}")
             if key == "h_reactive":
                 check_fields(config["autoscalers"][key],
                              ["time_period", "desired_cpu_utilization", "node_utilization_threshold"],
                              [int, float, float])
+                if config["autoscalers"][key]["time_period"] < 0:
+                    raise ValueError("Time period must be possitive")
+                if config["autoscalers"][key]["desired_cpu_utilization"] < 0.1:
+                    raise ValueError("Desired CPU utilization must be >= 0.1")
+                if config["autoscalers"][key]["node_utilization_threshold"] < 0.1:
+                    raise ValueError("Desired CPU utilization must be >= 0.1")
             elif key == "hv_reactive":
                 check_fields(config["autoscalers"][key],
                             ["time_period", "desired_cpu_utilization", "algorithm", "transition_time_budget"],
                              [int, float, str, int])
-                if config["autoscalers"]["hv_reactive"]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
+                if config["autoscalers"][key]["time_period"] < 0:
+                    raise ValueError("Time period must be possitive")
+                if config["autoscalers"][key]["desired_cpu_utilization"] < 0.1:
+                    raise ValueError("Desired CPU utilization must be >= 0.1")
+                if config["autoscalers"][key]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
             elif key == "hv_predictive":
                 check_fields(config["autoscalers"][key],
                              ["prediction_window", "prediction_percentile", "algorithm", "transition_time_budget"],
                              [int, int, str, int])
-                if config["autoscalers"]["hv_predictive"]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
+                if config["autoscalers"][key]["prediction_window"] < 10:
+                    raise ValueError("Prediction window must be >= 10")
+                if config["autoscalers"][key]["prediction_percentile"] < 0.1:
+                    raise ValueError("Prediction percentile must be >= 0.1")
+                if config["autoscalers"][key]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
+                    raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
+            elif key == "h_reactive_hv_reactive":
+                check_fields(config["autoscalers"][key],
+                             ["h_time_period", "h_node_utilization_threshold", "desired_cpu_utilization",
+                             "hv_time_period", "hv_algorithm", "hv_transition_time_budget"],
+                             [int, float, float, int, str, int])
+                h_time_period = config["autoscalers"][key]["h_time_period"]
+                hv_time_period = config["autoscalers"][key]["hv_time_period"]
+                if h_time_period == 0 or hv_time_period % h_time_period > 0 or hv_time_period / h_time_period < 2:
+                    raise ValueError("HV time period must be a multiple 2x or higher of h time period")
+                if config["autoscalers"][key]["desired_cpu_utilization"] < 0.1:
+                    raise ValueError("Desired CPU utilization must be >= 0.1")
+                if config["autoscalers"][key]["h_node_utilization_threshold"] < 0.1:
+                    raise ValueError("Desired CPU utilization must be >= 0.1")
+                if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
         if "autoscaler" not in config:
             raise ValueError("Field 'autoscaler' is missing")

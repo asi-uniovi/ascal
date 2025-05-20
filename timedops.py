@@ -61,7 +61,7 @@ class TimedOps:
         :param priorize_events: Set to priorize the processing of events released at the same time.
         """
         self.time_args = time_args # Times required to create/remove containers and nodes
-        self._event_list: list[tuple[int, TimedOps.Event]] = [] # List of events to handle in the form (time, event)
+        self.event_list: list[tuple[int, TimedOps.Event]] = [] # List of events to handle in the form (time, event)
         self._sorting_required = False # Events must be ordered by time before being processed
         self.node_billing_changed = False # True if node changes affecting node billing occurred at the current time
         self.new_nodes_ready = False # True if there are new nodes ready at the current time
@@ -75,7 +75,7 @@ class TimedOps:
         Check if the event list is empty.
         :return: True when the event list is empty.
         """
-        return len(self._event_list) == 0
+        return len(self.event_list) == 0
 
     def _add_event(self, at_time: int, event: Event):
         """
@@ -86,9 +86,9 @@ class TimedOps:
         assert at_time >= self._last_dispatched_time, "Can not dispatch events in the past"
 
         # Check if the event is previous to the last event in the list. Events must be dispatched in time order
-        if len(self._event_list) > 0 and at_time < self._event_list[-1][0]:
+        if len(self.event_list) > 0 and at_time < self.event_list[-1][0]:
             self._sorting_required = True
-        self._event_list.append((at_time, event))
+        self.event_list.append((at_time, event))
         # If the event occurs at the last dispatched time, it is dispatched to avoid unnecesary delays
         if at_time == self._last_dispatched_time:
             self._dispatch_at_last_time()
@@ -112,19 +112,19 @@ class TimedOps:
         Dispatch events in the list with the same time as the last dispatched time.
         Dispatching an event may modify nodes and container allocations.
         """
-        if len(self._event_list) == 0:
+        if len(self.event_list) == 0:
             return
         if self._sorting_required:
             # Sort events by increasing fire time
-            self._event_list.sort(key=lambda event: event[0])
-        while len(self._event_list) > 0 and self._event_list[0][0] == self._last_dispatched_time:
+            self.event_list.sort(key=lambda event: event[0])
+        while len(self.event_list) > 0 and self.event_list[0][0] == self._last_dispatched_time:
             # Get the first even in the event list
             # (and those with the same release time if priorities are set)
-            release_time, next_event = self._event_list.pop(0)
+            release_time, next_event = self.event_list.pop(0)
             next_events = [next_event]
             if self._priorize_events:
-                while len(self._event_list) > 0 and self._event_list[0][0] == release_time:
-                    next_events.append(self._event_list.pop(0)[1])
+                while len(self.event_list) > 0 and self.event_list[0][0] == release_time:
+                    next_events.append(self.event_list.pop(0)[1])
                 # Sort events using priorities
                 next_events.sort(key=lambda ev: ev.type.value)
             # Execute the callback functions and update node billing, performance and new nodes changes
@@ -158,28 +158,28 @@ class TimedOps:
         self._last_dispatched_time = until_time
 
         # If the list of events is empty, there is nothing to be done
-        if len(self._event_list) == 0:
+        if len(self.event_list) == 0:
             self._sorting_required = False
             return 0
 
         if self._sorting_required:
             # Sort events by increasing fire time
-            self._event_list.sort(key=lambda event: event[0])
+            self.event_list.sort(key=lambda event: event[0])
 
         # Dispatch the events
         dispatched_some_event = False
-        while len(self._event_list) > 0:
+        while len(self.event_list) > 0:
             # Check if we have processed all the events with release time less than or equal to untiL_time
-            if self._event_list[0][0] > until_time:
+            if self.event_list[0][0] > until_time:
                 return dispatched_some_event
             # Get the first event in the event list
             # (and those with the same release time if priorities are set)
             dispatched_some_event = True
-            release_time, next_event = self._event_list.pop(0)
+            release_time, next_event = self.event_list.pop(0)
             next_events = [next_event]
             if self._priorize_events:
-                while len(self._event_list) > 0 and self._event_list[0][0] == release_time:
-                    next_events.append(self._event_list.pop(0)[1])
+                while len(self.event_list) > 0 and self.event_list[0][0] == release_time:
+                    next_events.append(self.event_list.pop(0)[1])
                 # Sort events using priorities
                 next_events.sort(key=lambda ev: ev.type.value)
             # Execute the callback functions and update node billing, performance and new nodes changes

@@ -12,7 +12,7 @@ ascal_config = AscalConfig.get_from_config_yaml(config_file, aws_eu_west_1_c5m5r
 # Create the autoscaling problem
 ascal_problem = Ascal(ascal_config, log=log_file)
 
-# Run the autoscaling problem until the end. The argument of run() method is the last simulation time.
+# Run the autoscaling problem until the end. The argument of run() method is the last simulation time
 ascal_problem.run()
 
 # Write workloads, performance and cost into csv files
@@ -23,6 +23,7 @@ ascal_problem.write_cost_csv('cost.csv')
 # Get application overloads (workload/performance)
 workloads = ascal_problem.get_workloads()
 performances = ascal_problem.get_performances()
+
 overloads = {app: [w/p for w, p in zip(workloads[app], performances[app])] for app in workloads}
 
 # Plot autoscaling information

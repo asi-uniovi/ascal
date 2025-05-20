@@ -16,9 +16,16 @@ autoscalers:
     prediction_percentile: 95
     algorithm: fcma
     transition_time_budget: 200 # Approximate time budget for the transition (0 for simple transaction)
+  h_reactive_hv_reactive:
+    desired_cpu_utilization: 0.7  # Desired CPU utilization for both, the horizontal and vertical autoscaler
+    h_time_period: 60 # Time period to evaluate autoscaling for the horizontal autoscaler
+    h_node_utilization_threshold: 0.5 # Below this utilization, node removal is tried by the horizontal autoscaler
+    hv_time_period: 600 # Time period to evaluate autoscaling for the horizontal/vertical autoscaler
+    hv_algorithm: fcma # Allocation algorithm for the horizontal/vertical autoscaler
+    hv_transition_time_budget: 100 # Approximate time budget for the transition (0 for simple transaction)
 
 # Select autoscaler
-autoscaler: hv_predictive
+autoscaler: h_reactive_hv_reactive
 
 # Times in seconds
 node_time_to_billing: 20 # Time from the request of creating a node, until it starts to be billed.

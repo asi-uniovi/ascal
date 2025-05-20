@@ -146,6 +146,9 @@ class Transition:
             # A deep copy of application's performance surplus
             available_perf_surplus = dict(self._app_perf_surplus)
             for obsolete_cc in self._recycling.obsolete_containers[node]:
+                # We do not remove the same replicas to allocate
+                if obsolete_cc == cc:
+                    continue
                 # Number of required obsolete replicas of the container class to remove
                 required_replicas = max(
                     ceil((required_cores - node.free_cores) / obsolete_cc.cores),
