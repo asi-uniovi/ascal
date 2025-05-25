@@ -18,18 +18,18 @@ class TimedOps:
     _DELTA = 0.000001
 
     class EventTypes(Enum):
-        # Number express event priorities
+        # Low numbers express high event priorities when several events are triggered at the same time
         LOG_MESSAGE = 0
         CREATE_NODE_BEGIN = 1
         CREATE_NODE_BILLED = 2
         CREATE_NODE_END = 3
         START_REPLICAS_GRACE_PERIOD = 4
-        REMOVE_CONTAINER_REPLICAS_BEGIN = 5
-        REMOVE_CONTAINER_REPLICAS_END = 6
-        REMOVE_NODE_BEGIN = 7
-        REMOVE_NODE_END = 8
-        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 9
-        ALLOCATE_CONTAINER_REPLICAS_END = 10
+        REMOVE_CONTAINER_REPLICAS_END = 5
+        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 6 # After the end of removal, since removal frees up resources
+        ALLOCATE_CONTAINER_REPLICAS_END = 7
+        REMOVE_CONTAINER_REPLICAS_BEGIN = 8 # After the end of allocation to meet with performance requeriments
+        REMOVE_NODE_BEGIN = 9
+        REMOVE_NODE_END = 10
 
     @dataclass
     class Event:
@@ -54,11 +54,10 @@ class TimedOps:
         container_creation_time: int = 0 # Time required to create a container
         container_removal_time: int = 0 # Time required to remove a container
 
-    def __init__(self, time_args: TimingArgs, priorize_events: bool=False):
+    def __init__(self, time_args: TimingArgs):
         """
         Create an event-driven timing system for creation/removal of nodes and containers.
         :param time_args: Times required to create/remove nodes and containers.
-        :param priorize_events: Set to priorize the processing of events released at the same time.
         """
         self.time_args = time_args # Times required to create/remove containers and nodes
         self.event_list: list[tuple[int, TimedOps.Event]] = [] # List of events to handle in the form (time, event)
@@ -68,7 +67,6 @@ class TimedOps:
         self.perf_changed = False # True if containers are removed or allocated at the current time
         self._last_dispatched_time = -1 # Current time. It is the time of the last dispatched event
         self.log: Callable[[...], None] = lambda _: None # Method used to print a log message
-        self._priorize_events = priorize_events # Set to priorize events released at the same time
 
     def is_event_list_empty(self) -> bool:
         """
@@ -118,15 +116,13 @@ class TimedOps:
             # Sort events by increasing fire time
             self.event_list.sort(key=lambda event: event[0])
         while len(self.event_list) > 0 and self.event_list[0][0] == self._last_dispatched_time:
-            # Get the first even in the event list
-            # (and those with the same release time if priorities are set)
+            # Get the first even in the event list and those with the same release time
             release_time, next_event = self.event_list.pop(0)
             next_events = [next_event]
-            if self._priorize_events:
-                while len(self.event_list) > 0 and self.event_list[0][0] == release_time:
-                    next_events.append(self.event_list.pop(0)[1])
-                # Sort events using priorities
-                next_events.sort(key=lambda ev: ev.type.value)
+            while len(self.event_list) > 0 and self.event_list[0][0] == release_time:
+                next_events.append(self.event_list.pop(0)[1])
+            # Sort events using priorities
+            next_events.sort(key=lambda ev: ev.type.value)
             # Execute the callback functions and update node billing, performance and new nodes changes
             for next_event in next_events:
                 next_event.callback(next_event)
@@ -172,16 +168,14 @@ class TimedOps:
             # Check if we have processed all the events with release time less than or equal to untiL_time
             if self.event_list[0][0] > until_time:
                 return dispatched_some_event
-            # Get the first event in the event list
-            # (and those with the same release time if priorities are set)
+            # Get the first event in the event list and those with the same release time
             dispatched_some_event = True
             release_time, next_event = self.event_list.pop(0)
             next_events = [next_event]
-            if self._priorize_events:
-                while len(self.event_list) > 0 and self.event_list[0][0] == release_time:
-                    next_events.append(self.event_list.pop(0)[1])
-                # Sort events using priorities
-                next_events.sort(key=lambda ev: ev.type.value)
+            while len(self.event_list) > 0 and self.event_list[0][0] == release_time:
+                next_events.append(self.event_list.pop(0)[1])
+            # Sort events using priorities
+            next_events.sort(key=lambda ev: ev.type.value)
             # Execute the callback functions and update node billing, performance and new nodes changes
             for next_event in next_events:
                 if next_event.callback is not None:
@@ -265,7 +259,7 @@ class TimedOps:
                                containers=(replicas, node, cc, zero_perf_cc),
                                callback=self._at_allocate_container_replicas_end)
         self._add_event(self._last_dispatched_time + self.time_args.container_creation_time, event)
-        self.log(f'Allocating {replicas} replicas {cc.app} on node {node}')
+        self.log(f'Allocating {replicas} replicas {str(cc)} on node {node}')
 
     def _at_allocate_container_replicas_end(self, event: Event):
         """
@@ -360,7 +354,7 @@ class TimedOps:
         if removable_replicas == 0:
             return
 
-        self.log(f'Removing {removable_replicas} replicas {cc.app} from node {node}')
+        self.log(f'Removing {removable_replicas} replicas {str(cc)} from node {node}')
 
         # Move the replicas to remove to a new container group with zero performance
         # replicas and None application (None application means replicas being removed)

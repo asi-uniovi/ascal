@@ -3,7 +3,7 @@ A bunch of auxiliary methods for atoscaling
 """
 
 from collections import defaultdict
-from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass
+from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, System
 from recycling import Recycling
 
 class Vmt:
@@ -129,3 +129,7 @@ def get_min_max_load(load1: dict[App, RequestsPerTime], load2: dict[App, Request
         {app: min(load1.get(app, zero_load), load2.get(app, zero_load)) for app in load1},
         {app: max(load1.get(app, zero_load), load2.get(app, zero_load)) for app in load1},
     )
+
+
+
+

@@ -349,11 +349,8 @@ class Recycling:
         else:
             self.node_recycling_level = 0.5 * (recycled_node_cores / initial_node_cores +
                                                recycled_node_mem / initial_node_mem).magnitude
-        if len(self.recycled_containers) == 0:
-            self.container_recycling_level = 0
-        else:
-            self.container_recycling_level = 0.5 * (recycled_container_cores / initial_container_cores +
-                                                    recycled_container_mem / initial_container_mem).magnitude
+        self.container_recycling_level = 0.5 * ((recycled_container_cores / initial_container_cores).magnitude +
+                                                (recycled_container_mem / initial_container_mem).magnitude)
 
     def __init__(self, initial_alloc: Allocation, final_alloc: Allocation):
         """

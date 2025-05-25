@@ -18,11 +18,13 @@ from fcma import (
     System
 )
 from autoscalers import (
+    Autoscaler,
     AutoscalerTypes,
     HReactiveAutoscaler,
     HVReactiveAutoscaler,
     HVPredictiveAutoscaler,
     HReactiveHVReactiveAutoscaler,
+    HReactiveHVPredictiveAutoscaler,
     TimedOps
 )
 from nodestates import NodeStates
@@ -52,8 +54,55 @@ class AscalConfig:
         elif autoscaler_type == AutoscalerTypes.H_REACTIVE_HV_REACTIVE:
             self.autoscaler = HVPredictiveAutoscaler()
         elif autoscaler_type == AutoscalerTypes.H_REACTIVE_HV_PREDICTIVE:
-            self.autoscaler = HVPredictiveAutoscaler()
+            self.autoscaler = HReactiveHVPredictiveAutoscaler()
 
+    @staticmethod
+    def _get_aggs(data, apps: list[App], aggs) -> dict[App, list[int]]:
+        """
+        Get the aggregation levels for the applications using the horizontal autoscaler.
+        :param data: Data read from the YAML file.
+        :param apps: Applications.
+        :aggs: Agregations read from YAML file.
+        :return: A list of aggregation levels for each application.
+        """
+        aggs_dict = {app: [] for app in apps}
+
+        if isinstance(aggs, int):  # Aggregations in the autoscaler can be a single integer
+            agg = aggs  # Aggregations are in fact a single agregation
+            for app in apps:
+                if agg not in data['apps'][app.name]['container']['aggs']:
+                    raise ValueError("Invalid aggregation level in h_autoscaler")
+                aggs_dict[app] = [agg]
+        elif isinstance(aggs, list):  # Aggregations in the autoscaler can be a list of integers
+            for app in apps:
+                for agg in aggs:
+                    if agg not in data['apps'][app.name]['container']['aggs']:
+                        raise ValueError("Invalid aggregation level in h_autoscaler")
+                aggs_dict[app] = aggs
+        elif isinstance(aggs, dict):  # Aggregations in the autoscaler can be a dictionary
+            app_aggs = aggs
+            aggs_dict = {app: [1] for app in apps}  # Default aggregations
+            app_names = [app.name for app in apps]
+            for app_name, aggs in app_aggs.items():
+                try:
+                    app = apps[app_names.index(app_name)]
+                except ValueError:
+                    raise ValueError("Invalid app in agg field of h_autoscaler")
+                if isinstance(aggs, int):
+                    agg = aggs  # Aggregations are in fact a single agregation
+                    if agg not in data['apps'][app.name]['container']['aggs']:
+                        raise ValueError("Invalid aggregation level in h_autoscaler")
+                    aggs_dict[app] = [agg]
+                elif isinstance(aggs, list):
+                    for agg in aggs:
+                        if agg not in data['apps'][app_name]['container']['aggs']:
+                            raise ValueError("Invalid aggregation level in h_autoscaler")
+                    aggs_dict[app] = aggs
+                else:
+                    raise ValueError("Invalid app in agg field of h_autoscaler")
+        else:
+            raise ValueError("Invalid agg value in h_autoscaler. Use list and int ")
+        return aggs_dict
 
     @staticmethod
     def get_from_config_yaml(yaml_file:str, ic_family: InstanceClassFamily):
@@ -68,7 +117,26 @@ class AscalConfig:
             AscalConfig.validate_config(data)
             config = AscalConfig()
 
-            # Creation/removal times for contaienrs and nodes
+            # Set the system
+            config.system = {}
+            config.apps = []
+            app_names = []
+            for app_name in data['apps']:
+                app = App(app_name)
+                config.apps.append(app)
+                app_names.append(app.name)
+                aggs = (1,)
+                if 'aggs' in data['apps'][app_name]['container']:
+                    aggs = tuple(data['apps'][app_name]['container']['aggs'])
+                cores = ComputationalUnits(data['apps'][app_name]['container']['cpu'])
+                mem_agg1 = Storage(data['apps'][app_name]['container']['mem'])
+                gib = tuple(mem_agg1 for _ in aggs)
+                perf = RequestsPerTime(data['apps'][app_name]['container']['perf'])
+                app_family_perf = AppFamilyPerf(cores=cores, mem=gib, perf=perf, aggs=aggs)
+                config.system[(app, ic_family)] = app_family_perf
+            config.autoscaler.system = config.system
+
+            # Creation/removal times for containers and nodes
             timing_args = TimedOps.TimingArgs(data['node_time_to_billing'], data['node_creation_time'],
                                               data['node_removal_time'], data['container_creation_time'],
                                               data['container_removal_time'])
@@ -78,6 +146,7 @@ class AscalConfig:
                     data['autoscalers']['h_reactive']['time_period'],
                     data['autoscalers']['h_reactive']['desired_cpu_utilization'],
                     data['autoscalers']['h_reactive']['node_utilization_threshold'],
+                    AscalConfig._get_aggs(data, config.apps, aggs = data["autoscalers"]['h_reactive']["aggs"]),
                     timing_args
                 )
             elif data['autoscaler'] == 'hv_reactive':
@@ -127,22 +196,24 @@ class AscalConfig:
                     data['autoscalers']['h_reactive_hv_reactive']['hv_time_period'],
                     data['autoscalers']['h_reactive_hv_reactive']['hv_transition_time_budget']
                 )
-
-            # Set the system
-            config.system = {}
-            config.apps = []
-            for app_name in data['apps']:
-                app = App(app_name)
-                config.apps.append(app)
-                cores = ComputationalUnits(data['apps'][app_name]['container']['cpu'])
-                gib = Storage(data['apps'][app_name]['container']['mem'])
-                perf = RequestsPerTime(data['apps'][app_name]['container']['perf'])
-                aggs = (1,)
-                if 'aggs' in data['apps'][app_name]['container']:
-                    aggs = tuple(data['apps'][app_name]['container']['aggs'])
-                app_family_perf = AppFamilyPerf(cores=cores, mem=gib, perf=perf, aggs=aggs)
-                config.system[(app, ic_family)] = app_family_perf
-            config.autoscaler.system = config.system
+            elif data['autoscaler'] == 'h_reactive_hv_predictive':
+                algorithm = AutoscalerTypes.FCMA
+                if data['autoscalers']['h_reactive_hv_predictive']['hv_algorithm'] == 'fcma1':
+                    algorithm = AutoscalerTypes.FCMA1
+                elif  data['autoscalers']['h_reactive_hv_predictive']['hv_algorithm'] == 'fcma2':
+                    algorithm = AutoscalerTypes.FCMA2
+                elif data['autoscalers']['h_reactive_hv_predictive']['hv_algorithm'] == 'fcma3':
+                    algorithm = AutoscalerTypes.FCMA3
+                config.autoscaler = HReactiveHVPredictiveAutoscaler(
+                    data['autoscalers']['h_reactive_hv_predictive']['h_time_period'],
+                    data['autoscalers']['h_reactive_hv_predictive']['h_desired_cpu_utilization'],
+                    data['autoscalers']['h_reactive_hv_predictive']['h_node_utilization_threshold'],
+                    timing_args,
+                    algorithm,
+                    data['autoscalers']['h_reactive_hv_predictive']['hv_prediction_window'],
+                    data['autoscalers']['h_reactive_hv_predictive']['hv_prediction_percentile'],
+                    data['autoscalers']['h_reactive_hv_predictive']['hv_transition_time_budget']
+                )
 
             # Set workloads. For each spplication:
             # 1. Read the set of load samples.
@@ -214,7 +285,8 @@ class AscalConfig:
         for key in config["autoscalers"]:
             if not isinstance(config["autoscalers"][key], dict):
                 raise ValueError("Available autoscalers must be dictionaries")
-            valid_autoscalers = ["h_reactive", "hv_reactive", "hv_predictive", "h_reactive_hv_reactive"]
+            valid_autoscalers = ["h_reactive", "hv_reactive", "hv_predictive",
+                                 "h_reactive_hv_reactive", "h_reactive_hv_predictive"]
             if key not in valid_autoscalers:
                 raise ValueError(f"Valid autoscalers: {valid_autoscalers}")
             if key == "h_reactive":
@@ -262,6 +334,24 @@ class AscalConfig:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
                 if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
+                elif key == "h_reactive_hv_predictive":
+                    check_fields(config["autoscalers"][key],
+                                 ["h_time_period", "h_node_utilization_threshold", "h_desired_cpu_utilization",
+                                  "hv_prediction_window", "hv_prediction_percentile", "hv_algorithm",
+                                  "hv_transition_time_budget"],[int, float, float, int, float, str, int])
+                    h_time_period = config["autoscalers"][key]["h_time_period"]
+                    hv_prediction_window = config["autoscalers"][key]["hv_prediction_window"]
+                    if h_time_period == 0 or hv_prediction_window % h_time_period > 0 or\
+                            hv_prediction_window / h_time_period < 2:
+                        raise ValueError("HV time period must be a multiple 2x or higher of h time period")
+                    if config["autoscalers"][key]["desired_cpu_utilization"] < 0.1:
+                        raise ValueError("Desired CPU utilization must be >= 0.1")
+                    if config["autoscalers"][key]["h_node_utilization_threshold"] < 0.1:
+                        raise ValueError("Desired CPU utilization must be >= 0.1")
+                    if config["autoscalers"][key]["hv_prediction_percentile"] < 0.5:
+                        raise ValueError("Prediction percentile must be >= 0.5")
+                    if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
+                        raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
         if "autoscaler" not in config:
             raise ValueError("Field 'autoscaler' is missing")
         if config["autoscaler"] not in config["autoscalers"].keys():
@@ -306,8 +396,8 @@ class Ascal:
         :param ascal_config: Configuration for the Ascal problem.
         """
         self._workload_vectors = ascal_config.workload_vectors
-        self._system = ascal_config.system
         self._autoscaler = ascal_config.autoscaler
+        self._autoscaler.system = ascal_config.system
         self._autoscaler.apps = ascal_config.apps
         self._autoscaler.log_path = log # A string with the path of the log file
         self.time = -1 # Current simulation time
@@ -327,8 +417,9 @@ class Ascal:
             break_point = self.last_time
         while self.time < break_point:
             self.time += 1
-            if self.time == 0 and hasattr(self._autoscaler, 'prediction_window'):
-                self._autoscaler.workload_predictions(self._workload_vectors)
+            if self.time == 0 and (isinstance(self._autoscaler, HVPredictiveAutoscaler) or
+                                   isinstance(self._autoscaler, HReactiveHVPredictiveAutoscaler)):
+                Autoscaler.workload_predictions(self._autoscaler, self._workload_vectors)
             if self.time % 100 == 0:
                 print(f'Time: {self.time} s')
             workloads = {}

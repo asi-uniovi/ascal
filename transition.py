@@ -122,6 +122,18 @@ class Transition:
         self._time_limit = time_limit if time_limit is not None else self._timing_args.node_creation_time
         self._commands: list[Command] = None
 
+    def get_worst_case_transition_time(self) -> int:
+        """
+        Get the worst-case transition time excluding node removals.
+        :return: The worst-case transition time
+        """
+        if self._time_limit > 0:
+            return (self._timing_args.node_creation_time + 4 * self._timing_args.container_removal_time +
+                    4 * self._timing_args.container_creation_time)
+        else:
+            return (self._timing_args.node_creation_time + 3 * self._timing_args.container_removal_time +
+                    3 * self._timing_args.container_creation_time)
+
     def _remove_allocate(self, cc: ContainerClass, replicas: int, node: Vmt,
                          command: Command, obsolete: bool=False) -> int:
         """
@@ -247,6 +259,10 @@ class Transition:
         node.free_cores += cc.cores * removed_replicas
         assert (node.free_cores - node.ic.cores).magnitude < Transition._DELTA, "Invalid node free cores"
         node.free_mem += cc.mem[0] * removed_replicas
+
+        if (node.free_mem - node.ic.mem).magnitude >= Transition._DELTA:
+            a = 1
+
         assert (node.free_mem - node.ic.mem).magnitude < Transition._DELTA, "Invalid node free mem"
         self._app_perf_surplus[cc.app] -= cc.perf * removed_replicas
         assert self._app_perf_surplus[cc.app].magnitude > -Transition._DELTA, "Performance deficit"
@@ -409,6 +425,7 @@ class Transition:
 
         # Get initial application's performance surplus
         self._app_perf_surplus = Transition._get_app_perf_surplus(min_perf, self._current_alloc)
+        assert min(self._app_perf_surplus.values()).magnitude >= 0, "Invalid performance surplus"
 
         # Performance increment to add at the end of the command
         self._app_perf_increment = defaultdict(lambda : RequestsPerTime("0 req/s"))

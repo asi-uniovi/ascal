@@ -6,15 +6,16 @@ autoscalers:
     time_period: 60 # Time period to evaluate autoscaling
     desired_cpu_utilization: 0.7  # Desired CPU utilization
     node_utilization_threshold: 0.5 # Below this utilization, node removal is tried
+    aggs: 2 # Aggregation level for applications. Equivalent to {app0: 2, app1: 2}
   hv_reactive: # Horizontal/vertical+reactive autoscaling
     time_period: 60 # Time period to evaluate autoscaling
     desired_cpu_utilization: 0.7  # Desired CPU utilization
-    algorithm: fcma
+    algorithm: fcma # Allocation algorithm
     transition_time_budget: 100 # Approximate time budget for the transition (0 for simple transaction)
   hv_predictive: # Horizontal/vertical+predictive autoscaling
-    prediction_window: 600 # Prediction window in seconds
-    prediction_percentile: 95
-    algorithm: fcma
+    prediction_window: 240 # Prediction window in seconds
+    prediction_percentile: 95 # Percentile for application's load in the prediction window
+    algorithm: fcma  # Allocation algorithm
     transition_time_budget: 200 # Approximate time budget for the transition (0 for simple transaction)
   h_reactive_hv_reactive:
     desired_cpu_utilization: 0.7  # Desired CPU utilization for both, the horizontal and vertical autoscaler
@@ -22,6 +23,14 @@ autoscalers:
     h_node_utilization_threshold: 0.5 # Below this utilization, node removal is tried by the horizontal autoscaler
     hv_time_period: 600 # Time period to evaluate autoscaling for the horizontal/vertical autoscaler
     hv_algorithm: fcma # Allocation algorithm for the horizontal/vertical autoscaler
+    hv_transition_time_budget: 100 # Approximate time budget for the transition (0 for simple transaction)
+  h_reactive_hv_predictive:
+    h_desired_cpu_utilization: 0.7  # Desired CPU utilization for the horizontal autoscaler
+    h_time_period: 60 # Time period to evaluate autoscaling for the horizontal autoscaler
+    h_node_utilization_threshold: 0.5 # Below this utilization, node removal is tried by the horizontal autoscaler
+    hv_prediction_window: 600 # Prediction window for the horizontal/vertical autoscaler
+    hv_prediction_percentile: 95 # Percentile for application's load in the prediction window for the H/V autoscaler
+    hv_algorithm: fcma # Allocation algorithm for the H/V autoscaler
     hv_transition_time_budget: 100 # Approximate time budget for the transition (0 for simple transaction)
 
 # Select autoscaler
@@ -51,7 +60,7 @@ apps:
       cpu: 260 mcores
       mem: 0.420 GiB
       perf: 1 req/s
-      aggs: [1, 2]
+      aggs: [1, 2, 4]
   app1:
     load:
       file: ../trace-triangle.csv # Integer load samples in req/s
@@ -64,7 +73,7 @@ apps:
       cpu: 300 mcores
       mem: 0.500 GiB
       perf: 1 req/s
-      aggs: [1, 2]
+      aggs: [1, 2, 4]
 
 # Simulation time in seconds.
 # If application traces are short, the last load in the trace is repeated.
