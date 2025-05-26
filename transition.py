@@ -259,10 +259,6 @@ class Transition:
         node.free_cores += cc.cores * removed_replicas
         assert (node.free_cores - node.ic.cores).magnitude < Transition._DELTA, "Invalid node free cores"
         node.free_mem += cc.mem[0] * removed_replicas
-
-        if (node.free_mem - node.ic.mem).magnitude >= Transition._DELTA:
-            a = 1
-
         assert (node.free_mem - node.ic.mem).magnitude < Transition._DELTA, "Invalid node free mem"
         self._app_perf_surplus[cc.app] -= cc.perf * removed_replicas
         assert self._app_perf_surplus[cc.app].magnitude > -Transition._DELTA, "Performance deficit"
@@ -316,10 +312,12 @@ class Transition:
                     (node.ic.mem - node.free_mem).magnitude < Transition._DELTA:
                 empty_nodes_list.append(node)
                 continue
-            allocated_nodes_list.append(node)
-            app_perf_surplus = dict(self._app_perf_surplus)
             free_cores = node.free_cores
             free_mem = node.free_mem
+            if free_cores.magnitude == 0 or free_mem.magnitude == 0:
+                continue
+            allocated_nodes_list.append(node)
+            app_perf_surplus = dict(self._app_perf_surplus)
             for cc, replicas in node.replicas.items():
                 if node in self._recycling.obsolete_containers and cc in self._recycling.obsolete_containers[node]:
                     app = cc.app
@@ -332,6 +330,8 @@ class Transition:
             free_mem_list.append(free_mem)
         total_free_cores = sum(free_cores_list)
         total_free_mem = sum(free_mem_list)
+        if len(allocated_nodes_list) == 0:
+            return []
         free_capacities = [
             (free_cores_list[i]/total_free_cores).magnitude + (free_mem_list[i]/total_free_mem).magnitude
             for i in range(len(allocated_nodes_list))
@@ -438,23 +438,26 @@ class Transition:
         # The initial list of commands is empty
         self._commands = []
 
-    def _copy_obsolete_containers(self, obsolete_containers: tuple[Vmt, ContainerClass, int],
-                                  dest_nodes: list[Vmt]) -> tuple[int, Command]:
+    def _allocate_copying_obsolete_containers(self, node_cc_replicas: tuple[Vmt, ContainerClass, int],
+                                              available_obsolete_containers: dict[ContainerClass, int],
+                                              dest_nodes: list[Vmt]) -> tuple[int, Command]:
         """
-        Copy container obsolete replicas from one node to one of the destination nodes.
-        :param obsolete_containers: Obsolete replicas to allocate.
-        :param dest_nodes: Destination nodes
+        Allocate container replicas in a node copying obsolete replicas from the node to one of the destination nodes.
+        :param node_cc_replicas: Container replicas to allocate in a given node
+        :param available_obsolete_containers: Elegible obsolete containers in the node.
+        :param dest_nodes: Destination nodes for the elegible obsolete containers.
         :return: A tuple with the number of allocatable containers and a command with the allocation.
         """
 
         # Source node, container class and number of replicas to allocate
-        node, cc, replicas_to_allocate = obsolete_containers
+        node, cc, replicas_to_allocate = node_cc_replicas
 
         # Required cores and memory to allocate all the replicas
         required_cores = replicas_to_allocate * cc.cores
         required_mem = replicas_to_allocate * cc.mem[0]
 
         # The state must be recovered when we fail to allocate at least one replica, so create backups
+        dest_nodes_modified = []
         dest_nodes_backup = {
             node: (node.free_cores, node.free_mem, defaultdict(lambda: 0, node.replicas))
             for node in dest_nodes
@@ -470,7 +473,8 @@ class Transition:
 
         # Allocate obsolete container copies in destination nodes
         command2 = Command()
-        for removable_cc, removable_replicas in self._recycling.obsolete_containers[node].items():
+        allocated_obsolete_replicas = [] # In case of success, these obsolete replicas will no longer be elegible
+        for removable_cc, removable_replicas in available_obsolete_containers.items():
             # Required obsolete containers to free up enough computational resurces to allocate
             # replicas_to_allocate replicas in the node, considering rounding errors and the maximum
             # number of available replicas
@@ -489,13 +493,14 @@ class Transition:
                 if dest_node == node:
                     # Cannot copy obsolete containers to the same node
                     continue
-                allocated_obsolete_replicas = self._remove_allocate(removable_cc, required_obsolete_replicas,
-                                                                    dest_node, command2, obsolete=True)
-                if allocated_obsolete_replicas > 0:
-                    dest_nodes.append(dest_node)
-                    required_cores -= allocated_obsolete_replicas * removable_cc.cores
-                    required_mem -= allocated_obsolete_replicas * removable_cc.mem[0]
-                    required_obsolete_replicas -= allocated_obsolete_replicas
+                removed_obsolete_replicas = self._remove_allocate(removable_cc, required_obsolete_replicas,
+                                                                  dest_node, command2, obsolete=True)
+                if removed_obsolete_replicas > 0:
+                    allocated_obsolete_replicas.append((removable_cc, removed_obsolete_replicas))
+                    dest_nodes_modified.append(dest_node)
+                    required_cores -= removed_obsolete_replicas * removable_cc.cores
+                    required_mem -= removed_obsolete_replicas * removable_cc.mem[0]
+                    required_obsolete_replicas -= removed_obsolete_replicas
                     if required_obsolete_replicas == 0:
                         break
 
@@ -509,11 +514,16 @@ class Transition:
         )
         if allocatable_replicas == 0:
             # Recover from backups
-            for mod_node in dest_nodes:
+            for mod_node in dest_nodes_modified:
                 mod_node.free_cores, mod_node.free_mem, mod_node.replicas = dest_nodes_backup[mod_node]
             self._app_perf_surplus = app_perf_surplus_backup
             self._app_perf_increment = app_perf_increment_backup
             self._recycling.obsolete_containers = removed_containers_backup
+        else:
+            for cc, replicas in allocated_obsolete_replicas:
+                available_obsolete_containers[cc] -= replicas
+                if available_obsolete_containers[cc] == 0:
+                    del available_obsolete_containers[cc]
 
         return allocatable_replicas, command2
 
@@ -564,9 +574,14 @@ class Transition:
         # yielding enough application's performance surplus to allocate the replicas of unallocated
         # containers in the next transition step
         unalloc_node_cs = self._unalloc_node_cs[:]
+        node_obsolete_containers = {
+            node: {cc: replicas for cc, replicas in cc_replicas.items()}
+            for node, cc_replicas in self._recycling.obsolete_containers.items()
+        }
         for unalloc_node_cc in unalloc_node_cs:
             node, cc, replicas_to_allocate = unalloc_node_cc
-            allocatable_replicas, command2 = self._copy_obsolete_containers(unalloc_node_cc, copy_nodes)
+            allocatable_replicas, command2 = \
+                self._allocate_copying_obsolete_containers(unalloc_node_cc, node_obsolete_containers[node], copy_nodes)
             if allocatable_replicas > 0:
                 # Complete the list of containers allocatable in the next transisition step and remove them
                 # from the list of unallocated containers

@@ -18,7 +18,6 @@ from fcma import (
     InstanceClassFamily,
     ContainerGroup,
     RequestsPerTime,
-    System
 )
 from timedops import TimedOps
 from nodestates import NodeStates
@@ -887,6 +886,9 @@ class HVPredictiveAutoscaler(Autoscaler):
             transition2_time = Transition.get_transition_time(commands2, self.timing_args)
 
             self.log(f"Transition at {next_prediction_window_time}: {transition1_time + transition2_time} seconds")
+            self.log(f"Predicted loads for {self.prediction_percentile:.1f} % percentile:")
+            for app, load in new_app_load.items():
+                self.log(f"- {app.name} -> {load.to('req/s').magnitude:.2f} req/s")
             self.log(f"- From {[str(node) for node in self.allocation]}")
             self.log(f"- To   {[str(node) for node in self.new_allocation]}")
             temporal_nodes = []
@@ -1094,7 +1096,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             self._fcma_speed_level = 3
         self.transition = None
         self.transition_time_budget = hv_transition_time_budget
-        self._hv_timedops = TimedOps(self.timing_args, priorize_events=True)
+        self._hv_timedops = TimedOps(self.timing_args)
         self._next_prediction_window_time = hv_prediction_window
         self._hv_app_loads = {} # Application workloads in a time period for the HV autoscaler
 

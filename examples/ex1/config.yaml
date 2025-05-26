@@ -34,14 +34,14 @@ autoscalers:
     hv_transition_time_budget: 100 # Approximate time budget for the transition (0 for simple transaction)
 
 # Select autoscaler
-autoscaler: h_reactive_hv_reactive
+autoscaler: h_reactive_hv_predictive
 
 # Times in seconds
 node_time_to_billing: 20 # Time from the request of creating a node, until it starts to be billed.
 node_creation_time: 100 # Total time from the request of creating a node until the node is ready
                       # to execute containers. A node is billed (node_creation_time - node_time_to_running)
                       # seconds being ready to allocate any container.
-node_removal_time: 10  # Time from the request of node removal until it is removed. Meanwhile, it is billed.
+node_removal_time: 10  # Time > 0 from the request of node removal until it is removed. Meanwhile, it is billed.
 container_creation_time: 1 # Time from the request of container creation until it can process load.
 container_removal_time: 5 # Time from the request of container removal until it is removed from the node.
                           # Meanwhile. it can not process new load, but consumes computational resources.

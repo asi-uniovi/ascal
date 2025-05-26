@@ -18,17 +18,19 @@ class TimedOps:
     _DELTA = 0.000001
 
     class EventTypes(Enum):
-        # Low numbers express high event priorities when several events are triggered at the same time
+        # Low numbers express high event priorities when several events are triggered at the same time.
+        # Container removal times can not be zero with these priorities, since ALLOCATE_CONTAINER_REPLICAS_END
+        # has lower priority than START_REPLICAS_GRACE_PERIOD
         LOG_MESSAGE = 0
         CREATE_NODE_BEGIN = 1
         CREATE_NODE_BILLED = 2
         CREATE_NODE_END = 3
         START_REPLICAS_GRACE_PERIOD = 4
         REMOVE_CONTAINER_REPLICAS_END = 5
-        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 6 # After the end of removal, since removal frees up resources
+        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 6 # After the end of container removal, since removal frees up resources
         ALLOCATE_CONTAINER_REPLICAS_END = 7
         REMOVE_CONTAINER_REPLICAS_BEGIN = 8 # After the end of allocation to meet with performance requeriments
-        REMOVE_NODE_BEGIN = 9
+        REMOVE_NODE_BEGIN = 9 # After the end of container removal, since a node with containers can not be removed
         REMOVE_NODE_END = 10
 
     @dataclass

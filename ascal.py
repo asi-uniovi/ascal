@@ -361,6 +361,10 @@ class AscalConfig:
         check_fields(config,
              ["node_time_to_billing", "node_creation_time", "node_removal_time", "container_creation_time",
               "container_removal_time", "simulation_time"], [int, int, int, int, int, int])
+        # Avoid a problem with priorities while firing container removal events at the same time:
+        # begin removal, start grace period and end of removal
+        if config["node_removal_time"] == 0:
+            raise ValueError("Node removal time must be possitive")
 
         # Validate applications
         if "apps" not in config:

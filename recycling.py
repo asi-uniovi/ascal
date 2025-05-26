@@ -419,3 +419,15 @@ class Recycling:
         # Calculate recycling levels
         self._calculate_recycling_levels(initial_alloc)
 
+        # Change final node indexes
+        last_initial_node_ids = defaultdict(lambda: -1)
+        for initial_node in self.obsolete_nodes:
+            last_initial_node_ids[initial_node.ic] = max(last_initial_node_ids[initial_node.ic], initial_node.id)
+        for initial_node, final_node in self.recycled_node_pairs.items():
+            final_node.id = initial_node.id
+            last_initial_node_ids[initial_node.ic] = max(last_initial_node_ids[initial_node.ic], initial_node.id)
+        for final_node in self.new_nodes:
+            last_initial_node_ids[final_node.ic] += 1
+            final_node.id = last_initial_node_ids[final_node.ic]
+
+
