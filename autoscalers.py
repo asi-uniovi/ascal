@@ -885,7 +885,8 @@ class HVPredictiveAutoscaler(Autoscaler):
             transition1_time = Transition.get_transition_time(commands1, self.timing_args)
             transition2_time = Transition.get_transition_time(commands2, self.timing_args)
 
-            self.log(f"Transition at {next_prediction_window_time}: {transition1_time + transition2_time} seconds")
+            self.log(f"Transition at {next_prediction_window_time - transition1_time}:"
+                     f"{transition1_time + transition2_time} seconds")
             self.log(f"Predicted loads for {self.prediction_percentile:.1f} % percentile:")
             for app, load in new_app_load.items():
                 self.log(f"- {app.name} -> {load.to('req/s').magnitude:.2f} req/s")
@@ -1080,11 +1081,12 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         :param h_node_utilization_threshold: Below this threshold, a node is tried to be removed.
         :param timing_args: Timings for creation/removal of nodes and containers.
         :param hv_algorithm: Allocation algorithm.
-        :param hv_prediction_window: Prediction window for H/V autoscaler.
+        :param hv_prediction_window: Prediction window for the H/V autoscaler.
         :àram hv_prediction_percentile: Prediction percentile for the H/V autoscaler.
         :param hv_transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
         """
-        super().__init__(h_time_period, h_desired_cpu_utilization, h_node_utilization_threshold, None, timing_args)
+        super().__init__(h_time_period, h_desired_cpu_utilization,
+                         h_node_utilization_threshold, None, timing_args)
         self.time_period = h_time_period
         self.prediction_window = hv_prediction_window
         self.prediction_percentile = hv_prediction_percentile
@@ -1100,24 +1102,32 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         self._next_prediction_window_time = hv_prediction_window
         self._hv_app_loads = {} # Application workloads in a time period for the HV autoscaler
 
-    def disable_close_h_operations(self):
+    def enable_disable_close_h_operations(self):
         """
         Disable horizontal node/container creation/removal operations when they are too close
-        to the next Horizontal/vertical period.
+        to the next horizontal/vertical prediction window.
         """
         transition_time = self.transition.get_worst_case_transition_time()
         if self.time + self.timing_args.node_creation_time >= self._next_prediction_window_time - transition_time:
             self._enable_node_creation = False
+        else:
+            self._enable_node_creation = True
         if self.time + self.timing_args.node_removal_time >= self._next_prediction_window_time - transition_time:
             self._enable_node_removal = False
+        else:
+            self._enable_node_removal = True
         if self.time + self.timing_args.container_creation_time >= self._next_prediction_window_time - transition_time:
             self._enable_container_allocation = False
+        else:
+            self._enable_container_allocation = True
         if self.time + self.timing_args.container_removal_time >= self._next_prediction_window_time - transition_time:
             self._enable_container_removal = False
+        else:
+            self._enable_container_removal = True
 
     def run(self, app_workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
         """
-        Simulate for 1 second the horizontal/vertical and reactive autoscaling of containers and nodes.
+        Simulate for 1 second the mixed reactive horizontal and predictive horizontal/vertical autoscaler.
         :param app_workloads: Workload for all the applications at the current time.
         :return: A tuple with billing changes, performance changes and processing time.
         """
@@ -1139,21 +1149,19 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
 
         # If HV autoscaling is not in progress, and there is enough time until the first transition
         latest_h_time = self._next_prediction_window_time - self.transition.get_worst_case_transition_time()
-        before_transition = self._next_prediction_window_time - self.time >= self.prediction_window
-        if self.time <  latest_h_time and not before_transition and self._hv_timedops.is_event_list_empty():
-            self.disable_close_h_operations()
+        if self.time <  latest_h_time and self._hv_timedops.is_event_list_empty():
+            self.enable_disable_close_h_operations()
             # Perform H autoscaling. Note that calling run() method increments the value of self.time
             node_billing_changed, perf_changed, _ = super().run(app_workloads)
             return node_billing_changed, perf_changed, current_time() - initial_time
 
-        # Horizontal autoscaler does not run in the code thta follows, so application loads for the
+        # Horizontal autoscaler does not run in the code that follows, so application loads for the
         # horizontal autoscaler need to be updated
         for app in app_workloads:
             self._app_loads[app].append(app_workloads[app])
 
-        # Perform an HV transition
-        if not before_transition and self._hv_timedops.is_event_list_empty():
-
+        # Perform an HV transition after completing any event of the horizontal autoscaler
+        if self._hv_timedops.is_event_list_empty() and self._next_prediction_window_time in self.predicted_workloads:
             # Use FCMA algorithm to calculate an intermediate allocation for the next prediction window.
             # This allocation works with the maximum loads evaluated between the current and next prediciton windows
             hv_app_load = {
@@ -1198,8 +1206,11 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             transition1_time = Transition.get_transition_time(commands1, self.timing_args)
             transition2_time = Transition.get_transition_time(commands2, self.timing_args)
 
-            self.log(f"Transition at {self._next_prediction_window_time}: "
+            self.log(f"Transition at {self._next_prediction_window_time - transition1_time}:"
                      f"{transition1_time + transition2_time} seconds")
+            self.log(f"Predicted loads for {self.prediction_percentile:.1f} % percentile:")
+            for app, load in hv_new_app_load.items():
+                self.log(f"- {app.name} -> {load.to('req/s').magnitude:.2f} req/s")
             self.log(f"- From {[str(node) for node in self.allocation]}")
             self.log(f"- To   {[str(node) for node in new_allocation]}")
             temporal_nodes = []
@@ -1218,15 +1229,17 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
                                           timedops=self._hv_timedops)
             self._transition_execute_sync(commands2, self._next_prediction_window_time, timedops=self._hv_timedops)
 
+        # Dispatch events in the HV event list
+        self._hv_timedops.dispatch_events(self.time)
+        if self._hv_timedops.is_event_list_empty():
             # Calculate the next HV autoscaling time
             self._next_prediction_window_time += self.prediction_window
 
-        # Dispatch events in the HV event list
-        self._hv_timedops.dispatch_events(self.time)
         # Complete the removal of nodes
         for node in self.allocation:
             if NodeStates.get_state(node) == NodeStates.REMOVED:
                 self.allocation.remove(node)
+
         self.time += 1
 
         return self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed, current_time() - initial_time
