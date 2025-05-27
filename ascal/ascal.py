@@ -17,7 +17,7 @@ from fcma import (
     App,
     System
 )
-from autoscalers import (
+from ascal.autoscalers import (
     Autoscaler,
     AutoscalerTypes,
     HReactiveAutoscaler,
@@ -27,7 +27,7 @@ from autoscalers import (
     HReactiveHVPredictiveAutoscaler,
     TimedOps
 )
-from nodestates import NodeStates
+from ascal.nodestates import NodeStates
 
 
 class AscalConfig:

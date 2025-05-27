@@ -4,7 +4,7 @@ A bunch of auxiliary methods for atoscaling
 
 from collections import defaultdict
 from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, System
-from recycling import Recycling
+from ascal.recycling import Recycling
 
 class Vmt:
     """

@@ -33,9 +33,9 @@ from json import loads, dumps
 from collections import defaultdict, Counter
 from dataclasses import dataclass, field
 from fcma import (Fcma, SolvingPars, System, Allocation, App, Vm, ContainerClass, RequestsPerTime)
-from timedops import TimedOps
-from recycling import Recycling
-from helper import get_min_max_perf, Vmt, RecyclingVmt
+from ascal.timedops import TimedOps
+from ascal.recycling import Recycling
+from ascal.helper import get_min_max_perf, Vmt, RecyclingVmt
 
 # Variable used to debug a selected transition
 _debug_count = 0

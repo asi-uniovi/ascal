@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ascal"
+version = "0.1.0"
+description = "Simulate different H/HV and reactive/predictive autoscaling algorithms of containers"
+authors = [
+    { name="Jose Maria Lopez Lopez", email="chechu@uniovi.es" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+
+[tool.setuptools.packages.find]
+where = ["."]

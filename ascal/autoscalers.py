@@ -19,10 +19,10 @@ from fcma import (
     ContainerGroup,
     RequestsPerTime,
 )
-from timedops import TimedOps
-from nodestates import NodeStates
-from transition import Transition, Command
-from helper import get_min_max_load
+from ascal.timedops import TimedOps
+from ascal.nodestates import NodeStates
+from ascal.transition import Transition, Command
+from ascal.helper import get_min_max_load
 
 
 class AutoscalerTypes(Enum):

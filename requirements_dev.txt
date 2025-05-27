@@ -1,0 +1,7 @@
+numpy<2.0 # Matplotlib 3.10 problems with NumPy version 2.0 or higher
+matplotlib
+pint
+pulp
+PyYAML
+git+https://github.com/asi-uniovi/cloudmodel.git
+git+https://github.com/asi-uniovi/fcma.git

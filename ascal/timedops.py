@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
 from fcma import ContainerGroup, ContainerClass, Vm, RequestsPerTime
-from nodestates import NodeStates
+from ascal.nodestates import NodeStates
 
 class TimedOps:
     """
