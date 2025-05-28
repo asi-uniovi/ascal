@@ -2,6 +2,10 @@
 from ascal import AscalConfig, Ascal
 from examples import aws_eu_west_1_c5m5r5
 
+import os
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+
 config_file = "config.yaml"
 log_file = "config.log"
 
@@ -12,7 +16,13 @@ ascal_config = AscalConfig.get_from_config_yaml(config_file, aws_eu_west_1_c5m5r
 # Create the autoscaling problem
 ascal_problem = Ascal(ascal_config, log=log_file)
 
-# Run the autoscaling problem until the end. The argument of run() method is the last simulation time
+# Last time that can be simulated (last time in the trace)
+# Simulating time unit is seconds, so 3600 means 1 hour. Time starting from 0
+last_time = ascal_problem.last_time 
+print(f'Time range of the simulation: 0 - {last_time} seconds')
+
+# Run the autoscaling problem until the end. The argument of run() method is the last simulation time in seconds
+# Simulating time unit is seconds, so 3600 means 1 hour. Time starting from 0
 ascal_problem.run()
 
 # Write workloads, performance and cost into csv files

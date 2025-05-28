@@ -3,5 +3,5 @@ matplotlib
 pint
 pulp
 PyYAML
-git+https://github.com/asi-uniovi/cloudmodel.git
+git+https://github.com/jldiaz-uniovi/cloudmodel.git
 git+https://github.com/asi-uniovi/fcma.git

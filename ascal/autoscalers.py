@@ -158,7 +158,7 @@ class Autoscaler(ABC):
         """
         if self._log_f is not None:
             self._log_f.write(f'{self.time}:  {message}\n')
-        print(f'{self.time}: {message}', flush=True)
+        #print(f'{self.time}: {message}', flush=True)
 
     def __del__(self):
         """
