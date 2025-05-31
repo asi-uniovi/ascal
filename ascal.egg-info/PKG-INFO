@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: ascal
+Version: 0.1.0
+Summary: Simulate different H/HV and reactive/predictive autoscaling algorithms of containers
+Home-page: https://github.com/asi-uniovi/fcma.git
+Author: Jose Maria Lopez Lopez
+Author-email: Jose Maria Lopez Lopez <chechu@uniovi.es>
+License: MIT
+Description-Content-Type: text/markdown
+Dynamic: author
+Dynamic: home-page
