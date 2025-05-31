@@ -457,8 +457,7 @@ class Ascal:
         app_perfs = {str(app): [] for app in self._workload_vectors}
 
         previous_time = -1
-        for current_allocation in self.performance_changes:
-            current_time, current_nodes = current_allocation
+        for current_time, current_nodes in self.performance_changes:
             # Repeat the previous allocation performances
             if current_time - previous_time > 1:
                 for app_name, perf in app_perfs.items():
@@ -468,9 +467,8 @@ class Ascal:
             for node in current_nodes:
                 for cg in node.cgs:
                     app = cg.cc.app
-                    if app is None:
-                        continue
-                    current_perfs[str(app)] += cg.cc.perf.to('req/s').magnitude * cg.replicas
+                    if app is not None:
+                        current_perfs[str(app)] += cg.cc.perf.to('req/s').magnitude * cg.replicas
 
             # Append the current allocation performances
             for app_name in app_perfs:

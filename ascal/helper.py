@@ -1,8 +1,8 @@
 """
 A bunch of auxiliary methods for atoscaling
 """
-
-from collections import defaultdict
+from json import dumps
+from collections import defaultdict, Counter
 from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, System
 from ascal.recycling import Recycling
 
@@ -129,6 +129,23 @@ def get_min_max_load(load1: dict[App, RequestsPerTime], load2: dict[App, Request
         {app: min(load1.get(app, zero_load), load2.get(app, zero_load)) for app in load1},
         {app: max(load1.get(app, zero_load), load2.get(app, zero_load)) for app in load1},
     )
+
+
+def allocation_signature(alloc: list[Vmt]) -> Counter:
+    """
+    Get a signature to compare allocations.
+    :param alloc: Allocation.
+    :return: Signature
+    """
+    serializable_alloc = []
+    for node in alloc:
+        serializable_node = {
+            'ic': node.ic.name,
+            'replicas': {str(c): rep for c, rep in node.replicas.items()}
+        }
+        serializable_alloc.append(serializable_node)
+    return Counter([dumps(node, sort_keys=True) for node in serializable_alloc])
+
 
 
 

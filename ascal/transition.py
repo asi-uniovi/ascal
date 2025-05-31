@@ -29,13 +29,13 @@ computational resources.
 
 """
 from math import ceil, floor
-from json import loads, dumps
-from collections import defaultdict, Counter
+from json import loads
+from collections import defaultdict
 from dataclasses import dataclass, field
 from fcma import (Fcma, SolvingPars, System, Allocation, App, Vm, ContainerClass, RequestsPerTime)
 from ascal.timedops import TimedOps
 from ascal.recycling import Recycling
-from ascal.helper import get_min_max_perf, Vmt, RecyclingVmt
+from ascal.helper import get_min_max_perf, Vmt, RecyclingVmt, allocation_signature
 
 # Variable used to debug a selected transition
 _debug_count = 0
@@ -896,22 +896,6 @@ class Transition:
         :return: True if commands perform the required transition.
         :raises  ValueError: If some command is invalid.
         """
-
-        def allocation_signature(alloc: list[Vmt]) -> Counter:
-            """
-            Get a signature to compare allocations.
-            :param alloc: Allocation.
-            :return: Signature
-            """
-            serializable_alloc = []
-            for node in alloc:
-                serializable_node = {
-                    'ic': node.ic.name,
-                    'replicas': {str(c): rep for c, rep in node.replicas.items()}
-                }
-                serializable_alloc.append(serializable_node)
-            return Counter([dumps(node, sort_keys=True) for node in serializable_alloc])
-
         min_perf, _ = get_min_max_perf(initial_alloc, final_alloc)
         initial_alloc_vmt = [Vmt(node) for node in initial_alloc]
         final_alloc_vmt = [Vmt(node) for node in final_alloc]
