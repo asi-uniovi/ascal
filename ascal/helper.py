@@ -111,8 +111,8 @@ def get_min_max_perf(alloc1: Allocation, alloc2: Allocation) ->\
     perf2 = _get_alloc_perf(alloc2)
     zero_perf = RequestsPerTime("0 req/s")
     return (
-        {app: min(perf1.get(app, zero_perf), perf2.get(app, zero_perf)) for app in perf1},
-        {app: max(perf1.get(app, zero_perf), perf2.get(app, zero_perf)) for app in perf1},
+        {app: min(perf1.get(app, zero_perf), perf2.get(app, zero_perf)) for app in perf1 | perf2},
+        {app: max(perf1.get(app, zero_perf), perf2.get(app, zero_perf)) for app in perf1 | perf2},
     )
 
 def get_min_max_load(load1: dict[App, RequestsPerTime], load2: dict[App, RequestsPerTime])\

@@ -1,3 +1,4 @@
+# Use simple transition algorithm (transition_time_budget = 0)
 autoscalers:
   h_reactive_hv_predictive:
     h_desired_cpu_utilization: 0.7  # Desired CPU utilization for the horizontal autoscaler
@@ -6,7 +7,7 @@ autoscalers:
     hv_prediction_window: 600 # Prediction window for the horizontal/vertical autoscaler
     hv_prediction_percentile: 95 # Percentile for application's load in the prediction window for the H/V autoscaler
     hv_algorithm: fcma # Allocation algorithm for the H/V autoscaler
-    hv_transition_time_budget: 100 # Approximate time budget for the transition (0 for simple transaction)
+    hv_transition_time_budget: 0 # Approximate time budget for the transition (0 for simple transaction)
 
 # Select autoscaler
 autoscaler: h_reactive_hv_predictive

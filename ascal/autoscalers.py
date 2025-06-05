@@ -1,9 +1,11 @@
 """
 Implement several autoscalers
 """
-
+import copy
+from collections import defaultdict
 from time import time as current_time
 from enum import Enum
+from dataclasses import dataclass
 from math import ceil
 from abc import ABC, abstractmethod
 
@@ -37,6 +39,17 @@ class AutoscalerTypes(Enum):
     FCMA2 = 12         # FCMA algorithm with speed level 2
     FCMA3 = 13         # FCMA algorithm with speed level 3
 
+@dataclass(frozen=True)
+class AutoscalerStatistics:
+    """
+    Statistics returned by the run() method of autoscalers.
+    """
+    perf_changed: bool # True if the performance has changed
+    billing_changed: bool # True if the allocation has changed
+    calculation_time: int # Time required to perform the proccessing
+    node_recycling_level: float = 0.0 # Node recycling level in [0, 1]
+    container_recycling_level: float = 0.0 # Container recycling level in [0,1]
+
 class Autoscaler(ABC):
     """
     Base autoscaler class
@@ -44,6 +57,12 @@ class Autoscaler(ABC):
 
     # Constant used to deal with numerical approximations
     _DELTA = 0.000001
+
+    # Very small load
+    _DELTA_LOAD = RequestsPerTime(f"{_DELTA} req/s")
+
+    # Invalid recycling value
+    INVALID_RECYCLING = -1
 
     """
     Abstract class for autoscalers.
@@ -86,6 +105,16 @@ class Autoscaler(ABC):
         for node in self.allocation:
             for cg in node.cgs:
                 self.log(f'  - Allocated {cg.replicas} replicas {cg.cc} on node {str(node)}')
+
+    @staticmethod
+    def _set_delta_loads_if_zero(workloads: dict[App, RequestsPerTime]):
+        """
+        Set workloads to a delta workload if they are zero.
+        :param workloads: Dictionary with application's worload.
+        """
+        for app, workload in workloads.items():
+            if workload.magnitude == 0:
+                workloads[app] = Autoscaler._DELTA_LOAD
 
     @staticmethod
     def workload_predictions(predictive_autoscaler: 'HVPredictiveAutoscaler',
@@ -144,10 +173,11 @@ class Autoscaler(ABC):
                     commands1.remove(command1)
 
     @abstractmethod
-    def run(self, workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
+    def run(self, workloads: dict[App, RequestsPerTime]) -> AutoscalerStatistics:
         """
         Run autoscaling for 1 second.
         :param workloads: Workload for the applications at the last second.
+        :return: The statistics after running autoscaling for 1 second.
         """
         pass
 
@@ -278,16 +308,22 @@ class HReactiveAutoscaler(Autoscaler):
         cgs = []
         for app in workloads:
             workload = workloads[app] / self.desired_cpu_utilization
+            zero_replicas = True
             for cc in self._app_ccs[app]:
                 if cc == self._app_ccs[app][-1]:
                     replicas = int(ceil((workload / cc.perf).magnitude))
                 else:
                     replicas = int((workload // cc.perf).magnitude)
                 if replicas > 0:
+                    zero_replicas = False
                     cgs.append(ContainerGroup(cc, replicas))
                     workload -= replicas * cc.perf
                     if workload.magnitude == 0:
                         break
+            if zero_replicas:
+                # At least one replica is required, even with zero load
+                cc = self._app_ccs[app][-1]
+                cgs.append(ContainerGroup(cc, 1))
 
         required_nodes = self._get_required_nodes(cgs, allocate=True)
         for node in required_nodes:
@@ -307,9 +343,10 @@ class HReactiveAutoscaler(Autoscaler):
         :param node: Restrict to this node.
         :return: Number of replicas.
         """
+
         if node is None:
-            nodes = [n for n in self.allocation if NodeStates.get_state(n) == NodeStates.READY]
-        elif NodeStates.get_state(node) != NodeStates.READY:
+            nodes = [n for n in self.allocation if NodeStates.get_state(n) in (NodeStates.READY, NodeStates.MOVINGC)]
+        elif NodeStates.get_state(node) not in (NodeStates.READY, NodeStates.MOVINGC):
             return 0
         else:
             nodes = [node]
@@ -425,21 +462,37 @@ class HReactiveAutoscaler(Autoscaler):
         if not self._enable_container_allocation:
             return replicas_to_add
 
-        cgs = [] # List of container groups that can not be allocated with the current nodes
+        cgs = [] # List of container groups that can not be allocated in the current nodes
         nodes = [node for node in self.allocation if NodeStates.get_state(node) == NodeStates.READY]
-        for app, replicas in replicas_to_add.items():
+        for app, replicas_agg1 in replicas_to_add.items():
+            # Allocate starting with the largest containers
             for cc in self._app_ccs[app]:
                 for node in nodes:
-                    replicas_to_allocate = replicas // cc.agg_level
-                    allocated_replicas = self._timedops.allocate_container_replicas(self.time, cc,
-                                                                                    replicas_to_allocate, node)
-                    replicas -= allocated_replicas * cc.agg_level
-                    if replicas == 0:
+                    if cc != self._app_ccs[app][-1]:
+                        replicas_to_allocate = replicas_agg1 // cc.agg_level
+                    else:
+                        replicas_to_allocate = int(ceil(replicas_agg1 / cc.agg_level))
+                    if replicas_to_allocate > 0:
+                        allocated_replicas =\
+                            self._timedops.allocate_container_replicas(self.time, cc, replicas_to_allocate, node)
+                        replicas_agg1 -= allocated_replicas * cc.agg_level
+                    if replicas_agg1 == 0:
                         break
-                if replicas == 0:
+                if replicas_agg1 == 0:
                     break
-            if replicas > 0:
-                cgs.append(ContainerGroup(self._app_ccs[app][-1], replicas))
+            if replicas_agg1 > 0:
+                # The remaining replicas go to unallocated container groups with the avaliable allocation levels
+                for cc in self._app_ccs[app]:
+                    agg_level = cc.agg_level
+                    if cc != self._app_ccs[app][-1]:
+                        replicas_agg_level = replicas_agg1 // agg_level
+                    else:
+                        replicas_agg_level = int(ceil(replicas_agg1 / agg_level))
+                    if replicas_agg_level > 0:
+                        cgs.append(ContainerGroup(self._app_ccs[app][-1], replicas_agg_level))
+                        replicas_agg1 -= replicas_agg_level * agg_level
+            assert -self._app_ccs[app][-1].agg_level < replicas_agg1 <= 0, "Invalid number of deficit containers"
+
         return cgs
 
     def _create_required_nodes(self, cgs: list[ContainerGroup]) -> bool:
@@ -481,6 +534,17 @@ class HReactiveAutoscaler(Autoscaler):
         # Create the nodes
         if len(cgs_to_allocate) > 0 and self._enable_node_creation:
             new_nodes = self._get_required_nodes(cgs)
+            # Change node IDs so that they are new
+            current_ids = defaultdict(lambda: [])
+            for node in self.allocation:
+                current_ids[node.ic].append(node.id)
+            for ic in current_ids:
+                current_ids[ic].sort() # Sort IDs by increasing values
+            for node in new_nodes:
+                if node.ic in current_ids:
+                    node.id = current_ids[node.ic][-1] + 1
+                    current_ids[node.ic].append(node.id)
+            # Now new nodes are ready to be created
             for new_node in new_nodes:
                 self._timedops.create_node(self.time, new_node)
             self.allocation.extend(new_nodes)
@@ -490,10 +554,61 @@ class HReactiveAutoscaler(Autoscaler):
 
         return len(cgs_to_allocate) > 0
 
+    def _allocate_node_replicas(self, node: Vm, other_nodes: Allocation, sim: bool = False) -> bool:
+        """
+        Allocate application replicas currently allocated in one node in the other nodes.
+        Replicas in the process of being removed are ignored.
+        :param node: The node where the replicas are allocated.
+        :param other_nodes: Nodes where the replicas will be allocated.
+        :param sim: When it is true, allocation is simmulated and so it is not actually performed.
+        :return: True if the replicas can be allocated.
+        """
+
+        if sim:
+            other_nodes = copy.deepcopy(other_nodes)
+        else:
+            NodeStates.set_state(node, NodeStates.MOVINGC)
+            self._timedops.timed_log(self.time, f'Moving containers from node {node} to other nodes')
+
+        # Get equivalent agg=1 application replicas, including those that are starting and ignoring those
+        # that are being removed
+        app_replicas_agg1 = {app: self._get_replicas(app, node) for app in self.apps}
+        for app, replicas_agg1 in app_replicas_agg1.items():
+            if replicas_agg1 == 0:
+                continue
+            for cc in self._app_ccs[app]:
+                # The number of replicas is incremented if it is lower than the minimum aggregation level
+                if replicas_agg1  < self._app_ccs[app][-1].agg_level:
+                    replicas_agg1 = self._app_ccs[app][-1].agg_level
+                for other_node in other_nodes:
+                    allocatable_replicas_cpu = \
+                        int((other_node.free_cores / cc.cores).magnitude + Autoscaler._DELTA)
+                    allocatable_replicas_mem = \
+                        int((other_node.free_mem / cc.mem[0]).magnitude + Autoscaler._DELTA)
+                    allocatable_replicas = min(allocatable_replicas_cpu, allocatable_replicas_mem,
+                                               replicas_agg1 // cc.agg_level)
+                    if allocatable_replicas > 0:
+                        if not sim:
+                            allocated_replicas = self._timedops.allocate_container_replicas(self.time, cc,
+                                                                                            allocatable_replicas,
+                                                                                            other_node)
+                            assert allocatable_replicas == allocated_replicas, "Can not allocate replicas"
+                        replicas_agg1 -= allocatable_replicas * cc.agg_level
+                        if replicas_agg1 == 0:
+                            break
+                if replicas_agg1 == 0:
+                    break
+            if replicas_agg1 > 0:
+                return False
+        return True
+
     def _remove_low_utilization_nodes(self) -> None:
         """
         Try to remove nodes with CPU and memory utilization below the utilization threshold.
         """
+
+        if not self._enable_container_allocation:
+            return
 
         # Nodes can not be removed while creating new nodes
         for node in self.allocation:
@@ -501,92 +616,28 @@ class HReactiveAutoscaler(Autoscaler):
             if node_state == NodeStates.BOOTING or node_state == NodeStates.BILLED:
                 return 0
 
-        # Firstly, try to remove the smallest nodes to reduce cluster fragmentation
+        # Firstly, try to remove the largest nodes to reduce cost
         # Only nodes in the ready state are elegible
         nodes = [node for node in self.allocation if NodeStates.get_state(node) == NodeStates.READY]
         nodes_size = {node: node.ic.cores.magnitude * node.ic.mem.magnitude for node in nodes}
-        nodes.sort(key=lambda n: nodes_size[n])
+        nodes.sort(key=lambda n: nodes_size[n], reverse=True)
 
         for node in nodes:
+            # If the node is empty
+            if len(node.cgs) == 0:
+                self._timedops.remove_node(self.time, node)
             # Check the threshold utilization condition
-            if node.free_cores / node.ic.cores > self.node_utilization_threshold and \
+            elif node.free_cores / node.ic.cores > self.node_utilization_threshold and \
                     node.free_mem / node.ic.mem > self.node_utilization_threshold:
-                # If the node is empty
-                if len(node.cgs) == 0:
-                    self._timedops.remove_node(self.time, node)
-                    continue
-                # If the node is not empty, try to allocate its containers into other nodes
-                # The number of replicas to allocate are the number of equivalent agg=1 replicas
-                replicas_to_allocate = {app: self._get_replicas(app, node) for app in self.apps}
-                # Free capacity in other nodes and replicas to allocate
-                other_nodes_free_capacity = {
-                    other_node: [other_node.free_cores, other_node.free_mem]
-                    for other_node in nodes if other_node != node
-                }
-
-                # Simulate the allocation of the replicas in other nodes
-
-                # Get equivalent agg=1 application replicas, including those that are starting and ignoring those
-                # that are being removed
-                apps = {app for app in replicas_to_allocate.keys()}
-                for app in apps:
-                    for cc in self._app_ccs[app]:
-                        if replicas_to_allocate[app] < cc.agg_level:
-                            continue
-                        for other_node in other_nodes_free_capacity:
-                            allocatable_replicas_cpu = int(
-                                (other_nodes_free_capacity[other_node][0] / cc.cores).magnitude +  Autoscaler._DELTA
-                            )
-                            allocatable_replicas_mem = int(
-                                (other_nodes_free_capacity[other_node][1] / cc.mem[0]).magnitude + Autoscaler._DELTA
-                            )
-                            allocatable_replicas_agg = (replicas_to_allocate[app] // cc.agg_level) * cc.agg_level
-                            allocatable_replicas = min(allocatable_replicas_cpu, allocatable_replicas_mem,
-                                                       allocatable_replicas_agg)
-                            if allocatable_replicas > 0:
-                                other_nodes_free_capacity[other_node][0] -= allocatable_replicas * cc.cores
-                                other_nodes_free_capacity[other_node][1] -= allocatable_replicas * cc.mem[0]
-                                replicas_to_allocate[app] -= allocatable_replicas * cc.agg_level
-                                if replicas_to_allocate[app] == 0:
-                                    break
-                        if replicas_to_allocate[app] == 0:
-                            del replicas_to_allocate[app]
-                            break
-
-                # If all the node replicas can be allocated in other nodes, then allocate the replicas
-                # and remove the node
-                if len(replicas_to_allocate) == 0 and self._enable_container_allocation:
-                    # Prevent node from being used
-                    NodeStates.set_state(node, NodeStates.REMOVING)
-                    self._timedops.timed_log(self.time, f'Moving containers from node {node} to other nodes')
-                    # Get equivalent agg=1 application replicas, including those that are starting and ignoring those
-                    # that are being removed
-                    replicas_to_allocate = {app: self._get_replicas(app, node) for app in self.apps}
-                    apps = {app for app in replicas_to_allocate.keys()}
-                    for app in apps:
-                        for cc in self._app_ccs[app]:
-                            if replicas_to_allocate[app] < cc.agg_level:
-                                continue
-                            for other_node in other_nodes_free_capacity:
-                                allocatable_replicas_cpu = int(
-                                    (other_nodes_free_capacity[other_node][0] / cc.cores).magnitude + Autoscaler._DELTA
-                                )
-                                allocatable_replicas_mem = int(
-                                    (other_nodes_free_capacity[other_node][1] / cc.mem[0]).magnitude + Autoscaler._DELTA
-                                )
-                                allocatable_replicas_agg = (replicas_to_allocate[app] // cc.agg_level) * cc.agg_level
-                                allocatable_replicas = min(allocatable_replicas_cpu, allocatable_replicas_mem,
-                                                           allocatable_replicas_agg)
-                                allocated_replicas = \
-                                    self._timedops.allocate_container_replicas(self.time, cc,
-                                                                               allocatable_replicas, other_node)
-                                assert allocatable_replicas == allocated_replicas, "Can not allocate replicas"
-                                replicas_to_allocate[app] -= allocated_replicas * cc.agg_level
-                                if replicas_to_allocate[app] == 0:
-                                    break
-                            if replicas_to_allocate[app] == 0:
-                                del replicas_to_allocate[app]
-                                break
+                other_nodes = [
+                    other_node
+                    for other_node in nodes
+                    if other_node != node and NodeStates.get_state(other_node) == NodeStates.READY
+                ]
+                # Simulate the allocation of the node replicas in other nodes
+                if self._allocate_node_replicas(node, other_nodes, sim=True):
+                    # Now node replicas are actually allocated in the other nodes
+                    assert self._allocate_node_replicas(node, other_nodes), "Replicas must be allocated"
                     # Remove containers in the node
                     cgs = [cg for cg in node.cgs]
                     for cg in cgs:
@@ -616,18 +667,22 @@ class HReactiveAutoscaler(Autoscaler):
             current_replicas = self._get_replicas(app)
             average_load = sum(self._app_loads[app][-self.time_period:]) / self.time_period
             average_cpu_utilization = (average_load / (replica_perf * current_replicas)).magnitude
-            self._desired_app_replicas[app] = \
-                ceil(current_replicas * average_cpu_utilization / self.desired_cpu_utilization)
+            if average_cpu_utilization == 0:
+                # At least one replica with the minimum aggregation is required
+                self._desired_app_replicas[app] = self._app_ccs[app][-1].agg_level
+            else:
+                self._desired_app_replicas[app] = \
+                    ceil(current_replicas * average_cpu_utilization / self.desired_cpu_utilization)
             self._timedops.timed_log(self.time,
                                      f'Load of {app}: {average_load.to("req/s").magnitude:.2f} req/s')
             self._timedops.timed_log(self.time, f'Current replicas 1x of {app} {current_replicas}, '
                                                  f'desired {self._desired_app_replicas[app]}')
 
-    def run(self, app_workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
+    def run(self, app_workloads: dict[App, RequestsPerTime]) -> AutoscalerStatistics:
         """
         Simulate horizontal reactive autoscaling of containers and nodes in the one second.
         :param app_workloads: Workload for all the applications at the current time.
-        :return: A tuple with boolean values for performance changes, billing changes and processing time.
+        :return: Simulation statistics.
         """
         initial_time = current_time() # Reference to calculate the processing time
 
@@ -640,7 +695,9 @@ class HReactiveAutoscaler(Autoscaler):
             # Node creation time and container allocation time are assumed to be zero for the initial allocation
             self.allocation = self._initial_allocation(app_workloads)
             self.time += 1
-            return True, True, current_time() - initial_time
+            statistics = AutoscalerStatistics(True, True, current_time() - initial_time,
+                                              Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
+            return statistics
         else:
             # Update the application loads
             for app in app_workloads:
@@ -668,9 +725,10 @@ class HReactiveAutoscaler(Autoscaler):
                 self._allocate_deficit_replicas()
 
             self.time += 1
-            return (self._timedops.perf_changed, self._timedops.node_billing_changed,
-                    current_time() - initial_time)
-
+            statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
+                                              current_time() - initial_time, Autoscaler.INVALID_RECYCLING,
+                                              Autoscaler.INVALID_RECYCLING)
+            return statistics
 
 class HVReactiveAutoscaler(Autoscaler):
     """
@@ -702,19 +760,24 @@ class HVReactiveAutoscaler(Autoscaler):
         self._new_allocation = None
         self._timedops = TimedOps(self.timing_args)
 
-    def run(self, app_workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
+    def run(self, app_workloads: dict[App, RequestsPerTime]) -> AutoscalerStatistics:
         """
         Simulate for 1 second the horizontal/vertical and reactive autoscaling of containers and nodes.
         :param app_workloads: Workload for all the applications at the current time.
-        :return: A tuple with billing changes, performance changes and processing time.
+        :return: Simulation statistics.
         """
 
         initial_time = current_time() # Reference to calculate the processing time
+
+        node_recycling_level = Autoscaler.INVALID_RECYCLING
+        container_recycling_level = Autoscaler.INVALID_RECYCLING
 
         if self.time == 0:
             # Start with average loads equal to the first loads. Loads are incremented to obtain
             # the desired utilization
             incremented_workloads = {app: app_workloads[app] / self.desired_cpu_utilization for app in app_workloads}
+            # At least one application replica
+            Autoscaler._set_delta_loads_if_zero(incremented_workloads)
             # Initialize the transition
             self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget)
             # Calculate the first allocation
@@ -729,7 +792,8 @@ class HVReactiveAutoscaler(Autoscaler):
                 NodeStates.set_state(node, NodeStates.READY)
             self._app_loads = {app: [workload] for app, workload in app_workloads.items()}
             self.time += 1
-            return True, True, current_time() - initial_time
+            statistics = AutoscalerStatistics(True, True, current_time() - initial_time, -1, -1)
+            return statistics
 
         # Update the application loads
         for app in app_workloads:
@@ -742,6 +806,8 @@ class HVReactiveAutoscaler(Autoscaler):
             for app in self._app_loads:
                 incremented_workloads[app] = \
                     sum(self._app_loads[app][-self.time_period:]) / self.time_period / self.desired_cpu_utilization
+            # At least one application replica
+            Autoscaler._set_delta_loads_if_zero(incremented_workloads)
             # If any transition is completed
             if self._timedops.is_event_list_empty():
                 self.allocation = self._new_allocation
@@ -757,9 +823,12 @@ class HVReactiveAutoscaler(Autoscaler):
                 self.log(f"Transition: {transition_time} seconds")
                 self.log(f"- From {[str(node) for node in self.allocation]}")
                 self.log(f"- To   {[str(node) for node in self._new_allocation]}")
-                self.log(f"- Temporal nodes {[str(node) for node in commands[0].create_nodes if node.id < 0]}")
-                # Generate transition events from the current time
-                self._transition_execute_sync(commands)
+                if len(commands) > 0:
+                    self.log(f"- Temporal nodes {[str(node) for node in commands[0].create_nodes if node.id < 0]}")
+                    # Generate transition events from the current time
+                    self._transition_execute_sync(commands)
+                # Get recycling levels
+                node_recycling_level, container_recycling_level = self.transition.get_recycling_levels()
 
             # Reset loads
             for app in self._app_loads:
@@ -774,7 +843,11 @@ class HVReactiveAutoscaler(Autoscaler):
                 self.allocation.remove(node)
 
         self.time += 1
-        return self._timedops.perf_changed, self._timedops.node_billing_changed, current_time() - initial_time
+
+        statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
+                                          current_time() - initial_time, node_recycling_level,
+                                          container_recycling_level)
+        return statistics
 
 
 class HVPredictiveAutoscaler(Autoscaler):
@@ -812,13 +885,20 @@ class HVPredictiveAutoscaler(Autoscaler):
         """
         Simulate for 1 second the horizontal/vertical and predictive autoscaling of containers and nodes.
         :param dummy: This parameter is ignored.
-        :return: A tuple with billing changes, performance changes and processing time.
+        :return: Simulation statistics.
         """
 
         initial_time = current_time() # Reference to calculate the processing time
 
+        node_recycling_level1 = Autoscaler.INVALID_RECYCLING
+        node_recycling_level2 = Autoscaler.INVALID_RECYCLING
+        container_recycling_level1 = Autoscaler.INVALID_RECYCLING
+        container_recycling_level2 = Autoscaler.INVALID_RECYCLING
+
         if self.time == 0:
             self._app_load = self.predicted_workloads[self.time]
+            # At least one application replica
+            Autoscaler._set_delta_loads_if_zero(self._app_load)
             self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget//2)
             # The first allocation uses the load for the first prediction window
             fcma_problem = Fcma(self.system, workloads=self._app_load)
@@ -833,7 +913,8 @@ class HVPredictiveAutoscaler(Autoscaler):
             self._timedops.node_billing_changed = True
             self._waiting_for_transition_completion = True
             self.time += 1
-            return True, True, current_time() - initial_time
+            statistics = AutoscalerStatistics(True, True, current_time() - initial_time, 0, 0)
+            return statistics
 
         # An allocation for the next prediction window is calculated when the transition for the current window ends
         if self.time % self.prediction_window == 0:
@@ -844,6 +925,10 @@ class HVPredictiveAutoscaler(Autoscaler):
             self._waiting_for_transition_completion = False
             self.allocation = self.new_allocation
             new_app_load = self.predicted_workloads[next_prediction_window_time]
+
+            # At least one application replica
+            Autoscaler._set_delta_loads_if_zero(self._app_load)
+            Autoscaler._set_delta_loads_if_zero(new_app_load)
 
             # Use FCMA algorithm to calculate an intermediate allocation for the next prediction window.
             # This allocation works with the maximum loads evaluated between the current and next prediciton windows
@@ -862,13 +947,23 @@ class HVPredictiveAutoscaler(Autoscaler):
             self._app_load = new_app_load
 
             # Calculate the transition from the current allocation to the intermediate allocation
-            for node in self.allocation + intermediate_allocation:
+            for node in self.allocation:
                 NodeStates.set_state(node, NodeStates.READY)
             commands1, _ = self.transition.calculate_sync(self.allocation, intermediate_allocation)
 
+            # Recycling levels coming from the first transition
+            node_recycling_level1, container_recycling_level1 = self.transition.get_recycling_levels()
+
+            # Get a dictionary with the initial node corresponding to each recycled node.
+            recycled_node_pairs1 = self.transition.get_recycled_node_pairs()
+            inverse_recycled_node_pairs1 = {
+                final_node: initial_node
+                for initial_node, final_node in recycled_node_pairs1.items()
+            }
+
             # Calculate the transition from the intermediate allocation to the new allocation.
             # The second transition uses all the nodes, even those removed in the first transition
-            removed_nodes = [node for comand in commands1 for node in comand.remove_nodes]
+            removed_nodes = [node for command in commands1 for node in command.remove_nodes]
             removed_nodes_backup = {
                 node: (node.free_cores, node.free_mem, node.cgs, node.history)
                 for node in removed_nodes
@@ -877,6 +972,13 @@ class HVPredictiveAutoscaler(Autoscaler):
             commands2, _ = self.transition.calculate_sync(intermediate_allocation, self.new_allocation)
             for node in removed_nodes:
                 node.free_cores, node.free_mem, node.cgs, node.history = removed_nodes_backup[node]
+
+            # Commands of the second transition work with the intermediate nodes, but need to work
+            # with the same nodes as the first transition
+            commands2 = [command2.replace_nodes(inverse_recycled_node_pairs1) for command2 in commands2]
+
+            # Recycling levels coming from the second transition
+            node_recycling_level2, container_recycling_level2 = self.transition.get_recycling_levels()
 
             # Common node removals in both transitions must be handled
             Autoscaler._handle_node_removals(commands1, commands2)
@@ -916,7 +1018,11 @@ class HVPredictiveAutoscaler(Autoscaler):
                 self.allocation.remove(node)
 
         self.time += 1
-        return self._timedops.perf_changed, self._timedops.node_billing_changed, current_time() - initial_time
+        statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
+                                          current_time() - initial_time,
+                                          min(node_recycling_level1, node_recycling_level2),
+                                          min(container_recycling_level1, container_recycling_level2))
+        return statistics
 
 
 class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
@@ -983,9 +1089,12 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         """
         Simulate for 1 second the horizontal/vertical and reactive autoscaling of containers and nodes.
         :param app_workloads: Workload for all the applications at the current time.
-        :return: A tuple with billing changes, performance changes and processing time.
+        :return: Simulation statistics.
         """
         initial_time = current_time() # Reference to calculate the processing time
+
+        node_recycling_level = Autoscaler.INVALID_RECYCLING
+        container_recycling_level = Autoscaler.INVALID_RECYCLING
 
         # If it is the first execution
         if self.time == 0:
@@ -994,7 +1103,9 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             # Initialize the transition
             self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget)
             super().run(app_workloads)
-            return True, True, current_time() - initial_time
+            statistics = AutoscalerStatistics(True, True, current_time() - initial_time,
+                                              Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
+            return statistics
 
         # Update the application loads
         for app in app_workloads:
@@ -1004,12 +1115,12 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         if self.time < self._next_hv_autoscaling_time and self._hv_timedops.is_event_list_empty():
             self.enable_disable_near_h_operations()
             # Perform H autoscaling. Note that calling run() method increments the value of self.time
-            node_billing_changed, perf_changed, _ = super().run(app_workloads)
+            statistics = super().run(app_workloads)
             # If the H autoscaler requires a node creation too close to the next HV autoscaling transition
             node_creation_end = self.time + self.timing_args.node_creation_time
             if self._new_nodes_required and node_creation_end >= self._next_hv_autoscaling_time:
                 self._next_hv_autoscaling_time = self.time
-            return node_billing_changed, perf_changed, current_time() - initial_time
+            return statistics
 
         # Update application loads for the horizontal autoscaler. Note that run() method does not execute
         # in the code that follows
@@ -1021,7 +1132,10 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         if not self._timedops.is_event_list_empty():
             self.time += 1
             self._timedops.dispatch_events(self.time)
-            return self._timedops.node_billing_changed, self._timedops.perf_changed, current_time() - initial_time
+            statistics = AutoscalerStatistics(self._timedops.node_billing_changed, self._timedops.perf_changed,
+                                              current_time() - initial_time, Autoscaler.INVALID_RECYCLING,
+                                              Autoscaler.INVALID_RECYCLING)
+            return statistics
 
         elif self._hv_timedops.is_event_list_empty():
             # Perform an HV autoscaling
@@ -1030,6 +1144,9 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
                 app: sum(self._hv_app_loads[app][-self.time_period:]) / self.time_period / self.desired_cpu_utilization
                 for app in app_workloads
             }
+            # At least one application replica
+            Autoscaler._set_delta_loads_if_zero(incremented_workloads)
+
             for app in self._hv_app_loads:
                 self._hv_app_loads[app].clear()
             # Use FCMA algorithm to calculate the new allocation
@@ -1044,11 +1161,14 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             self.log(f"Transition: {transition_time} seconds")
             self.log(f"- From {[str(node) for node in self.allocation]}")
             self.log(f"- To   {[str(node) for node in new_allocation]}")
-            self.log(f"- Temporal nodes {[str(node) for node in commands[0].create_nodes if node.id < 0]}")
-            # Generate transition events from the current time and move the events to the HV event list
-            self._transition_execute_sync(commands, timedops=self._hv_timedops)
+            if len(commands) > 0:
+                self.log(f"- Temporal nodes {[str(node) for node in commands[0].create_nodes if node.id < 0]}")
+                # Generate transition events from the current time and move the events to the HV event list
+                self._transition_execute_sync(commands, timedops=self._hv_timedops)
             # Calculate the next HV autoscaling time
             self._next_hv_autoscaling_time = int(ceil(self.time / self.hv_time_period + 1)) * self.hv_time_period
+            # Get recycling levels
+            node_recycling_level, container_recycling_level = self.transition.get_recycling_levels()
 
         # Dispatch events in the HV event list
         self._hv_timedops.dispatch_events(self.time)
@@ -1059,8 +1179,10 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
                 self.allocation.remove(node)
         self.time += 1
 
-
-        return self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed, current_time() - initial_time
+        statistics = AutoscalerStatistics(self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed,
+                                          current_time() - initial_time, node_recycling_level,
+                                          container_recycling_level)
+        return statistics
 
 
 class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
@@ -1134,6 +1256,11 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
 
         initial_time = current_time() # Reference to calculate the processing time
 
+        node_recycling_level1 = Autoscaler.INVALID_RECYCLING
+        node_recycling_level2 = Autoscaler.INVALID_RECYCLING
+        container_recycling_level1 = Autoscaler.INVALID_RECYCLING
+        container_recycling_level2 = Autoscaler.INVALID_RECYCLING
+
         # If it is the first execution
         if self.time == 0:
             # Initialize the HV application load in the last period
@@ -1141,7 +1268,9 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             # Initialize the transition
             self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget)
             super().run(app_workloads)
-            return True, True, current_time() - initial_time
+            statistics = AutoscalerStatistics(True, True, current_time() - initial_time,
+                                              Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
+            return statistics
 
         # Update the HV application loads
         for app in app_workloads:
@@ -1152,8 +1281,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         if self.time <  latest_h_time and self._hv_timedops.is_event_list_empty():
             self.enable_disable_close_h_operations()
             # Perform H autoscaling. Note that calling run() method increments the value of self.time
-            node_billing_changed, perf_changed, _ = super().run(app_workloads)
-            return node_billing_changed, perf_changed, current_time() - initial_time
+            statistics = super().run(app_workloads)
+            return statistics
 
         # Horizontal autoscaler does not run in the code that follows, so application loads for the
         # horizontal autoscaler need to be updated
@@ -1171,6 +1300,9 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             for app in self._hv_app_loads:
                 self._hv_app_loads[app].clear()
             hv_new_app_load = self.predicted_workloads[self._next_prediction_window_time]
+            # At least one application replica
+            Autoscaler._set_delta_loads_if_zero(hv_app_load)
+            Autoscaler._set_delta_loads_if_zero(hv_new_app_load)
             _, max_app_load = get_min_max_load(hv_app_load, hv_new_app_load)
             fcma_problem = Fcma(self.system, workloads=max_app_load)
             solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
@@ -1187,6 +1319,15 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
                 NodeStates.set_state(node, NodeStates.READY)
             commands1, _ = self.transition.calculate_sync(self.allocation, intermediate_allocation)
 
+            # Recycling levels coming from the first transition
+            node_recycling_level1, container_recycling_level1 = self.transition.get_recycling_levels()
+
+            # Get a dictionary with the initial node corresponding to each recycled node.
+            recycled_node_pairs1 = self.transition.get_recycled_node_pairs()
+            inverse_recycled_node_pairs1 = {
+                final_node: initial_node
+                for initial_node, final_node in recycled_node_pairs1.items()
+            }
             # Calculate the transition from the intermediate allocation to the new allocation.
             # The second transition uses all the nodes, even those removed in the first transition
             removed_nodes = [node for comand in commands1 for node in comand.remove_nodes]
@@ -1198,6 +1339,13 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             commands2, _ = self.transition.calculate_sync(intermediate_allocation, new_allocation)
             for node in removed_nodes:
                 node.free_cores, node.free_mem, node.cgs, node.history = removed_nodes_backup[node]
+
+            # Recycling levels coming from the first transition
+            node_recycling_level2, container_recycling_level2 = self.transition.get_recycling_levels()
+
+            # Commands of the second transition work with the intermediate nodes, but need to work
+            # with the same nodes as the first transition
+            commands2 = [command2.replace_nodes(inverse_recycled_node_pairs1) for command2 in commands2]
 
             # Common node removals in both transitions must be handled
             Autoscaler._handle_node_removals(commands1, commands2)
@@ -1229,7 +1377,6 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
                                           timedops=self._hv_timedops)
             self._transition_execute_sync(commands2, self._next_prediction_window_time, timedops=self._hv_timedops)
 
-        # Dispatch events in the HV event list
         self._hv_timedops.dispatch_events(self.time)
         if self._hv_timedops.is_event_list_empty():
             # Calculate the next HV autoscaling time
@@ -1242,5 +1389,9 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
 
         self.time += 1
 
-        return self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed, current_time() - initial_time
+        statistics = AutoscalerStatistics(self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed,
+                                          current_time() - initial_time,
+                                          min(node_recycling_level1, node_recycling_level2),
+                                          min(container_recycling_level1, container_recycling_level2))
+        return statistics
 

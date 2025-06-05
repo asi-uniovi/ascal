@@ -33,6 +33,8 @@ from json import loads
 from collections import defaultdict
 from dataclasses import dataclass, field
 from fcma import (Fcma, SolvingPars, System, Allocation, App, Vm, ContainerClass, RequestsPerTime)
+from fontTools.varLib.avarPlanner import normalizeDegrees
+
 from ascal.timedops import TimedOps
 from ascal.recycling import Recycling
 from ascal.helper import get_min_max_perf, Vmt, RecyclingVmt, allocation_signature
@@ -93,6 +95,36 @@ class Command:
             container_command_time += timing_args.container_creation_time
         return container_command_time
 
+    def replace_nodes(self, node_pairs: dict[Vm, Vm]) -> 'Command':
+        """
+        Replace the nodes in the command by their counterparts in the node pairs.
+        :param node_pairs: A dictionary with the final node for each initial node.
+        :return: A new command with the replacement.
+        """
+        new_command = Command()
+        new_command.sync_on_nodes_creation = self.sync_on_nodes_creation
+        for node, cc, replicas in self.allocate_containers:
+            if node in node_pairs:
+                new_command.allocate_containers.append((node_pairs[node], cc, replicas))
+            else:
+                new_command.allocate_containers.append((node, cc, replicas))
+        for node, cc, replicas in self.remove_containers:
+            if node in node_pairs:
+                new_command.remove_containers.append((node_pairs[node], cc, replicas))
+            else:
+                new_command.remove_containers.append((node, cc, replicas))
+        for node in self.create_nodes:
+            if node in node_pairs:
+                new_command.create_nodes.append(node_pairs[node])
+            else:
+                new_command.create_nodes.append(node)
+        for node in self.remove_nodes:
+            if node in node_pairs:
+                new_command.remove_nodes.append(node_pairs[node])
+            else:
+                new_command.remove_nodes.append(node)
+        return new_command
+
 class Transition:
     """
     Class to perform transitions between initial allocation and final allocations for a given system.
@@ -113,6 +145,7 @@ class Transition:
         self._timing_args = timing_args
         self._system = system
         self._recycling = None
+        self._recycling_vm = None
         self._current_alloc: list[Vmt] = None
         self._unalloc_node_cs: list[tuple[Vmt, ContainerClass, int]]  = None
         self._app_unalloc_perf: defaultdict[App, RequestsPerTime]  = None
@@ -125,14 +158,25 @@ class Transition:
     def get_worst_case_transition_time(self) -> int:
         """
         Get the worst-case transition time excluding node removals.
-        :return: The worst-case transition time
+        :return: The worst-case transition time.
         """
+        # - If time_limit == 0: wait for node creation + allocate containers in new/tmp nodes +
+        #   remove_allocate + remove obsolete containers/nodes.
+        # - If time_limit > 0: wait for max(NCT , ceil(limit/CRCA) * CRCA) + allocate containers in
+        #   new/tmp nodes + remove_allocate + remove obsolete containers/nodes, where NCT is the
+        # node creation time and CRCA is the time to remove containers plus allocating containers.
+        # In the worst-case, node removals occur at the end of transition.
+
+        if self._time_limit == 0:
+            return self._timing_args.node_creation_time + self._timing_args.container_creation_time + \
+                   (self._timing_args.container_removal_time + self._timing_args.container_creation_time) + \
+                   self._timing_args.container_removal_time + self._timing_args.node_removal_time
+
         if self._time_limit > 0:
-            return (self._timing_args.node_creation_time + 4 * self._timing_args.container_removal_time +
-                    4 * self._timing_args.container_creation_time)
-        else:
-            return (self._timing_args.node_creation_time + 3 * self._timing_args.container_removal_time +
-                    3 * self._timing_args.container_creation_time)
+            crca = self._timing_args.container_removal_time + self._timing_args.container_creation_time
+            return max(self._timing_args.node_creation_time, ceil(self._time_limit / crca) * crca) +\
+                   self._timing_args.container_creation_time + crca + self._timing_args.container_removal_time +\
+                   self._timing_args.node_removal_time
 
     def _remove_allocate(self, cc: ContainerClass, replicas: int, node: Vmt,
                          command: Command, obsolete: bool=False) -> int:
@@ -331,7 +375,7 @@ class Transition:
         total_free_cores = sum(free_cores_list)
         total_free_mem = sum(free_mem_list)
         if len(allocated_nodes_list) == 0:
-            return []
+            return empty_nodes_list
         free_capacities = [
             (free_cores_list[i]/total_free_cores).magnitude + (free_mem_list[i]/total_free_mem).magnitude
             for i in range(len(allocated_nodes_list))
@@ -599,6 +643,20 @@ class Transition:
 
         return command
 
+    def get_recycling_levels(self) -> tuple[float, float]:
+        """
+        Get node and conytainer recycling levels for the las transition.
+        :return: A tuple with node and container recycling levels.
+        """
+        return self._recycling.node_recycling_level, self._recycling.container_recycling_level
+
+    def get_recycled_node_pairs(self):
+        """
+        Get the recycled node pairs.
+        :return: Recycled node pairs.
+        """
+        return self._recycling_vm.recycled_node_pairs
+
     def get_allocation(self, app_performance: dict[App, RequestsPerTime]) -> list[Vm]:
         """
         Get an allocation to fulfill application performances.
@@ -707,9 +765,6 @@ class Transition:
 
         self._commands = []
 
-        # Calculate the minimum application performance during the transition
-        min_perf, _ = get_min_max_perf(initial_alloc, final_alloc)
-
         # Now it is time to transition from the initial allocation to the final allocation, so
         # start with the initial allocation. All the nodes are changed to the Vmt format
         self._current_alloc = [Vmt(node) for node in initial_alloc]
@@ -717,9 +772,17 @@ class Transition:
         vm_to_vmt = dict(zip(initial_alloc, self._current_alloc)) | \
                     dict(zip(final_alloc, final_alloc_vmt))
 
+        # Calculate the minimum application performance during the transition
+        min_perf, _ = get_min_max_perf(initial_alloc, final_alloc)
+
         # Calculate recycled node pairs, new nodes, nodes to remove, recycled containers, new containers
         # and containers to remove when transitioning from the initial allocation to the final allocation
-        self._recycling = RecyclingVmt(Recycling(initial_alloc, final_alloc), vm_to_vmt)
+        self._recycling_vm = Recycling(initial_alloc, final_alloc)
+        self._recycling = RecyclingVmt(self._recycling_vm, vm_to_vmt)
+
+        # Check whether the initial allocation is identical to the final allocation
+        if allocation_signature(self._current_alloc) == allocation_signature(final_alloc_vmt):
+            return self._commands, 0
 
         # Initialize the remove-allocate-copy algorithm, which is executed iteratively during the transition
         self._transition_init(min_perf)
@@ -735,6 +798,10 @@ class Transition:
         # (a) The transition of recycled nodes has completed.
         # (b) The transition can not advance until new nodes are available.
         # (c) The transition has been interrupted just after surpassing the transition time limit.
+
+        # Transition time ignoring initial node creation command and node removal times. Its maximum value
+        # at the end of this code snippet is ceil(limit/CRCA) * CRCA,
+        # where CRCA = container removal time + container allocation time
         transition_time = 0
         while self._time_limit > 0:
             command = self._remove_allocate_copy()
@@ -745,9 +812,10 @@ class Transition:
                 break
             # Scenario (c).
             command_time = command.get_container_command_time(self._timing_args)
-            if transition_time + command_time > self._time_limit:
+            if transition_time + command_time >= self._time_limit:
                 self._append_command(command)
                 break
+            transition_time += command_time
             self._append_command(command)
 
         # Now, allocate containers in new nodes. The corresponding command may be empty if there

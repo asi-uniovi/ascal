@@ -5,7 +5,6 @@ from examples import aws_eu_west_1_c5m5r5
 import os
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
-
 config_file = "config.yaml"
 log_file = "config.log"
 
@@ -51,6 +50,12 @@ billing_changes = ascal_problem.billing_changes # Dictionary with times and clus
 performance_changes = ascal_problem.performance_changes # Dictionary with times and cluster state on allocation changes
 calculation_times = ascal_problem.calc_times # Calculation times to obtain new allocations
 
+# Recycling levels for Horizontal/Vertical autoscalers
+node_recycling_levels, container_recycling_levels = ascal_problem.get_recycling_levels()
+
 # Plot calculation times
 ascal_problem.plot({'times': calculation_times}, "Calculation times", "Seconds")
 
+# Plot recyclings
+ascal_problem.plot_bar({'nodes': node_recycling_levels, 'containers': container_recycling_levels},
+                   "Recyclings", "Recycling value")

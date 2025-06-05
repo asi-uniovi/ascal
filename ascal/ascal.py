@@ -5,6 +5,7 @@ a given autoscaler and applications
 from copy import deepcopy
 from yaml import safe_load
 import matplotlib.pyplot as plt
+import numpy as np
 
 import csv
 from fcma import (
@@ -20,6 +21,7 @@ from fcma import (
 from ascal.autoscalers import (
     Autoscaler,
     AutoscalerTypes,
+    AutoscalerStatistics,
     HReactiveAutoscaler,
     HVReactiveAutoscaler,
     HVPredictiveAutoscaler,
@@ -409,6 +411,8 @@ class Ascal:
         self.performance_changes: list[(int, Allocation)] = [] # Pairs time and allocation
         self.billing_changes: list[(int, Allocation)] = [] # Pairs time and allocation
         self.calc_times: list[float] = [] # Calculation times
+        self.node_recycling_levels: list[float] = [] # List of node recycling levels
+        self.container_recycling_levels: list[float] = [] # List of container recycling levels
 
     def run(self, break_point: int = None) -> bool:
         """
@@ -432,14 +436,16 @@ class Ascal:
                 workloads[app] = workload
             # Save the current allocation as an allocation change or a node change. Nodes are considered to change
             # onece it begin to be billed, even if they can not allocate contaoners yet
-            performance_changed, billing_changed, calculation_time = self._autoscaler.run(workloads)
-            if performance_changed or billing_changed or self.time == break_point:
+            statistics = self._autoscaler.run(workloads)
+            if statistics.perf_changed or statistics.billing_changed or self.time == break_point:
                 allocation_copy = (self.time, deepcopy(self._autoscaler.allocation))
-                if performance_changed or self.time == break_point:
+                if statistics.perf_changed or self.time == break_point:
                     self.performance_changes.append(allocation_copy)
-                if billing_changed or self.time == break_point:
+                if statistics.billing_changed or self.time == break_point:
                     self.billing_changes.append(allocation_copy)
-            self.calc_times.append(calculation_time)
+            self.calc_times.append(statistics.calculation_time)
+            self.node_recycling_levels.append(statistics.node_recycling_level)
+            self.container_recycling_levels.append(statistics.container_recycling_level)
         self._autoscaler.log_allocation_summary()
 
     def get_workloads(self) -> dict[str, list[int]]:
@@ -448,6 +454,13 @@ class Ascal:
         :return: For each application the workloads in req/s at every second, starting from 0 seconds.
         """
         return {str(key): value for key, value in self._workload_vectors.items()}
+
+    def get_recycling_levels(self) -> tuple[list[float], list[float]]:
+        """
+        Get node and container recycling levels.
+        :return: The recyclings at every second, starting from 0 seconds.
+        """
+        return self.node_recycling_levels, self.container_recycling_levels
 
     def get_performances(self) -> dict[str, list[int]]:
         """
@@ -540,7 +553,7 @@ class Ascal:
         """
         Plot a curve per dictionary entry with values at every time second.
         :param dict_values: Dictionary to plot, example: {'app0': [1.4, 3.0, 3.1], 'app1': [1.0, 1.0, 3.1]}.
-        :param title: Title of the plot
+        :param title: Title of the plot.
         :param unit: Unit for the vertical axis
         """
         colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
@@ -560,3 +573,43 @@ class Ascal:
         plt.legend()
         plt.grid(True)
         plt.show()
+
+    @staticmethod
+    def plot_bar(dict_values: dict[str, list[int]], title: str = None, unit:str = None):
+        """
+        Plot a bar chart showing non-negative values from a dictionary of time series.
+
+        :param dict_values: Dictionary to plot. Example: {'app0': [0.1, 2.0, 3.1], 'app1': [-1.0, 1.0, 3.1]}.
+                            Only zero or positive values are displayed; negative values are ignored.
+        :param title: Title of the plot.
+        :param unit: Label for the vertical axis (e.g., "MB", "requests", etc.).
+        """
+
+        # Prepare labels and values
+        labels = list(dict_values.keys())
+        values = [np.array(dict_values[label]) for label in labels]
+        x = np.arange(len(values[0]))
+
+        # Replace negative values with NaN
+        masked_values = [np.where(v >= 0, v, np.nan) for v in values]
+
+        # Plot order to show the smallest in the foreground
+        order = np.argsort([np.nan_to_num(v, nan=np.inf) for v in zip(*masked_values)], axis=1)
+
+        # Plot the highest and next the lowest
+        for pos in range(len(x)):
+            ordered_indices = order[pos]
+            for idx in ordered_indices[::-1]:
+                val = masked_values[idx][pos]
+                if not np.isnan(val):
+                    plt.bar(pos, val, color=f"C{idx}", label=labels[idx], zorder=idx, width=20, alpha=0.85)
+
+        # Títle and style
+        if title:
+            plt.title(title)
+        plt.xlabel('Time (s)')
+        if unit is not None:
+            plt.ylabel(unit)
+
+        plt.show()
+
