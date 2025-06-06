@@ -50,7 +50,7 @@ container_removal_time: 5 # Time from the request of container removal until it 
 apps:
   app0:
     load:
-      file: ../trace-triangle.csv # Integer load samples in req/s
+      file: ../../traces/triangle_rand.csv # Integer load samples in req/s
       time_interval: 1 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
       load_offset: 10 # Integer value to be added to every load sample
@@ -63,7 +63,7 @@ apps:
       aggs: [1, 2, 4]
   app1:
     load:
-      file: ../trace-triangle.csv # Integer load samples in req/s
+      file: ../../traces/triangle_rand.csv # Integer load samples in req/s
       time_interval: 1 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
       load_offset: 50 # Integer value to be added to every load sample
@@ -79,5 +79,3 @@ apps:
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
 simulation_time: 3600
-
-

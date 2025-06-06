@@ -1,0 +1,216 @@
+0:  Current allocation with ('c5.large[0]',)
+0:    - Allocated 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[0]
+60:  Transition: 0 seconds
+60:  - From ['c5.large[0]']
+60:  - To   ['c5.large[0]']
+120:  Transition: 0 seconds
+120:  - From ['c5.large[0]']
+120:  - To   ['c5.large[0]']
+180:  Transition: 0 seconds
+180:  - From ['c5.large[0]']
+180:  - To   ['c5.large[0]']
+240:  Transition: 0 seconds
+240:  - From ['c5.large[0]']
+240:  - To   ['c5.large[0]']
+300:  Transition: 0 seconds
+300:  - From ['c5.large[0]']
+300:  - To   ['c5.large[0]']
+360:  Transition: 0 seconds
+360:  - From ['c5.large[0]']
+360:  - To   ['c5.large[0]']
+420:  Transition: 0 seconds
+420:  - From ['c5.large[0]']
+420:  - To   ['c5.large[0]']
+480:  Transition: 0 seconds
+480:  - From ['c5.large[0]']
+480:  - To   ['c5.large[0]']
+540:  Transition: 0 seconds
+540:  - From ['c5.large[0]']
+540:  - To   ['c5.large[0]']
+600:  Transition: 0 seconds
+600:  - From ['c5.large[0]']
+600:  - To   ['c5.large[0]']
+660:  Transition: 0 seconds
+660:  - From ['c5.large[0]']
+660:  - To   ['c5.large[0]']
+720:  Transition: 0 seconds
+720:  - From ['c5.large[0]']
+720:  - To   ['c5.large[0]']
+780:  Transition: 0 seconds
+780:  - From ['c5.large[0]']
+780:  - To   ['c5.large[0]']
+840:  Transition: 0 seconds
+840:  - From ['c5.large[0]']
+840:  - To   ['c5.large[0]']
+900:  Transition: 0 seconds
+900:  - From ['c5.large[0]']
+900:  - To   ['c5.large[0]']
+960:  Transition: 0 seconds
+960:  - From ['c5.large[0]']
+960:  - To   ['c5.large[0]']
+1020:  Transition: 0 seconds
+1020:  - From ['c5.large[0]']
+1020:  - To   ['c5.large[0]']
+1080:  Transition: 0 seconds
+1080:  - From ['c5.large[0]']
+1080:  - To   ['c5.large[0]']
+1140:  Transition: 0 seconds
+1140:  - From ['c5.large[0]']
+1140:  - To   ['c5.large[0]']
+1200:  Transition: 116 seconds
+1200:  - From ['c5.large[0]']
+1200:  - To   ['c5.xlarge[0]']
+1200:  - Temporal nodes []
+1200:  Creating node c5.xlarge[0]
+1220:  Billing of node c5.xlarge[0] starts
+1300:  Node c5.xlarge[0] is ready to execute containers
+1300:  Allocating 1 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.xlarge[0]
+1300:  Allocating 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.xlarge[0]
+1301:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.xlarge[0]
+1301:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.xlarge[0]
+1301:  Removing 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.large[0]
+1306:  Completed the removal of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.large[0]
+1306:  Removing node c5.large[0]
+1316:  Node c5.large[0] is removed
+1320:  Transition: 101 seconds
+1320:  - From ['c5.xlarge[0]']
+1320:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1320:  - Temporal nodes []
+1320:  Creating node c5.4xlarge[0]
+1320:  Creating node c5.24xlarge[0]
+1340:  Billing of node c5.4xlarge[0] starts
+1340:  Billing of node c5.24xlarge[0] starts
+1420:  Node c5.4xlarge[0] is ready to execute containers
+1420:  Node c5.24xlarge[0] is ready to execute containers
+1420:  Allocating 10 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.4xlarge[0]
+1420:  Allocating 60 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.24xlarge[0]
+1421:  Completed the allocation of 10 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.4xlarge[0]
+1421:  Completed the allocation of 60 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.24xlarge[0]
+1440:  Transition: 0 seconds
+1440:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1440:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1500:  Transition: 0 seconds
+1500:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1500:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1560:  Transition: 0 seconds
+1560:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1560:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1620:  Transition: 0 seconds
+1620:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1620:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1680:  Transition: 0 seconds
+1680:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1680:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1740:  Transition: 0 seconds
+1740:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1740:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1800:  Transition: 0 seconds
+1800:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1800:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1860:  Transition: 0 seconds
+1860:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1860:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1920:  Transition: 0 seconds
+1920:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1920:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1980:  Transition: 0 seconds
+1980:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+1980:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2040:  Transition: 0 seconds
+2040:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2040:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2100:  Transition: 0 seconds
+2100:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2100:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2160:  Transition: 0 seconds
+2160:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2160:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2220:  Transition: 0 seconds
+2220:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2220:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2280:  Transition: 0 seconds
+2280:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2280:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2340:  Transition: 0 seconds
+2340:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2340:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2400:  Transition: 116 seconds
+2400:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2400:  - To   ['c5.large[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2400:  - Temporal nodes []
+2400:  Creating node c5.large[0]
+2420:  Billing of node c5.large[0] starts
+2500:  Node c5.large[0] is ready to execute containers
+2500:  Allocating 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[0]
+2501:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[0]
+2501:  Removing 1 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.xlarge[0]
+2501:  Removing 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.xlarge[0]
+2506:  Completed the removal of 1 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.xlarge[0]
+2506:  Completed the removal of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.xlarge[0]
+2506:  Removing node c5.xlarge[0]
+2516:  Node c5.xlarge[0] is removed
+2520:  Transition: 15 seconds
+2520:  - From ['c5.large[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
+2520:  - To   ['c5.large[0]']
+2520:  - Temporal nodes []
+2520:  Removing 10 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.4xlarge[0]
+2520:  Removing 60 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.24xlarge[0]
+2525:  Completed the removal of 10 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.4xlarge[0]
+2525:  Completed the removal of 60 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.24xlarge[0]
+2525:  Removing node c5.4xlarge[0]
+2525:  Removing node c5.24xlarge[0]
+2535:  Node c5.4xlarge[0] is removed
+2535:  Node c5.24xlarge[0] is removed
+2580:  Transition: 0 seconds
+2580:  - From ['c5.large[0]']
+2580:  - To   ['c5.large[0]']
+2640:  Transition: 0 seconds
+2640:  - From ['c5.large[0]']
+2640:  - To   ['c5.large[0]']
+2700:  Transition: 0 seconds
+2700:  - From ['c5.large[0]']
+2700:  - To   ['c5.large[0]']
+2760:  Transition: 0 seconds
+2760:  - From ['c5.large[0]']
+2760:  - To   ['c5.large[0]']
+2820:  Transition: 0 seconds
+2820:  - From ['c5.large[0]']
+2820:  - To   ['c5.large[0]']
+2880:  Transition: 0 seconds
+2880:  - From ['c5.large[0]']
+2880:  - To   ['c5.large[0]']
+2940:  Transition: 0 seconds
+2940:  - From ['c5.large[0]']
+2940:  - To   ['c5.large[0]']
+3000:  Transition: 0 seconds
+3000:  - From ['c5.large[0]']
+3000:  - To   ['c5.large[0]']
+3060:  Transition: 0 seconds
+3060:  - From ['c5.large[0]']
+3060:  - To   ['c5.large[0]']
+3120:  Transition: 0 seconds
+3120:  - From ['c5.large[0]']
+3120:  - To   ['c5.large[0]']
+3180:  Transition: 0 seconds
+3180:  - From ['c5.large[0]']
+3180:  - To   ['c5.large[0]']
+3240:  Transition: 0 seconds
+3240:  - From ['c5.large[0]']
+3240:  - To   ['c5.large[0]']
+3300:  Transition: 0 seconds
+3300:  - From ['c5.large[0]']
+3300:  - To   ['c5.large[0]']
+3360:  Transition: 0 seconds
+3360:  - From ['c5.large[0]']
+3360:  - To   ['c5.large[0]']
+3420:  Transition: 0 seconds
+3420:  - From ['c5.large[0]']
+3420:  - To   ['c5.large[0]']
+3480:  Transition: 0 seconds
+3480:  - From ['c5.large[0]']
+3480:  - To   ['c5.large[0]']
+3540:  Transition: 0 seconds
+3540:  - From ['c5.large[0]']
+3540:  - To   ['c5.large[0]']
+3600:  Current allocation with ('c5.large[0]',)
+3600:    - Allocated 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[0]

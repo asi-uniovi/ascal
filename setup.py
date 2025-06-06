@@ -10,7 +10,7 @@ setup(
     description="Simulate different H/HV and reactive/predictive autoscaling algorithms of containers",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/asi-uniovi/fcma.git",  # Optional
+    url="https://github.com/asi-uniovi/ascal.git",  # Optional
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License"

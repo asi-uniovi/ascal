@@ -1,0 +1,146 @@
+0:  Initial allocation with ('c5.large[1]',)
+0:    - Allocated 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[1]
+60:  Load of app0: 0.00 req/s
+60:  Current replicas 1x of app0 1, desired 1
+120:  Load of app0: 0.00 req/s
+120:  Current replicas 1x of app0 1, desired 1
+180:  Load of app0: 0.00 req/s
+180:  Current replicas 1x of app0 1, desired 1
+240:  Load of app0: 0.00 req/s
+240:  Current replicas 1x of app0 1, desired 1
+300:  Load of app0: 0.00 req/s
+300:  Current replicas 1x of app0 1, desired 1
+360:  Load of app0: 0.00 req/s
+360:  Current replicas 1x of app0 1, desired 1
+420:  Load of app0: 0.00 req/s
+420:  Current replicas 1x of app0 1, desired 1
+476:  Transition at 600:0 seconds
+476:  Predicted loads for 95.0 % percentile:
+476:  - app0 -> 0.00 req/s
+476:  - From ['c5.large[1]']
+476:  - To   ['c5.large[1]']
+476:  - Temporal nodes []
+480:  Load of app0: 0.00 req/s
+480:  Current replicas 1x of app0 1, desired 1
+540:  Load of app0: 0.00 req/s
+540:  Current replicas 1x of app0 1, desired 1
+600:  Load of app0: 0.00 req/s
+600:  Current replicas 1x of app0 1, desired 1
+660:  Load of app0: 0.00 req/s
+660:  Current replicas 1x of app0 1, desired 1
+720:  Load of app0: 0.00 req/s
+720:  Current replicas 1x of app0 1, desired 1
+780:  Load of app0: 0.00 req/s
+780:  Current replicas 1x of app0 1, desired 1
+840:  Load of app0: 0.00 req/s
+840:  Current replicas 1x of app0 1, desired 1
+900:  Load of app0: 0.00 req/s
+900:  Current replicas 1x of app0 1, desired 1
+960:  Load of app0: 0.00 req/s
+960:  Current replicas 1x of app0 1, desired 1
+1020:  Load of app0: 0.00 req/s
+1020:  Current replicas 1x of app0 1, desired 1
+1076:  Transition at 1084:116 seconds
+1076:  Predicted loads for 95.0 % percentile:
+1076:  - app0 -> 100.00 req/s
+1076:  - From ['c5.large[1]']
+1076:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]']
+1076:  - Temporal nodes ['c5.2xlarge[0]', 'c5.18xlarge[0]']
+1260:  Load of app0: 100.00 req/s
+1260:  Current replicas 1x of app0 100, desired 143
+1260:  Creating node c5.9xlarge[0]
+1280:  Billing of node c5.9xlarge[0] starts
+1320:  Load of app0: 100.00 req/s
+1320:  Current replicas 1x of app0 100, desired 143
+1360:  Node c5.9xlarge[0] is ready to execute containers
+1360:  Allocating 21 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.9xlarge[0]
+1360:  Allocating 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.9xlarge[0]
+1361:  Completed the allocation of 21 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.9xlarge[0]
+1361:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.9xlarge[0]
+1380:  Load of app0: 100.00 req/s
+1380:  Current replicas 1x of app0 143, desired 143
+1440:  Load of app0: 100.00 req/s
+1440:  Current replicas 1x of app0 143, desired 143
+1500:  Load of app0: 100.00 req/s
+1500:  Current replicas 1x of app0 143, desired 143
+1560:  Load of app0: 100.00 req/s
+1560:  Current replicas 1x of app0 143, desired 143
+1620:  Load of app0: 100.00 req/s
+1620:  Current replicas 1x of app0 143, desired 143
+1676:  Transition at 1785:15 seconds
+1676:  Predicted loads for 95.0 % percentile:
+1676:  - app0 -> 100.00 req/s
+1676:  - From ['c5.2xlarge[0]', 'c5.18xlarge[0]', 'c5.9xlarge[0]']
+1676:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]']
+1676:  - Temporal nodes []
+1860:  Load of app0: 100.00 req/s
+1860:  Current replicas 1x of app0 100, desired 143
+1860:  Creating node c5.9xlarge[0]
+1880:  Billing of node c5.9xlarge[0] starts
+1920:  Load of app0: 100.00 req/s
+1920:  Current replicas 1x of app0 100, desired 143
+1960:  Node c5.9xlarge[0] is ready to execute containers
+1960:  Allocating 21 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.9xlarge[0]
+1960:  Allocating 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.9xlarge[0]
+1961:  Completed the allocation of 21 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.9xlarge[0]
+1961:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.9xlarge[0]
+1980:  Load of app0: 100.00 req/s
+1980:  Current replicas 1x of app0 143, desired 143
+2040:  Load of app0: 100.00 req/s
+2040:  Current replicas 1x of app0 143, desired 143
+2100:  Load of app0: 100.00 req/s
+2100:  Current replicas 1x of app0 143, desired 143
+2160:  Load of app0: 100.00 req/s
+2160:  Current replicas 1x of app0 143, desired 143
+2220:  Load of app0: 100.00 req/s
+2220:  Current replicas 1x of app0 143, desired 143
+2276:  Transition at 2385:131 seconds
+2276:  Predicted loads for 95.0 % percentile:
+2276:  - app0 -> 0.00 req/s
+2276:  - From ['c5.2xlarge[0]', 'c5.18xlarge[0]', 'c5.9xlarge[0]']
+2276:  - To   ['c5.large[0]']
+2276:  - Temporal nodes []
+2520:  Load of app0: 0.00 req/s
+2520:  Current replicas 1x of app0 1, desired 1
+2580:  Load of app0: 0.00 req/s
+2580:  Current replicas 1x of app0 1, desired 1
+2640:  Load of app0: 0.00 req/s
+2640:  Current replicas 1x of app0 1, desired 1
+2700:  Load of app0: 0.00 req/s
+2700:  Current replicas 1x of app0 1, desired 1
+2760:  Load of app0: 0.00 req/s
+2760:  Current replicas 1x of app0 1, desired 1
+2820:  Load of app0: 0.00 req/s
+2820:  Current replicas 1x of app0 1, desired 1
+2876:  Transition at 3000:0 seconds
+2876:  Predicted loads for 95.0 % percentile:
+2876:  - app0 -> 0.00 req/s
+2876:  - From ['c5.large[0]']
+2876:  - To   ['c5.large[0]']
+2876:  - Temporal nodes []
+2880:  Load of app0: 0.00 req/s
+2880:  Current replicas 1x of app0 1, desired 1
+2940:  Load of app0: 0.00 req/s
+2940:  Current replicas 1x of app0 1, desired 1
+3000:  Load of app0: 0.00 req/s
+3000:  Current replicas 1x of app0 1, desired 1
+3060:  Load of app0: 0.00 req/s
+3060:  Current replicas 1x of app0 1, desired 1
+3120:  Load of app0: 0.00 req/s
+3120:  Current replicas 1x of app0 1, desired 1
+3180:  Load of app0: 0.00 req/s
+3180:  Current replicas 1x of app0 1, desired 1
+3240:  Load of app0: 0.00 req/s
+3240:  Current replicas 1x of app0 1, desired 1
+3300:  Load of app0: 0.00 req/s
+3300:  Current replicas 1x of app0 1, desired 1
+3360:  Load of app0: 0.00 req/s
+3360:  Current replicas 1x of app0 1, desired 1
+3420:  Load of app0: 0.00 req/s
+3420:  Current replicas 1x of app0 1, desired 1
+3480:  Load of app0: 0.00 req/s
+3480:  Current replicas 1x of app0 1, desired 1
+3540:  Load of app0: 0.00 req/s
+3540:  Current replicas 1x of app0 1, desired 1
+3600:  Current allocation with ('c5.large[0]',)
+3600:    - Allocated 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[0]

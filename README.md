@@ -69,36 +69,6 @@ package, install it in editable mode:
 pip install -e .
 ```
 
-### Installation using poetry
-
-Poetry is a tool for ensuring that the package is installed with the correct dependencies and versions. The initial setup is more complex than the manual installation, but it is preferable for developing and publishing the package.
-
-First be sure to have poetry installed in your system. First you require `pipx`, which is a tool that installs python tools into their own isolated environments, and adds them to your path. Follow [this instructions](https://pipx.pypa.io/stable/installation/) to install `pipx`. Then install poetry with pipx:
-
-```bash
-pipx install poetry
-```
-
-Clone `ascal` repository:
-
-```bash
-git clone https://github.com/asi-uniovi/ascal.git
-cd ascal
-```
-
-Start a poetry shell (it is a virtual environment specific for this project):
-
-```bash
-poetry shell
-```
-
-Install the package (it will be installed in editable mode, for development)
-
-```bash
-poetry install
-```
-
-Remember to use `poetry shell` from `ascal` folder every time you want to work with the package in a different terminal or session.
 
 Usage
 -----
@@ -146,7 +116,7 @@ ascal_problem.write_cost_csv('cost.csv')
 ```
 **7. Optional plot of workloads and simulation results.**
 ```python
-scal_problem.plot(ascal_problem.get_workloads(), "Application Workloads", "req/s")
+ascal_problem.plot(ascal_problem.get_workloads(), "Application Workloads", "req/s")
 ascal_problem.plot(ascal_problem.get_performances(), "Application Performances", "req/s")
 cluster_cost = ascal_problem.get_cluster_cost()
 total_cost_str = f"total cost = {sum(cluster_cost)/(last_time + 1):.3f} $"
@@ -258,7 +228,7 @@ This section in the YAML file defines the applications.
 apps:
   app0:
     load:
-      file: ../trace-triangle.csv
+      file: ../../traces/triangle_rand.csv
       time_interval: 1
       repeat: 1
       load_offset: 10
