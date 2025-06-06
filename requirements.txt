@@ -4,5 +4,4 @@ pint
 pulp
 PyYAML
 pytest
-git+https://github.com/asi-uniovi/cloudmodel.git
 git+https://github.com/asi-uniovi/fcma.git
