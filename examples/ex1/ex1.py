@@ -1,4 +1,8 @@
-# Example of autoscaling problem
+"""
+Example of autoscaling problem
+"""
+
+from numpy import percentile as percentile
 from ascal import AscalConfig, Ascal
 from examples import aws_eu_west_1_c5m5r5
 
@@ -29,11 +33,20 @@ ascal_problem.write_workload_csv('workloads.csv')
 ascal_problem.write_performance_csv('performances.csv')
 ascal_problem.write_cost_csv('cost.csv')
 
-# Get application overloads (workload/performance)
+# Get application overloads as workload/performance
 workloads = ascal_problem.get_workloads()
 performances = ascal_problem.get_performances()
-
 overloads = {app: [w/p for w, p in zip(workloads[app], performances[app])] for app in workloads}
+
+# Get queue waiting times relative to service times, assuming each container is a server in a heterogenous D/D/n queue
+relative_queue_waiting_times = ascal_problem.get_relative_queue_waiting_times()
+percentiles95 = {
+    app_name: percentile(waiting_times, 99)
+    for app_name, waiting_times in relative_queue_waiting_times.items()
+}
+for app_name in dict(relative_queue_waiting_times):
+    relative_queue_waiting_times[f"{app_name} 99% percentile = {percentiles95[app_name]:.3f}"] =\
+        relative_queue_waiting_times.pop(app_name)
 
 # Plot autoscaling information
 ascal_problem.plot(ascal_problem.get_workloads(), "Application Workloads", "req/s")
@@ -42,6 +55,7 @@ cluster_cost = ascal_problem.get_cluster_cost()
 total_cost_str = f"total cost = {sum(cluster_cost)/3600:.3f} $"
 ascal_problem.plot({total_cost_str: cluster_cost}, "Cluster Cost", "$/hour")
 ascal_problem.plot(overloads, "Application Overloads")
+ascal_problem.plot(relative_queue_waiting_times, "Relative queue waiting times")
 
 # Useful properties
 last_time = ascal_problem.last_time # Last time that can be simulated

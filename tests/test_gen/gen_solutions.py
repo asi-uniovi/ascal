@@ -51,6 +51,8 @@ for problem_file in problem_files:
     ascal_problem.run()
     write_allocations(sol_file, ascal_problem.performance_changes)
 
+    """ Uncomment to show the plots
+    
     workloads = ascal_problem.get_workloads()
     performances = ascal_problem.get_performances()
     overloads = {app: [w / p for w, p in zip(workloads[app], performances[app])] for app in workloads}
@@ -63,4 +65,5 @@ for problem_file in problem_files:
     ascal_problem.plot(overloads, "Application Overloads")
     ascal_problem.plot_bar({'nodes': node_recycling_levels, 'containers': container_recycling_levels},
                            "Recyclings", "Recycling value")
-
+    
+    """

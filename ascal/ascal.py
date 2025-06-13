@@ -2,11 +2,11 @@
 Main module of the ascal package. It defines class Ascal to calculate the sequence of allocations for
 a given autoscaler and applications
 """
+from math import ceil, floor
 from copy import deepcopy
 from yaml import safe_load
 import matplotlib.pyplot as plt
 import numpy as np
-
 import csv
 from fcma import (
     RequestsPerTime,
@@ -18,17 +18,12 @@ from fcma import (
     App,
     System
 )
-from ascal.autoscalers import (
-    Autoscaler,
-    AutoscalerTypes,
-    AutoscalerStatistics,
-    HReactiveAutoscaler,
-    HVReactiveAutoscaler,
-    HVPredictiveAutoscaler,
-    HReactiveHVReactiveAutoscaler,
-    HReactiveHVPredictiveAutoscaler,
-    TimedOps
-)
+from ascal.autoscalers import Autoscaler, AutoscalerTypes, TimedOps
+from ascal.hreactive import HReactiveAutoscaler
+from ascal.hvreactive import HVReactiveAutoscaler
+from ascal.hvpredictive import HVPredictiveAutoscaler
+from ascal.hreactivehvreactive import HReactiveHVReactiveAutoscaler
+from ascal.hreactivehvpredictive import HReactiveHVPredictiveAutoscaler
 from ascal.nodestates import NodeStates
 
 
@@ -464,7 +459,7 @@ class Ascal:
 
     def get_performances(self) -> dict[str, list[int]]:
         """
-        Gets application performances.
+        Get application performances.
         :return: For each application the performances in req/s at every second, starting at 0 seconds.
         """
         app_perfs = {str(app): [] for app in self._workload_vectors}
@@ -491,7 +486,7 @@ class Ascal:
             previous_time = current_time
         return app_perfs
 
-    def get_cluster_cost(self) -> list[int]:
+    def get_cluster_cost(self) -> list[float]:
         """
         Gets the cluster cost in $/hour.
         :return: A list with the cost in $/hour at every second, starting from 0 seconds.
@@ -512,6 +507,80 @@ class Ascal:
             node_costs.append(sum(node.ic.price.magnitude for node in billed_nodes))
             previous_time = current_time
         return node_costs
+
+    def _get_weighted_aggs(self) -> dict[str, list[int]]:
+        """
+        Get the weighted aggreation among application containers. . For example, if one applications has 2 containers
+        # with aggregation level 4 and 1 container with aggregation level 2, the weithted aggregation would be
+        # 2 x 4 + 1 x 2 = 10
+        :return: Samples of weigthed aggregations, starting at 0 seconds.
+        """
+        weighted_aggs = {str(app): [] for app in self._workload_vectors}
+
+        previous_time = -1
+        for current_time, current_nodes in self.performance_changes:
+            # Repeat the previous allocation performances
+            if current_time - previous_time > 1:
+                for app_name, wagg in weighted_aggs.items():
+                    weighted_aggs[app_name].extend([wagg[-1]] * (current_time - previous_time - 1))
+            # Get weighted aggregations for the current allocation
+            current_aggs = {str(app): 0 for app in self._workload_vectors}
+            current_replicas = {str(app): 0 for app in self._workload_vectors}
+            for node in current_nodes:
+                for cg in node.cgs:
+                    app = cg.cc.app
+                    if app is not None:
+                        current_replicas[str(app)] += cg.replicas
+                        current_aggs[str(app)] += cg.cc.agg_level * cg.replicas
+
+            # Append the current weighted aggregations
+            for app_name in weighted_aggs:
+                weighted_aggs[app_name].append(current_aggs[app_name] / current_replicas[app_name])
+
+            # Prepare for the next allocation change
+            previous_time = current_time
+        return weighted_aggs
+
+    def get_relative_queue_waiting_times(self) -> list[float]:
+        """
+        Get the waiting times of requests in the processing queues, relative to the service time. Requests of
+        a given application can be served by different containers (servers), with different service time.
+        A D/D/n queue with heterogeneous servers and infinite queues is considered, so that requests coming from an
+        application arrive at constant rate and service times depend on the server.
+        Some assumptions/approximations are considered:
+        - One application has as many servers as application containers, where the service time of each container
+        is (1/p), being p the container performance in reqs/s.
+        - Perfect load balancing, so the queue length of each container is proportional to container's performance, p.
+        :return: One-second samples of queue relative waiting times.
+        """
+
+        app_workloads = self._workload_vectors
+        app_performances = self.get_performances()
+
+        # Calculate samples of the queue length. Difference (w-p) doesn't have to be multiple of 1 second
+        frac_surplus = {app_name: 0.0 for app_name in app_performances}
+        queue_length = {app_name: [0] for app_name in app_performances}
+        for app in app_workloads:
+            app_name = str(app)
+            for w, p in zip(app_workloads[app][1:], app_performances[app_name][1:]):
+                w_frac = w - int(w)
+                if frac_surplus[app_name] >= w_frac:
+                    frac_surplus[app_name] -= w_frac
+                    w = floor(w)
+                else:
+                    frac_surplus[app_name] += (1 - w_frac)
+                    w = ceil(w)
+                queue_length[app_name].append(max(0, queue_length[app_name][-1] + w - p))
+
+        # Calculate samples of application's weighted aggregations
+        weighted_perf = self._get_weighted_aggs()
+
+        # Samples of waiting factors
+        waiting_factors = {
+            app_name: [ql / wperf for ql, wperf in zip(queue_length[app_name], weighted_perf[app_name])]
+            for app_name in queue_length
+        }
+        return waiting_factors
 
     def write_workload_csv(self, csv_file: str) -> None:
         """
@@ -596,13 +665,18 @@ class Ascal:
         # Plot order to show the smallest in the foreground
         order = np.argsort([np.nan_to_num(v, nan=np.inf) for v in zip(*masked_values)], axis=1)
 
-        # Plot the highest and next the lowest
+        # Keep track of which labels have already been added to the legend
+        shown_labels = set()
+
+        # Plot the highest bar and next the lowest
         for pos in range(len(x)):
             ordered_indices = order[pos]
             for idx in ordered_indices[::-1]:
                 val = masked_values[idx][pos]
                 if not np.isnan(val):
-                    plt.bar(pos, val, color=f"C{idx}", label=labels[idx], zorder=idx, width=20, alpha=0.85)
+                    label = labels[idx] if labels[idx] not in shown_labels else "_nolegend_"
+                    plt.bar(pos, val, color=f"C{idx}", label=label, zorder=idx, width=20, alpha=0.85)
+                    shown_labels.add(labels[idx])
 
         # Títle and style
         if title:
@@ -610,6 +684,7 @@ class Ascal:
         plt.xlabel('Time (s)')
         if unit is not None:
             plt.ylabel(unit)
+        plt.legend()
 
         plt.show()
 

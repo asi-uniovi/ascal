@@ -394,9 +394,6 @@ class TimedOps:
         :param at_time: Node creation starts at this time.
         :param node: Preconfigured node.
         """
-        if at_time < self._last_dispatched_time:
-            a = 1
-
         assert at_time >= self._last_dispatched_time, "Can not create nodes in the past"
         assert node is not None, "Nodes need to be preconfigured to be created"
         event = TimedOps.Event(TimedOps.EventTypes.CREATE_NODE_BEGIN, node=node,
@@ -460,13 +457,6 @@ class TimedOps:
         :param event: Event that has just being fired.
         """
         node = event.node
-        if len(node.cgs) > 0:
-            # First complete the removal of containers at the current time
-            self._dispatch_at_last_time()
-
-        if len(node.cgs) > 0:
-            a = 1
-
         assert len(node.cgs) == 0, "Can not remove a node with containers"
         NodeStates.set_state(node, NodeStates.REMOVING)
         event = TimedOps.Event(TimedOps.EventTypes.REMOVE_NODE_END, node=node,

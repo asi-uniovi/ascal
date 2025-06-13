@@ -4,6 +4,7 @@ Test ASCAL based on the sequence of allocations
 
 import os
 from yaml import safe_load as yaml_safe_load
+from yaml import dump as yaml_dump
 from collections import defaultdict
 from pathlib import Path
 import pytest
@@ -20,7 +21,7 @@ def read_allocations(file_name) -> dict:
     :param file_name: File with the allocations.
     :return: A dictionary obtained from the YAML.
     """
-    with open(f"{SOLUTIONS_DIR}/{file_name}-alloc.yaml", "r") as f:
+    with open(f"{SOLUTIONS_DIR}/{file_name}", "r") as f:
         allocations = yaml_safe_load(f)
     return allocations
 
@@ -59,5 +60,7 @@ def test_problem_allocation(problem_file_name):
     ascal_problem = Ascal(ascal_config)
     ascal_problem.run()
     calculated_allocs = allocations_to_serializable_dict(ascal_problem.performance_changes)
-    solution_allocs = read_allocations(problem_file_name)
+    solution_allocs = read_allocations(f"{problem_file_name[:-len('.yaml')]}-alloc.yaml")
+    if calculated_allocs != solution_allocs:
+        print(yaml_dump(calculated_allocs, default_flow_style=False))
     assert calculated_allocs == solution_allocs, f"Check failed for {problem_file_name}"
