@@ -40,7 +40,7 @@ class Vmt:
 
     def is_empty(self) -> bool:
         """
-        Check wether the node is empty.
+        Check whether the node is empty.
         :return: Return True when the node is empty.
         """
         for cc, replicas in self.replicas.items():
@@ -131,7 +131,7 @@ def get_min_max_load(load1: dict[App, RequestsPerTime], load2: dict[App, Request
     )
 
 
-def allocation_signature(alloc: list[Vmt]) -> Counter:
+def get_allocation_signature(alloc: list[Vmt]) -> Counter:
     """
     Get a signature to compare allocations.
     :param alloc: Allocation.

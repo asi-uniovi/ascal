@@ -11,17 +11,23 @@ class NodeStates(Enum):
 
     @staticmethod
     def get_state(node: Vm) -> 'NodeStates':
+        """
+        Return the current state of the node based on its history.
+        """
         assert node is not None, "Invalid node"
         if len(node.history) == 0:
             return NodeStates.BOOTING
-        if node.history[0] not in [state for state in NodeStates]:
+        if node.history[0] not in NodeStates:
             return NodeStates.BOOTING
         else:
             return node.history[0]
 
     @staticmethod
     def set_state(node: Vm, new_state: 'NodeStates'):
-        if len(node.history) == 0:
+        """
+        Set the current state of the node based on its history.
+        """
+        if not node.history:
             node.history.append(new_state)
         else:
             if node.history[0] != new_state:

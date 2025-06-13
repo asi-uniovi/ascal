@@ -4,7 +4,7 @@ Implement a base class for autoscalers
 from enum import Enum
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from numpy import percentile as percentile
+from numpy import percentile
 from fcma import App, ContainerClass, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.transition import Command
@@ -29,7 +29,7 @@ class AutoscalerStatistics:
     """
     perf_changed: bool # True if the performance has changed
     billing_changed: bool # True if the allocation has changed
-    calculation_time: int # Time required to perform the proccessing
+    calculation_time: int # Time required to perform the processing
     node_recycling_level: float = 0.0 # Node recycling level in [0, 1]
     container_recycling_level: float = 0.0 # Container recycling level in [0,1]
 
@@ -95,7 +95,7 @@ class Autoscaler(ABC):
     def _set_delta_loads_if_zero(workloads: dict[App, RequestsPerTime]):
         """
         Set workloads to a delta workload if they are zero.
-        :param workloads: Dictionary with application's worload.
+        :param workloads: Dictionary with application's workload.
         """
         for app, workload in workloads.items():
             if workload.magnitude == 0:
@@ -145,7 +145,7 @@ class Autoscaler(ABC):
         for command1 in commands1[:]:
             if len(command1.remove_nodes) > 0:
                 for removed_node1 in command1.remove_nodes:
-                    # Check if the node removed in the first comand list
+                    # Check if the node removed in the first cmomand list
                     # was used in allocations in the second command list
                     if removed_node1 in nodes_used2:
                         command1.remove_nodes.remove(removed_node1)
@@ -172,7 +172,10 @@ class Autoscaler(ABC):
         :param message: Message to print.
         """
         if self._log_f is not None:
-            self._log_f.write(f'{self.time}:  {message}\n')
+            try:
+                self._log_f.write(f'{self.time}:  {message}\n')
+            except Exception as e:
+                print(f"[LOG ERROR] {e}")
         #print(f'{self.time}: {message}', flush=True)
 
     def __del__(self):
@@ -184,7 +187,7 @@ class Autoscaler(ABC):
 
     def _get_app_ccs(self, app_aggs: dict[App, list[int]]) -> dict[App, list[int]]:
         """
-        Get a list of container classs for each application in the system. Container classes are sorted
+        Get a list of container class for each application in the system. Container classes are sorted
         by decreasing aggregation level.
         :param app_aggs: Application aggregations. Use None to consider all the application
         aggregations in system.
