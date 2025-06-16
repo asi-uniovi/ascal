@@ -67,8 +67,9 @@ calculation_times = ascal_problem.calc_times # Calculation times to obtain new a
 # Recycling levels for Horizontal/Vertical autoscalers
 node_recycling_levels, container_recycling_levels = ascal_problem.get_recycling_levels()
 
-# Plot calculation times
-ascal_problem.plot({'times': calculation_times}, "Calculation times", "Seconds")
+# Plot times to calculate transitions
+transition_times = calculation_times["transition_times"]
+ascal_problem.plot({'_nolegend_': transition_times}, "Transition times", "Seconds")
 
 # Plot recyclings
 ascal_problem.plot_bar({'nodes': node_recycling_levels, 'containers': container_recycling_levels},
