@@ -5,9 +5,10 @@ from enum import Enum
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from numpy import percentile
-from fcma import App, ContainerClass, RequestsPerTime
+from fcma import Fcma, SolvingPars, Allocation, App, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.transition import Command
+from ascal.helper import mncf_allocation
 
 
 class AutoscalerTypes(Enum):
@@ -17,10 +18,15 @@ class AutoscalerTypes(Enum):
     HV_PREDICTIVE = 4  # Horizontal/vertical predictive
     H_REACTIVE_HV_REACTIVE   = 5  # Mixed reactive horizontal and horizontal/vertical autoscaling
     H_REACTIVE_HV_PREDICTIVE = 6  # Mixed reactive horizontal and horizontal/vertical autoscaling
-    FCMA =  10         # FCMA algorithm with speed level 1
-    FCMA1 = 11         # FCMA algorithm with speed level 1
-    FCMA2 = 12         # FCMA algorithm with speed level 2
-    FCMA3 = 13         # FCMA algorithm with speed level 3
+
+class AllocationSolver(Enum):
+    FCMA1 = 1         # FCMA algorithm with speed level 1
+    FCMA2 = 2         # FCMA algorithm with speed level 2
+    FCMA3 = 3         # FCMA algorithm with speed level 3
+    FCMA4 = 4         # FCMA algorithm with speed level 4
+    FCMA =  FCMA1     # FCMA algorithm with speed level 1
+    MNCF = 5          # Minimum Node Cost Fit allocation
+
 
 @dataclass(frozen=True)
 class AutoscalerStatistics:
@@ -29,7 +35,8 @@ class AutoscalerStatistics:
     """
     perf_changed: bool # True if the performance has changed
     billing_changed: bool # True if the allocation has changed
-    calculation_time: int # Time required to perform the processing
+    transition_time: float # Time to perform the transition
+    total_time: float # Time to perform all the autoscaling calculations (includes transition)
     node_recycling_level: float = 0.0 # Node recycling level in [0, 1]
     container_recycling_level: float = 0.0 # Container recycling level in [0,1]
 
@@ -81,6 +88,23 @@ class Autoscaler(ABC):
         else:
             self._log_f = open(self.log_path, "w")
         self._timedops.log = self.log
+
+    def _solve_allocation(self, workloads, solver: AllocationSolver=AllocationSolver.FCMA1) -> Allocation:
+        """
+        Solve allocation problem for the given application workloads.
+        :param workloads: Workloads to calculate the allocation.
+        :param solver: Solver used to find an allocation.
+        :return: An allocation as a list of nodes.
+        """
+        if solver in (AllocationSolver.FCMA, AllocationSolver.FCMA1, AllocationSolver.FCMA2, AllocationSolver.FCMA3):
+            fcma_speed_level = solver.value
+            problem = Fcma(self.system, workloads=workloads)
+            solution = problem.solve(SolvingPars(speed_level=fcma_speed_level))
+            return [node for _, nodes in solution.allocation.items() for node in nodes]
+        elif solver == AllocationSolver.MNCF:
+            return mncf_allocation(self.system, workloads)
+        else:
+            raise ValueError("Invalid allocation solver")
 
     def log_allocation_summary(self):
         """
@@ -184,38 +208,6 @@ class Autoscaler(ABC):
         """
         if self._log_f is not None:
             self._log_f.close()
-
-    def _get_app_ccs(self, app_aggs: dict[App, list[int]]) -> dict[App, list[int]]:
-        """
-        Get a list of container class for each application in the system. Container classes are sorted
-        by decreasing aggregation level.
-        :param app_aggs: Application aggregations. Use None to consider all the application
-        aggregations in system.
-        :return: A dictionary with a list of containers for each application.
-        """
-        # Container classes for applications sorted by decreasing aggregation
-        app_ccs = {}
-        icf = list(self.system.keys())[0][1]
-        if app_aggs is None:
-            aggs = {app_icf[0]: perf.aggs for app_icf, perf in self.system.items()}
-        else:
-            aggs = app_aggs
-        for app in aggs:
-            app_ccs[app] = []
-            for agg in aggs[app]:
-                cc = ContainerClass(
-                    app=app,
-                    ic=None,
-                    fm=icf,
-                    cores=self.system[(app, icf)].cores * agg,
-                    mem=self.system[(app, icf)].mem[0],
-                    perf=self.system[(app, icf)].perf * agg,
-                    agg_level=agg,
-                    aggs=tuple(aggs[app])
-                )
-                app_ccs[app].append(cc)
-            app_ccs[app].sort(key=lambda c: c.agg_level, reverse=True)
-        return app_ccs
 
     def _transition_execute_sync(self, commands: list[Command], start_time: int=-1,
                                  timedops: TimedOps=None):

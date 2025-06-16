@@ -2,6 +2,7 @@
 Main module of the ascal package. It defines class Ascal to calculate the sequence of allocations for
 a given autoscaler and applications
 """
+
 from math import ceil, floor
 from copy import deepcopy
 from yaml import safe_load
@@ -18,7 +19,7 @@ from fcma import (
     App,
     System
 )
-from ascal.autoscalers import Autoscaler, AutoscalerTypes, TimedOps
+from ascal.autoscalers import Autoscaler, AllocationSolver, AutoscalerTypes, TimedOps
 from ascal.hreactive import HReactiveAutoscaler
 from ascal.hvreactive import HVReactiveAutoscaler
 from ascal.hvpredictive import HVPredictiveAutoscaler
@@ -147,13 +148,15 @@ class AscalConfig:
                     timing_args
                 )
             elif data['autoscaler'] == 'hv_reactive':
-                algorithm = AutoscalerTypes.FCMA
+                algorithm = AllocationSolver.FCMA
                 if data['autoscalers']['hv_reactive']['algorithm'] == 'fcma1':
-                    algorithm = AutoscalerTypes.FCMA1
+                    algorithm = AllocationSolver.FCMA1
                 elif  data['autoscalers']['hv_reactive']['algorithm'] == 'fcma2':
-                    algorithm = AutoscalerTypes.FCMA2
+                    algorithm = AllocationSolver.FCMA2
                 elif data['autoscalers']['hv_reactive']['algorithm'] == 'fcma3':
-                    algorithm = AutoscalerTypes.FCMA3
+                    algorithm = AllocationSolver.FCMA3
+                elif data['autoscalers']['hv_reactive']['algorithm'] == 'mncf':
+                    algorithm = AllocationSolver.MNCF
                 config.autoscaler = HVReactiveAutoscaler(
                     data['autoscalers']['hv_reactive']['time_period'],
                     data['autoscalers']['hv_reactive']['desired_cpu_utilization'],
@@ -162,13 +165,15 @@ class AscalConfig:
                     data['autoscalers']['hv_reactive']['transition_time_budget']
                 )
             elif data['autoscaler'] == 'hv_predictive':
-                algorithm = AutoscalerTypes.FCMA
+                algorithm = AllocationSolver.FCMA
                 if data['autoscalers']['hv_predictive']['algorithm'] == 'fcma1':
-                    algorithm = AutoscalerTypes.FCMA1
+                    algorithm = AllocationSolver.FCMA1
                 elif  data['autoscalers']['hv_predictive']['algorithm'] == 'fcma2':
-                    algorithm = AutoscalerTypes.FCMA2
+                    algorithm = AllocationSolver.FCMA2
                 elif data['autoscalers']['hv_predictive']['algorithm'] == 'fcma3':
-                    algorithm = AutoscalerTypes.FCMA3
+                    algorithm = AllocationSolver.FCMA3
+                elif data['autoscalers']['hv_predictive']['algorithm'] == 'mncf':
+                    algorithm = AllocationSolver.MNCF
                 config.autoscaler = HVPredictiveAutoscaler(
                     data['autoscalers']['hv_predictive']['prediction_window'],
                     data['autoscalers']['hv_predictive']['prediction_percentile'],
@@ -177,13 +182,15 @@ class AscalConfig:
                     data['autoscalers']['hv_predictive']['transition_time_budget']
                 )
             elif data['autoscaler'] == 'h_reactive_hv_reactive':
-                algorithm = AutoscalerTypes.FCMA
+                algorithm = AllocationSolver.FCMA
                 if data['autoscalers']['h_reactive_hv_reactive']['hv_algorithm'] == 'fcma1':
-                    algorithm = AutoscalerTypes.FCMA1
+                    algorithm = AllocationSolver.FCMA1
                 elif  data['autoscalers']['h_reactive_hv_reactive']['hv_algorithm'] == 'fcma2':
-                    algorithm = AutoscalerTypes.FCMA2
+                    algorithm = AllocationSolver.FCMA2
                 elif data['autoscalers']['h_reactive_hv_reactive']['hv_algorithm'] == 'fcma3':
-                    algorithm = AutoscalerTypes.FCMA3
+                    algorithm = AllocationSolver.FCMA3
+                elif data['autoscalers']['h_reactive_hv_reactive']['hv_algorithm'] == 'mncf':
+                    algorithm = AllocationSolver.MNCF
                 config.autoscaler = HReactiveHVReactiveAutoscaler(
                     data['autoscalers']['h_reactive_hv_reactive']['h_time_period'],
                     data['autoscalers']['h_reactive_hv_reactive']['desired_cpu_utilization'],
@@ -194,13 +201,15 @@ class AscalConfig:
                     data['autoscalers']['h_reactive_hv_reactive']['hv_transition_time_budget']
                 )
             elif data['autoscaler'] == 'h_reactive_hv_predictive':
-                algorithm = AutoscalerTypes.FCMA
+                algorithm = AllocationSolver.FCMA
                 if data['autoscalers']['h_reactive_hv_predictive']['hv_algorithm'] == 'fcma1':
-                    algorithm = AutoscalerTypes.FCMA1
+                    algorithm = AllocationSolver.FCMA1
                 elif  data['autoscalers']['h_reactive_hv_predictive']['hv_algorithm'] == 'fcma2':
-                    algorithm = AutoscalerTypes.FCMA2
+                    algorithm = AllocationSolver.FCMA2
                 elif data['autoscalers']['h_reactive_hv_predictive']['hv_algorithm'] == 'fcma3':
-                    algorithm = AutoscalerTypes.FCMA3
+                    algorithm = AllocationSolver.FCMA3
+                elif data['autoscalers']['h_reactive_hv_predictive']['hv_algorithm'] == 'mncf':
+                    algorithm = AllocationSolver.MNCF
                 config.autoscaler = HReactiveHVPredictiveAutoscaler(
                     data['autoscalers']['h_reactive_hv_predictive']['h_time_period'],
                     data['autoscalers']['h_reactive_hv_predictive']['h_desired_cpu_utilization'],
@@ -212,7 +221,7 @@ class AscalConfig:
                     data['autoscalers']['h_reactive_hv_predictive']['hv_transition_time_budget']
                 )
 
-            # Set workloads. For each spplication:
+            # Set workloads. For each application:
             # 1. Read the set of load samples.
             # 2. Repeat the set of samples "repeat" times.
             # 3. Add "load_offset" to all the samples and multiply the result by "load_mult".
@@ -304,8 +313,8 @@ class AscalConfig:
                     raise ValueError("Time period must be possitive")
                 if config["autoscalers"][key]["desired_cpu_utilization"] < 0.1:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
-                if config["autoscalers"][key]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
-                    raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
+                if config["autoscalers"][key]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
+                    raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
             elif key == "hv_predictive":
                 check_fields(config["autoscalers"][key],
                              ["prediction_window", "prediction_percentile", "algorithm", "transition_time_budget"],
@@ -314,8 +323,8 @@ class AscalConfig:
                     raise ValueError("Prediction window must be >= 10")
                 if config["autoscalers"][key]["prediction_percentile"] < 0.1:
                     raise ValueError("Prediction percentile must be >= 0.1")
-                if config["autoscalers"][key]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
-                    raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
+                if config["autoscalers"][key]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
+                    raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
             elif key == "h_reactive_hv_reactive":
                 check_fields(config["autoscalers"][key],
                              ["h_time_period", "h_node_utilization_threshold", "desired_cpu_utilization",
@@ -329,8 +338,8 @@ class AscalConfig:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
                 if config["autoscalers"][key]["h_node_utilization_threshold"] < 0.1:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
-                if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
-                    raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
+                if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
+                    raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
                 elif key == "h_reactive_hv_predictive":
                     check_fields(config["autoscalers"][key],
                                  ["h_time_period", "h_node_utilization_threshold", "h_desired_cpu_utilization",
@@ -347,8 +356,8 @@ class AscalConfig:
                         raise ValueError("Desired CPU utilization must be >= 0.1")
                     if config["autoscalers"][key]["hv_prediction_percentile"] < 0.5:
                         raise ValueError("Prediction percentile must be >= 0.5")
-                    if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3"]:
-                        raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2' or 'fcma3'")
+                    if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
+                        raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
         if "autoscaler" not in config:
             raise ValueError("Field 'autoscaler' is missing")
         if config["autoscaler"] not in config["autoscalers"].keys():
@@ -377,7 +386,7 @@ class AscalConfig:
                 raise ValueError(f"'container' key is missing in application '{val}'")
             check_fields(config["apps"][key]["load"],
                          ["file", "time_interval", "repeat", "load_offset", "load_mult", "time_offset"],
-                         [str, int, int, int, int, int])
+                         [str, int, int, int, (int, float), int])
             check_fields(config["apps"][key]["container"],
                          ["cpu", "mem", "perf", "aggs"],
                          [str, str, str, list])
@@ -405,7 +414,7 @@ class Ascal:
         self.last_time = len(next(iter(self._workload_vectors.values()))) - 1 # Last simulation time
         self.performance_changes: list[(int, Allocation)] = [] # Pairs time and allocation
         self.billing_changes: list[(int, Allocation)] = [] # Pairs time and allocation
-        self.calc_times: list[float] = [] # Calculation times
+        self.calc_times: dict[str, float] = {"transition_times": [], "total_times": []} # Calculation times
         self.node_recycling_levels: list[float] = [] # List of node recycling levels
         self.container_recycling_levels: list[float] = [] # List of container recycling levels
 
@@ -438,7 +447,8 @@ class Ascal:
                     self.performance_changes.append(allocation_copy)
                 if statistics.billing_changed or self.time == break_point:
                     self.billing_changes.append(allocation_copy)
-            self.calc_times.append(statistics.calculation_time)
+            self.calc_times["transition_times"].append(statistics.transition_time)
+            self.calc_times["total_times"].append(statistics.total_time)
             self.node_recycling_levels.append(statistics.node_recycling_level)
             self.container_recycling_levels.append(statistics.container_recycling_level)
         self._autoscaler.log_allocation_summary()

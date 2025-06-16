@@ -240,9 +240,21 @@ apps:
       perf: 1 req/s
       aggs: [1, 2, 4]
 ```
-The application workload is based on a trace file in csv format, with a column per application, where a line corresponds to a sample of integer workloads. The other properties preprocess the trace. _time_interval_ is the time in seconds between two consecutive samples. The whole number of samples is repeated _repeat_ times. For example, we can repeat one hour of samples to obtain the trace for several hours. Workloads can be incremented using an integer _load_offset_ and multiplied by another integer _load_mult_. Finally, the first sample of the workload is repeated _time_ofset_ times adding some offset to the final workloads.
+The application workload is based on a trace file in csv format, with a column per application, 
+where a line corresponds to a sample of integer workloads. The other properties preprocess the 
+trace. _time_interval_ is the time in seconds between two consecutive samples. The whole number 
+of samples is repeated _repeat_ times. For example, we can repeat one hour of samples to obtain 
+the trace for several hours. Workloads can be incremented using an integer _load_offset_ 
+and multiplied by a float _load_mult_. Finally, the first sample of the workload is repeated 
+_time_ofset_ times adding some offset to the final workloads.
 
-Each application is implemented as a set of containers, with allocated cores, memory and associated performance. Three different types of containers, or container classes, are defined for _app0_ in the example. _cpu_, _mem_ and _perf_ data in the YAML file correspond to the minimum-size container, with aggregation level 1. The other container classes correspond to aggregation levels 2 and 4, have x2 nd x4 cores and performance, but memory is assumed to be the same.
+Each application is implemented as a set of containers, with allocated cores, memory and 
+associated performance. Three different types of containers, or container classes, are defined 
+for _app0_ in the example. _cpu_, _mem_ and _perf_ data in the YAML file correspond to the 
+minimum-size container, with aggregation level 1. The other container classes correspond to 
+aggregation levels 2 and 4, have x2 nd x4 cores and performance, but memory is assumed to be 
+the same. The value 1/_perf represents the minimum inter-arrival time required for the minimum-sized
+container to meet the application's timing requirements.
 
 **4. Simulation time.**
 The simulation time is defined in this section.

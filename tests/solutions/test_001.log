@@ -1,7 +1,7 @@
-0:  Initial allocation with ('r5.24xlarge[0]', 'c5.24xlarge[0]')
-0:    - Allocated 46 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node r5.24xlarge[0]
-0:    - Allocated 40 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) on node r5.24xlarge[0]
-0:    - Allocated 80 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) on node c5.24xlarge[0]
+0:  Initial allocation with ('c5.24xlarge[0]', 'c5.24xlarge[1]')
+0:    - Allocated 23 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.24xlarge[0]
+0:    - Allocated 20 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
+0:    - Allocated 40 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
 60:  Load of app0: 78.53 req/s
 60:  Current replicas 1x of app0 92, desired 113
 60:  Load of app1: 168.00 req/s
@@ -495,10 +495,10 @@
 3540:  Removing 3 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.4xlarge[0]
 3545:  Completed the removal of 4 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.4xlarge[0]
 3545:  Completed the removal of 3 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.4xlarge[0]
-3600:  Current allocation with ('r5.24xlarge[0]', 'c5.24xlarge[0]', 'c5.4xlarge[0]', 'c5.4xlarge[1]')
-3600:    - Allocated 46 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node r5.24xlarge[0]
-3600:    - Allocated 40 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) on node r5.24xlarge[0]
-3600:    - Allocated 80 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) on node c5.24xlarge[0]
+3600:  Current allocation with ('c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.4xlarge[0]', 'c5.4xlarge[1]')
+3600:    - Allocated 23 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.24xlarge[0]
+3600:    - Allocated 20 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
+3600:    - Allocated 40 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
 3600:    - Allocated 5 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.4xlarge[0]
 3600:    - Allocated 2 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) on node c5.4xlarge[0]
 3600:    - Allocated 6 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.4xlarge[1]

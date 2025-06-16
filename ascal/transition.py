@@ -32,12 +32,11 @@ from math import ceil, floor
 from json import loads
 from collections import defaultdict
 from dataclasses import dataclass, field
-from fcma import (Fcma, SolvingPars, System, Allocation, App, Vm, ContainerClass, RequestsPerTime)
-from fontTools.varLib.avarPlanner import normalizeDegrees
+from fcma import Fcma, SolvingPars, System, Allocation, App, Vm, ContainerClass, RequestsPerTime
 
 from ascal.timedops import TimedOps
 from ascal.recycling import Recycling
-from ascal.helper import get_min_max_perf, Vmt, RecyclingVmt, allocation_signature
+from ascal.helper import get_min_max_perf, Vmt, RecyclingVmt, get_allocation_signature, get_app_perf_surplus
 
 # Variable used to debug a selected transition
 _debug_count = 0
@@ -415,20 +414,6 @@ class Transition:
                 del self._recycling.obsolete_containers[node]
                 self._recycling.obsolete_nodes.remove(node)
 
-    @staticmethod
-    def _get_app_perf_surplus(min_perf: dict[App, RequestsPerTime], alloc: list[Vmt]) -> dict[App, RequestsPerTime]:
-        """
-        Calculate application's performance surplus.
-        :param min_perf: Minimum application's performance.
-        :param alloc: Allocation.
-        :return: Application's performance surplus.
-        """
-        app_perf_surplus = {app: -min_perf[app] for app in min_perf}
-        for node in alloc:
-            for cc, replicas in node.replicas.items():
-                app_perf_surplus[cc.app] += replicas * cc.perf
-        return app_perf_surplus
-
     def _transition_init(self, min_perf: dict[App, RequestsPerTime]):
         """
         Initialize the transition algorithm.
@@ -468,7 +453,7 @@ class Transition:
                 self._app_unalloc_perf[cc.app] += replicas * cc.perf
 
         # Get initial application's performance surplus
-        self._app_perf_surplus = Transition._get_app_perf_surplus(min_perf, self._current_alloc)
+        self._app_perf_surplus = get_app_perf_surplus(min_perf, self._current_alloc)
         assert min(self._app_perf_surplus.values()).magnitude >= 0, "Invalid performance surplus"
 
         # Performance increment to add at the end of the command
@@ -781,7 +766,7 @@ class Transition:
         self._recycling = RecyclingVmt(self._recycling_vm, vm_to_vmt)
 
         # Check whether the initial allocation is identical to the final allocation
-        if allocation_signature(self._current_alloc) == allocation_signature(final_alloc_vmt):
+        if get_allocation_signature(self._current_alloc) == get_allocation_signature(final_alloc_vmt):
             return self._commands, 0
 
         # Initialize the remove-allocate-copy algorithm, which is executed iteratively during the transition
@@ -968,7 +953,7 @@ class Transition:
         initial_alloc_vmt = [Vmt(node) for node in initial_alloc]
         final_alloc_vmt = [Vmt(node) for node in final_alloc]
         vm_to_vmt = dict(zip(initial_alloc, initial_alloc_vmt))
-        app_perf_surplus = Transition._get_app_perf_surplus(min_perf, initial_alloc_vmt)
+        app_perf_surplus = get_app_perf_surplus(min_perf, initial_alloc_vmt)
 
         command_index = 0
         for command in commands:
@@ -1040,8 +1025,8 @@ class Transition:
                 app_perf_increment[app] = RequestsPerTime("0 req/s")
 
         # Compare initial and final allocations
-        initial_alloc_signature = allocation_signature(initial_alloc_vmt)
-        final_alloc_signature = allocation_signature(final_alloc_vmt)
+        initial_alloc_signature = get_allocation_signature(initial_alloc_vmt)
+        final_alloc_signature = get_allocation_signature(final_alloc_vmt)
         if initial_alloc_signature != final_alloc_signature:
             only_in_initial_alloc = initial_alloc_signature - final_alloc_signature
             only_in_final_alloc = final_alloc_signature - initial_alloc_signature

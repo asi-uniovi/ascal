@@ -11,13 +11,14 @@ from fcma import (
     Allocation,
     Vm,
     ContainerClass,
-    InstanceClassFamily,
+    InstanceClass,
     ContainerGroup,
     RequestsPerTime,
 )
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
 from ascal.autoscalers import Autoscaler, AutoscalerStatistics
+from ascal.helper import get_app_ccs, get_required_nodes, mncf_allocation
 
 
 class HReactiveAutoscaler(Autoscaler):
@@ -41,7 +42,7 @@ class HReactiveAutoscaler(Autoscaler):
         self.desired_cpu_utilization = desired_cpu_utilization
         self.node_utilization_threshold = node_utilization_threshold
         self._app_loads: dict[App, list[RequestsPerTime]] = {} # Application workloads in a time period
-        self._icf: InstanceClassFamily = None # Instance class family
+        self._ics: list[InstanceClass] = None # Instance class family
         self._app_ccs: dict[App: list[ContainerClass]] = {} # Application container classes
         self._desired_app_replicas: dict[App, int] = {} # Desired application replicas
         self._enable_node_creation = True # Set to enable node creation
@@ -58,35 +59,19 @@ class HReactiveAutoscaler(Autoscaler):
         :param workloads: First workload sample for each application.
         :return: The initial allocation.
         """
-        cgs = []
-        for app in workloads:
-            workload = workloads[app] / self.desired_cpu_utilization
-            zero_replicas = True
-            for cc in self._app_ccs[app]:
-                if cc == self._app_ccs[app][-1]:
-                    replicas = int(ceil((workload / cc.perf).magnitude))
-                else:
-                    replicas = int((workload // cc.perf).magnitude)
-                if replicas > 0:
-                    zero_replicas = False
-                    cgs.append(ContainerGroup(cc, replicas))
-                    workload -= replicas * cc.perf
-                    if workload.magnitude == 0:
-                        break
-            if zero_replicas:
-                # At least one replica is required, even with zero load
-                cc = self._app_ccs[app][-1]
-                cgs.append(ContainerGroup(cc, 1))
 
-        required_nodes = self._get_required_nodes(cgs, allocate=True)
-        for node in required_nodes:
+        incremented_workloads = {}
+        for app in workloads:
+            incremented_workloads[app] = workloads[app] / self.desired_cpu_utilization
+        allocation = mncf_allocation(self.system, incremented_workloads)
+        for node in allocation:
             NodeStates.set_state(node, NodeStates.READY)
-        self.log(f'Initial allocation with {tuple(str(node) for node in required_nodes)}')
-        for node in required_nodes:
+        self.log(f'Initial allocation with {tuple(str(node) for node in allocation)}')
+        for node in allocation:
             for cg in node.cgs:
                 self.log(f'  - Allocated {cg.replicas} replicas {cg.cc} on node {str(node)}')
 
-        return required_nodes
+        return allocation
 
     def _get_replicas(self, app: App, node: Vm = None) -> int:
         """
@@ -109,59 +94,6 @@ class HReactiveAutoscaler(Autoscaler):
             for cg in node.cgs
             if cg.cc.app == app
         )
-
-    def _get_required_nodes(self, cgs: list[ContainerGroup], allocate:bool = False) -> Allocation:
-        """
-        Get the required nodes to allocate the containers.
-        :param cgs: Container groups, defined by container classes and number of replicas.
-        :param allocate: In addition to get the required nodes, allocate containers on the nodes.
-        :return: A list with the required nodes.
-        """
-        required_nodes = []
-
-        # Sort available instance classes by decreasing number of resources
-        ics = [ic for ic in self._icf.ics]
-        ics_value = {ic: ic.cores.magnitude * ic.mem.magnitude for ic in self._icf.ics}
-        ics.sort(key=lambda ic: ics_value[ic], reverse=True)
-
-        # Simulate allocation using the minimum number of the biggest instance class
-        new_node = Vm(ics[0])
-        required_nodes.append(new_node)
-        for cg in cgs:
-            replicas = cg.replicas
-            while replicas > 0:
-                # Allocate as many replicas as possible
-                allocatable_replicas_cpu = int((new_node.free_cores / cg.cc.cores).magnitude + Autoscaler._DELTA)
-                allocatable_replicas_mem = int((new_node.free_mem / cg.cc.mem[0]).magnitude + Autoscaler._DELTA)
-                allocated_replicas = min(replicas, allocatable_replicas_cpu, allocatable_replicas_mem)
-                if allocated_replicas > 0:
-                    new_node.free_cores -= allocated_replicas * cg.cc.cores
-                    new_node.free_mem -= allocated_replicas * cg.cc.mem[0]
-                    new_node.cgs.append(ContainerGroup(cg.cc, allocated_replicas))
-                    replicas -= allocated_replicas
-                else:
-                    new_node = Vm(ics[0])
-                    required_nodes.append(new_node)
-        # Try to reduce the cost of the latest added virtual machine
-        lowest_cost_ic = new_node.ic
-        cpu_usage = new_node.ic.cores - new_node.free_cores
-        mem_usage = new_node.ic.mem - new_node.free_mem
-        for ic in ics:
-            if ic.cores >= cpu_usage and ic.mem >= mem_usage and ic.price < lowest_cost_ic.price:
-                lowest_cost_ic = ic
-        # If a cheaper instance class is found with enough capacity
-        if lowest_cost_ic != new_node.ic:
-            last_node = Vm(lowest_cost_ic)
-            last_node.cgs = new_node.cgs
-            last_node.free_cores = last_node.ic.cores - cpu_usage
-            last_node.free_mem = last_node.ic.mem - mem_usage
-            required_nodes[-1] = last_node
-        # Remove all the containers of the required nodes when allocation is not required
-        if not allocate:
-            for node in required_nodes:
-                node.clear()
-
-        return required_nodes
 
     def _remove_excess_of_replicas(self):
         """
@@ -286,7 +218,7 @@ class HReactiveAutoscaler(Autoscaler):
 
         # Create the nodes
         if len(cgs_to_allocate) > 0 and self._enable_node_creation:
-            new_nodes = self._get_required_nodes(cgs)
+            new_nodes = get_required_nodes(self._ics, cgs)
             # Change node IDs so that they are new
             current_ids = defaultdict(lambda: [])
             for node in self.allocation:
@@ -443,12 +375,15 @@ class HReactiveAutoscaler(Autoscaler):
         if self.time == 0:
             # Prepare data required in the next times
             self._app_loads = {app: [workload] for app, workload in app_workloads.items()}
-            self._icf = list(self.system.keys())[0][1] # The instance class family used
-            self._app_ccs = self._get_app_ccs(self._aggs)
+            self._ics = list(self.system.keys())[0][1].ics # Available instance classes
+            # Application container classes sorted by decreasing aggregation level
+            self._app_ccs = get_app_ccs(self.system, self._aggs)
+            for app in self._app_ccs:
+                self._app_ccs[app].sort(key=lambda c: c.agg_level, reverse=True)
             # Node creation time and container allocation time are assumed to be zero for the initial allocation
             self.allocation = self._initial_allocation(app_workloads)
             self.time += 1
-            statistics = AutoscalerStatistics(True, True, current_time() - initial_time,
+            statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
                                               Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
             return statistics
         else:
@@ -479,7 +414,7 @@ class HReactiveAutoscaler(Autoscaler):
 
             self.time += 1
             statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
-                                              current_time() - initial_time, Autoscaler.INVALID_RECYCLING,
+                                              0, current_time() - initial_time, Autoscaler.INVALID_RECYCLING,
                                               Autoscaler.INVALID_RECYCLING)
             return statistics
 

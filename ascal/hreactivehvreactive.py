@@ -4,10 +4,10 @@ Implement a mixed horizontal and horizontal/vertical reactive autoscaler
 
 from math import ceil
 from time import time as current_time
-from fcma import App, Fcma, SolvingPars, RequestsPerTime
+from fcma import App, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
-from ascal.autoscalers import AutoscalerTypes, Autoscaler, AutoscalerStatistics
+from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
 from ascal.hreactive import HReactiveAutoscaler
 from ascal.transition import Transition
 
@@ -19,7 +19,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
 
     def __init__(self, h_time_period: int = 60, desired_cpu_utilization: float = 0.6,
                  h_node_utilization_threshold: float = 0.5, timing_args: TimedOps.TimingArgs = None,
-                 hv_algorithm: AutoscalerTypes = AutoscalerTypes.FCMA,
+                 hv_algorithm: AllocationSolver = AllocationSolver.FCMA,
                  hv_time_period: int = 300,
                  hv_transition_time_budget: int = 0
                  ):
@@ -39,11 +39,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         self.desired_cpu_utilization = desired_cpu_utilization
         self._hv_app_loads = {} # Application workloads in a time period for the HV autoscaler
         self._aggs = None # H autoscaler works with all the aggregation levels
-        self._fcma_speed_level = 1
-        if hv_algorithm == AutoscalerTypes.FCMA2:
-            self._fcma_speed_level = 2
-        elif hv_algorithm == AutoscalerTypes.FCMA3:
-            self._fcma_speed_level = 3
+        self._allocation_solver = hv_algorithm
         self.transition = None
         self.transition_time_budget = hv_transition_time_budget
         self._new_allocation = None
@@ -55,26 +51,21 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         Disable horizontal node/container creation/removal operations when they are too close
         to the next Horizontal/vertical period.
         """
-        if self.time + self.timing_args.node_creation_time >= self._next_hv_autoscaling_time:
-            self._enable_node_creation = False
-        else:
-            self._enable_node_creation = True
-        if self.time + self.timing_args.node_removal_time >= self._next_hv_autoscaling_time:
-            self._enable_node_removal = False
-        else:
-            self._enable_node_removal = True
-        if self.time + self.timing_args.container_creation_time >= self._next_hv_autoscaling_time:
-            self._enable_container_allocation = False
-        else:
-            self._enable_container_allocation = True
-        if self.time + self.timing_args.container_removal_time >= self._next_hv_autoscaling_time:
-            self._enable_container_removal = False
-        else:
-            self._enable_container_removal = True
+        operations = [
+            ('node_creation', self.timing_args.node_creation_time),
+            ('node_removal', self.timing_args.node_removal_time),
+            ('container_allocation', self.timing_args.container_creation_time),
+            ('container_removal', self.timing_args.container_removal_time),
+        ]
+        for name, offset in operations:
+            enabled = self.time + offset < self._next_hv_autoscaling_time
+            setattr(self, f"_enable_{name}", enabled)
 
     def run(self, app_workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
         """
-        Simulate for 1 second the horizontal/vertical and reactive autoscaling of containers and nodes.
+        Simulate for 1 second the mixed autoscaling strategy:
+            - Fast horizontal reactions are applied unless a HV scaling point is near.
+            - HV autoscaling is triggered periodically and overrides horizontal decisions.
         :param app_workloads: Workload for all the applications at the current time.
         :return: Simulation statistics.
         """
@@ -83,6 +74,9 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         node_recycling_level = Autoscaler.INVALID_RECYCLING
         container_recycling_level = Autoscaler.INVALID_RECYCLING
 
+        # Time required to perform the transition
+        transition_time = 0
+
         # If it is the first execution
         if self.time == 0:
             # Initialize the HV application load in the last period
@@ -90,7 +84,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             # Initialize the transition
             self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget)
             super().run(app_workloads)
-            statistics = AutoscalerStatistics(True, True, current_time() - initial_time,
+            statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
                                               Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
             return statistics
 
@@ -120,7 +114,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             self.time += 1
             self._timedops.dispatch_events(self.time)
             statistics = AutoscalerStatistics(self._timedops.node_billing_changed, self._timedops.perf_changed,
-                                              current_time() - initial_time, Autoscaler.INVALID_RECYCLING,
+                                              0, current_time() - initial_time, Autoscaler.INVALID_RECYCLING,
                                               Autoscaler.INVALID_RECYCLING)
             return statistics
 
@@ -137,14 +131,15 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             for app in self._hv_app_loads:
                 self._hv_app_loads[app].clear()
             # Use FCMA algorithm to calculate the new allocation
-            fcma_problem = Fcma(self.system, workloads=incremented_workloads)
-            solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
-            fcma_allocation = fcma_problem.solve(solving_pars).allocation
-            new_allocation = [node for family, nodes in fcma_allocation.items() for node in nodes]
+            new_allocation = self._solve_allocation(incremented_workloads, self._allocation_solver)
+
             # Calculate the transition between the previous allocation and the new one
+            transition_time_start = current_time()
             for node in self.allocation + new_allocation:
                 NodeStates.set_state(node, NodeStates.READY)
             commands, transition_time = self.transition.calculate_sync(self.allocation, new_allocation)
+            transition_time = current_time() - transition_time_start
+
             self.log(f"Transition: {transition_time} seconds")
             self.log(f"- From {[str(node) for node in self.allocation]}")
             self.log(f"- To   {[str(node) for node in new_allocation]}")
@@ -167,7 +162,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         self.time += 1
 
         statistics = AutoscalerStatistics(self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed,
-                                          current_time() - initial_time, node_recycling_level,
+                                          transition_time, current_time() - initial_time, node_recycling_level,
                                           container_recycling_level)
         return statistics
 

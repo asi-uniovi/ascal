@@ -3,10 +3,9 @@ Implement the horizontal/vertical predictive autoscaler
 """
 
 from time import time as current_time
-from fcma import Fcma, SolvingPars
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
-from ascal.autoscalers import AutoscalerTypes, Autoscaler, AutoscalerStatistics
+from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
 from ascal.transition import Transition
 from ascal.helper import get_min_max_load
 
@@ -18,22 +17,18 @@ class HVPredictiveAutoscaler(Autoscaler):
 
     def __init__(self, prediction_window: int = 3600, prediction_percentile: int = 95,
                  timing_args: TimedOps.TimingArgs = None,
-                 algorithm: AutoscalerTypes = AutoscalerTypes.FCMA,
+                 algorithm: AllocationSolver = AllocationSolver.FCMA,
                  transition_time_budget: int = 0):
         """
         Constructor for the horizontal/vertical reactive autoscaler.
         :param prediction_percentile: Load prediction percentile.
-        :param, prediction_window: Prediction window in seconds.
+        :param prediction_window: Prediction window in seconds.
         :param timing_args: Timings for creation/removal of nodes and containers.
         """
         super().__init__(timing_args)
         self.prediction_percentile = prediction_percentile
         self.prediction_window = prediction_window
-        self._fcma_speed_level = 1
-        if algorithm == AutoscalerTypes.FCMA2:
-            self._fcma_speed_level = 2
-        elif algorithm == AutoscalerTypes.FCMA3:
-            self._fcma_speed_level = 3
+        self._allocation_solver = algorithm
         self.predicted_workloads = None
         self.transition = None
         self.transition_time_budget = transition_time_budget
@@ -41,6 +36,38 @@ class HVPredictiveAutoscaler(Autoscaler):
         self._timedops = TimedOps(self.timing_args)
         self._app_load = None
         self._waiting_for_transition_completion = False
+
+    def _initialize_allocation(self, initial_time: float) -> AutoscalerStatistics:
+        """
+        Perform the initial allocation based on the first prediction.
+        """
+        if self.time not in self.predicted_workloads:
+            raise ValueError("Missing predicted workload for time 0")
+
+        self._app_load = self.predicted_workloads[self.time]
+
+        # A minimum load is required for each application
+        Autoscaler._set_delta_loads_if_zero(self._app_load)
+
+        # Initialize the transition
+        self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget // 2)
+
+        # Calculate a new allocation
+        self.new_allocation = self._solve_allocation(self._app_load, self._allocation_solver)
+        self.allocation = self.new_allocation
+
+        self.log_allocation_summary()
+
+        # Set all the nodes to the ready state
+        for node in set(self.allocation + self.new_allocation):
+            NodeStates.set_state(node, NodeStates.READY)
+
+        self._timedops.perf_changed = True
+        self._timedops.node_billing_changed = True
+        self._waiting_for_transition_completion = True
+        self.time += 1
+
+        return AutoscalerStatistics(True, True, 0, current_time() - initial_time, 0, 0)
 
     def run(self, dummy) -> tuple[bool, bool, float]:
         """
@@ -56,26 +83,11 @@ class HVPredictiveAutoscaler(Autoscaler):
         container_recycling_level1 = Autoscaler.INVALID_RECYCLING
         container_recycling_level2 = Autoscaler.INVALID_RECYCLING
 
+        # Time required to perform the transition
+        transition_time = 0
+
         if self.time == 0:
-            self._app_load = self.predicted_workloads[self.time]
-            # At least one application replica
-            Autoscaler._set_delta_loads_if_zero(self._app_load)
-            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget//2)
-            # The first allocation uses the load for the first prediction window
-            fcma_problem = Fcma(self.system, workloads=self._app_load)
-            solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
-            fcma_allocation = fcma_problem.solve(solving_pars).allocation
-            self.new_allocation = [node for family, nodes in fcma_allocation.items() for node in nodes]
-            self.allocation = self.new_allocation
-            self.log_allocation_summary()
-            for node in self.allocation + self.new_allocation:
-                NodeStates.set_state(node, NodeStates.READY)
-            self._timedops.perf_changed = True
-            self._timedops.node_billing_changed = True
-            self._waiting_for_transition_completion = True
-            self.time += 1
-            statistics = AutoscalerStatistics(True, True, current_time() - initial_time, 0, 0)
-            return statistics
+            return self._initialize_allocation(initial_time)
 
         # An allocation for the next prediction window is calculated when the transition for the current window ends
         if self.time % self.prediction_window == 0:
@@ -83,6 +95,7 @@ class HVPredictiveAutoscaler(Autoscaler):
         next_prediction_window_time = (self.time // self.prediction_window + 1) * self.prediction_window
         if self._waiting_for_transition_completion and self._timedops.is_event_list_empty() and \
                 next_prediction_window_time in self.predicted_workloads:
+            # A new transition is started
             self._waiting_for_transition_completion = False
             self.allocation = self.new_allocation
             new_app_load = self.predicted_workloads[next_prediction_window_time]
@@ -94,18 +107,16 @@ class HVPredictiveAutoscaler(Autoscaler):
             # Use FCMA algorithm to calculate an intermediate allocation for the next prediction window.
             # This allocation works with the maximum loads evaluated between the current and next prediciton windows
             _, max_app_load = get_min_max_load(self._app_load, new_app_load)
-            fcma_problem = Fcma(self.system, workloads=max_app_load)
-            solving_pars = SolvingPars(speed_level=self._fcma_speed_level)
-            fcma_allocation1 = fcma_problem.solve(solving_pars).allocation
-            intermediate_allocation = [node for family, nodes in fcma_allocation1.items() for node in nodes]
+            intermediate_allocation = self._solve_allocation(max_app_load, self._allocation_solver)
 
             # Use FCMA to calculate the new allocation
-            fcma_problem = Fcma(self.system, workloads=new_app_load)
-            fcma_allocation2 = fcma_problem.solve(solving_pars).allocation
-            self.new_allocation = [node for family, nodes in fcma_allocation2.items() for node in nodes]
+            self.new_allocation = self._solve_allocation(new_app_load, self._allocation_solver)
 
             # Prepare application's load for the next prediction window
             self._app_load = new_app_load
+
+            # We need to measure the time required to perform the transition
+            transition_time_start = current_time()
 
             # Calculate the transition from the current allocation to the intermediate allocation
             for node in self.allocation:
@@ -129,6 +140,8 @@ class HVPredictiveAutoscaler(Autoscaler):
                 node: (node.free_cores, node.free_mem, node.cgs, node.history)
                 for node in removed_nodes
             }
+            # Remove all the containers in the removed nodes of the first transition and add the nodes
+            # to the intermediate allocation. These nodes may be useful in the second transition
             intermediate_allocation.extend([node.clear() for node in removed_nodes])
             commands2, _ = self.transition.calculate_sync(intermediate_allocation, self.new_allocation)
             for node in removed_nodes:
@@ -144,10 +157,14 @@ class HVPredictiveAutoscaler(Autoscaler):
             # Common node removals in both transitions must be handled
             Autoscaler._handle_node_removals(commands1, commands2)
 
+            # Time required to perform the transition
+            transition_time = current_time() - transition_time_start
+
             # Calculate the times for the two transitions
             transition1_time = Transition.get_transition_time(commands1, self.timing_args)
             transition2_time = Transition.get_transition_time(commands2, self.timing_args)
 
+            # Log transition info
             self.log(f"Transition at {next_prediction_window_time - transition1_time}:"
                      f"{transition1_time + transition2_time} seconds")
             self.log(f"Predicted loads for {self.prediction_percentile:.1f} % percentile:")
@@ -179,8 +196,10 @@ class HVPredictiveAutoscaler(Autoscaler):
                 self.allocation.remove(node)
 
         self.time += 1
+
+        # Generate statistics
         statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
-                                          current_time() - initial_time,
+                                          transition_time, current_time() - initial_time,
                                           min(node_recycling_level1, node_recycling_level2),
                                           min(container_recycling_level1, container_recycling_level2))
         return statistics

@@ -206,11 +206,11 @@ class Recycling:
         new nodes (final nodes not recycled) and a measurement of node recycling.
         """
         longer_list_length = max(len(initial_nodes), len(final_nodes))
-        shorter_list_lenght = min(len(initial_nodes), len(final_nodes))
+        shorter_list_length = min(len(initial_nodes), len(final_nodes))
 
         # Calculate the number of possible recyclings as permutations(longer_list_length, short_list_length)
         n_possible_recyclings = 1
-        for i in range(shorter_list_lenght):
+        for i in range(shorter_list_length):
             n_possible_recyclings *= longer_list_length
             longer_list_length -= 1
             if n_possible_recyclings >= ILP_SOLVER_THRESHOLD:
@@ -274,7 +274,7 @@ class Recycling:
                 for cg2 in final_node.cgs:
                     # Containers in the same container class for both the initial and final nodes
                     # may be recycled, obsolete or new, depending on the number
-                    if str(cg1.cc) == str(cg2.cc):
+                    if str(cg1.cc) == str(cg2.cc): # This should be improved additng method __eq__ to ContainerClass
                         self.recycled_containers[initial_node][cg1.cc] = min(cg1.replicas, cg2.replicas)
                         if cg1.replicas > cg2.replicas:
                             if initial_node not in self.obsolete_containers:
@@ -353,7 +353,98 @@ class Recycling:
             self.container_recycling_level = 0.5 * ((recycled_container_cores / initial_container_cores).magnitude +
                                                     (recycled_container_mem / initial_container_mem).magnitude)
 
+    def _initialize_fields(self):
+        """
+        Initialize all internal data structures to their default empty state.
+        This includes recycled node/container mappings and recycling level metrics.
+        """
+        self.obsolete_nodes: list[Vm] = []
+        self.recycled_node_pairs: dict[Vm, Vm] = {}
+        self.new_nodes: list[Vm] = []
+        self.obsolete_containers: dict[Vm, dict[ContainerClass, int]] = {}
+        self.recycled_containers: dict[Vm, dict[ContainerClass, int]] = {}
+        self.new_containers: dict[Vm, dict[ContainerClass, int]] = {}
+        self.node_recycling_level: float = 0
+        self.container_recycling_level: float = 0
+
+    @staticmethod
+    def _group_nodes_by_ic(alloc: Allocation) -> dict:
+        """
+        Group nodes in an allocation by their instance class (IC).
+        :param alloc: List of VM nodes.
+        :return: Dictionary mapping instance class to list of nodes with that class.
+        """
+        ic_nodes = {}
+        for node in alloc:
+            ic_nodes.setdefault(node.ic, []).append(node)
+        return ic_nodes
+
+    def _classify_nodes_by_ic(self, initial_ic_nodes: dict, final_ic_nodes: dict) -> tuple[dict, dict]:
+        """
+        Determine which nodes are:
+            - Obsolete: present only in initial allocation.
+            - New: present only in final allocation.
+            - Recyclable: present in both.
+        :param initial_ic_nodes: Dict of initial nodes grouped by instance class.
+        :param final_ic_nodes: Dict of final nodes grouped by instance class.
+        :return: Tuple with two dicts: recyclable initial and recyclable final nodes.
+        """
+        initial_recyclable = {}
+        final_recyclable = {}
+        for ic, nodes in initial_ic_nodes.items():
+            if ic not in final_ic_nodes:
+                self.obsolete_nodes.extend(nodes)
+            else:
+                initial_recyclable[ic] = nodes
+        for ic, nodes in final_ic_nodes.items():
+            if ic not in initial_ic_nodes:
+                self.new_nodes.extend(nodes)
+            else:
+                final_recyclable[ic] = nodes
+        return initial_recyclable, final_recyclable
+
+    def _assign_final_node_ids(self):
+        """
+        Update the IDs of final nodes to ensure:
+            - Recycled nodes inherit the ID of their corresponding initial node.
+            - New nodes receive an incremented ID following the highest used in that IC.
+        """
+        from collections import defaultdict
+        last_initial_node_ids = defaultdict(lambda: -1)
+        for node in self.obsolete_nodes:
+            last_initial_node_ids[node.ic] = max(last_initial_node_ids[node.ic], node.id)
+        for init_node, final_node in self.recycled_node_pairs.items():
+            final_node.id = init_node.id
+            last_initial_node_ids[init_node.ic] = max(last_initial_node_ids[init_node.ic], init_node.id)
+        for node in self.new_nodes:
+            last_initial_node_ids[node.ic] += 1
+            node.id = last_initial_node_ids[node.ic]
+
     def __init__(self, initial_alloc: Allocation, final_alloc: Allocation):
+        """
+        Constructor for the Recycling class. Computes node and container recycling between two allocations.
+        :param initial_alloc: Initial allocation.
+        :param final_alloc: Final allocation.
+        """
+        self._initialize_fields()
+
+        initial_ic_nodes = Recycling._group_nodes_by_ic(initial_alloc)
+        final_ic_nodes = Recycling._group_nodes_by_ic(final_alloc)
+
+        initial_recyclable, final_recyclable = self._classify_nodes_by_ic(initial_ic_nodes, final_ic_nodes)
+
+        for ic in initial_recyclable:
+            node_recyclings = Recycling._calculate_node_recycling(initial_recyclable[ic], final_recyclable[ic])
+            self.obsolete_nodes.extend(node_recyclings["obsolete"])
+            self.new_nodes.extend(node_recyclings["new"])
+            for initial_node, final_node in node_recyclings["recycled_pairs"]:
+                self.recycled_node_pairs[initial_node] = final_node
+
+        self._calculate_container_recycling()
+        self._calculate_recycling_levels(initial_alloc)
+        self._assign_final_node_ids()
+
+    def __init2__(self, initial_alloc: Allocation, final_alloc: Allocation):
         """
         Constructor for the Recycling class. The Reycling class object defines properties to get the new nodes,
         obsolete nodes, node recycling pairs, obsolete containers, new containers and recycled containers.
