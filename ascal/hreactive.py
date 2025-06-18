@@ -42,8 +42,8 @@ class HReactiveAutoscaler(Autoscaler):
         self.desired_cpu_utilization = desired_cpu_utilization
         self.node_utilization_threshold = node_utilization_threshold
         self._app_loads: dict[App, list[RequestsPerTime]] = {} # Application workloads in a time period
-        self._ics: list[InstanceClass] = None # Instance class family
-        self._app_ccs: dict[App: list[ContainerClass]] = {} # Application container classes
+        self._ics: list[InstanceClass] = [] # Instance class family
+        self._app_ccs: dict[App, list[ContainerClass]] = {} # Application container classes
         self._desired_app_replicas: dict[App, int] = {} # Desired application replicas
         self._enable_node_creation = True # Set to enable node creation
         self._enable_node_removal = True # Set to enable node removal
@@ -55,7 +55,7 @@ class HReactiveAutoscaler(Autoscaler):
     def _initial_allocation(self, workloads: dict[App, RequestsPerTime]) -> Allocation:
         """
         Initial allocation for all the applications, based on their first workload.
-        Creation/removal times for nodes and containers are assumed to be zero in the initial alocation.
+        Creation/removal times for nodes and containers are assumed to be zero in the initial allocation.
         :param workloads: First workload sample for each application.
         :return: The initial allocation.
         """
@@ -130,10 +130,10 @@ class HReactiveAutoscaler(Autoscaler):
                             break
                     cgs.pop(0)
 
-    def _allocate_deficit_replicas(self) -> list[ContainerGroup]:
+    def _allocate_deficit_replicas(self) -> list[ContainerGroup] | None:
         """
         Try allocating replicas for those applications with a deficit.
-        :return: The replicas that can not be allocated.
+        :return: The replicas that can not be allocated, or None if allocation is disabled.
         """
         # Number of equivalent agg=1 replicas
         replicas_to_add = {
@@ -292,7 +292,7 @@ class HReactiveAutoscaler(Autoscaler):
         Try to remove nodes with CPU and memory utilization below the utilization threshold.
         """
 
-        if not self._enable_container_allocation:
+        if not self._enable_node_removal:
             return
 
         # Nodes can not be removed while creating new nodes
