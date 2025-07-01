@@ -1,63 +1,63 @@
 0:  Current allocation with ('c5.large[0]',)
 0:    - Allocated 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[0]
-60:  Transition: 0.0032312870025634766 seconds
+60:  Transition: 0.004359006881713867 seconds
 60:  - From ['c5.large[0]']
 60:  - To   ['c5.large[0]']
-120:  Transition: 0.0025060176849365234 seconds
+120:  Transition: 0.0030777454376220703 seconds
 120:  - From ['c5.large[0]']
 120:  - To   ['c5.large[0]']
-180:  Transition: 0.0030586719512939453 seconds
+180:  Transition: 0.002053976058959961 seconds
 180:  - From ['c5.large[0]']
 180:  - To   ['c5.large[0]']
-240:  Transition: 0.003062725067138672 seconds
+240:  Transition: 0.0033178329467773438 seconds
 240:  - From ['c5.large[0]']
 240:  - To   ['c5.large[0]']
-300:  Transition: 0.0054247379302978516 seconds
+300:  Transition: 0.0040509700775146484 seconds
 300:  - From ['c5.large[0]']
 300:  - To   ['c5.large[0]']
-360:  Transition: 0.0020444393157958984 seconds
+360:  Transition: 0.002124786376953125 seconds
 360:  - From ['c5.large[0]']
 360:  - To   ['c5.large[0]']
-420:  Transition: 0.0019931793212890625 seconds
+420:  Transition: 0.004313230514526367 seconds
 420:  - From ['c5.large[0]']
 420:  - To   ['c5.large[0]']
-480:  Transition: 0.003175020217895508 seconds
+480:  Transition: 0.0019936561584472656 seconds
 480:  - From ['c5.large[0]']
 480:  - To   ['c5.large[0]']
-540:  Transition: 0.0030362606048583984 seconds
+540:  Transition: 0.0031349658966064453 seconds
 540:  - From ['c5.large[0]']
 540:  - To   ['c5.large[0]']
-600:  Transition: 0.0029878616333007812 seconds
+600:  Transition: 0.0031015872955322266 seconds
 600:  - From ['c5.large[0]']
 600:  - To   ['c5.large[0]']
-660:  Transition: 0.004837989807128906 seconds
+660:  Transition: 0.001992940902709961 seconds
 660:  - From ['c5.large[0]']
 660:  - To   ['c5.large[0]']
-720:  Transition: 0.0031909942626953125 seconds
+720:  Transition: 0.004369974136352539 seconds
 720:  - From ['c5.large[0]']
 720:  - To   ['c5.large[0]']
-780:  Transition: 0.002142667770385742 seconds
+780:  Transition: 0.0030863285064697266 seconds
 780:  - From ['c5.large[0]']
 780:  - To   ['c5.large[0]']
-840:  Transition: 0.001992940902709961 seconds
+840:  Transition: 0.0032558441162109375 seconds
 840:  - From ['c5.large[0]']
 840:  - To   ['c5.large[0]']
-900:  Transition: 0.001992940902709961 seconds
+900:  Transition: 0.00322723388671875 seconds
 900:  - From ['c5.large[0]']
 900:  - To   ['c5.large[0]']
-960:  Transition: 0.004024982452392578 seconds
+960:  Transition: 0.001993417739868164 seconds
 960:  - From ['c5.large[0]']
 960:  - To   ['c5.large[0]']
-1020:  Transition: 0.001992464065551758 seconds
+1020:  Transition: 0.003223419189453125 seconds
 1020:  - From ['c5.large[0]']
 1020:  - To   ['c5.large[0]']
-1080:  Transition: 0.0021965503692626953 seconds
+1080:  Transition: 0.00408172607421875 seconds
 1080:  - From ['c5.large[0]']
 1080:  - To   ['c5.large[0]']
-1140:  Transition: 0.0019931793212890625 seconds
+1140:  Transition: 0.003286600112915039 seconds
 1140:  - From ['c5.large[0]']
 1140:  - To   ['c5.large[0]']
-1200:  Transition: 0.006976127624511719 seconds
+1200:  Transition: 0.011289834976196289 seconds
 1200:  - From ['c5.large[0]']
 1200:  - To   ['c5.xlarge[0]']
 1200:  - Temporal nodes []
@@ -72,7 +72,7 @@
 1306:  Completed the removal of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.large[0]
 1306:  Removing node c5.large[0]
 1316:  Node c5.large[0] is removed
-1320:  Transition: 0.008095264434814453 seconds
+1320:  Transition: 0.007494926452636719 seconds
 1320:  - From ['c5.xlarge[0]']
 1320:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1320:  - Temporal nodes []
@@ -89,52 +89,52 @@
 1440:  Transition: 0.0059795379638671875 seconds
 1440:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1440:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-1500:  Transition: 0.009805679321289062 seconds
+1500:  Transition: 0.005024433135986328 seconds
 1500:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1500:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-1560:  Transition: 0.010523319244384766 seconds
+1560:  Transition: 0.0051479339599609375 seconds
 1560:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1560:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-1620:  Transition: 0.009850025177001953 seconds
+1620:  Transition: 0.0060558319091796875 seconds
 1620:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1620:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-1680:  Transition: 0.0050847530364990234 seconds
+1680:  Transition: 0.005144357681274414 seconds
 1680:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1680:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-1740:  Transition: 0.008970022201538086 seconds
+1740:  Transition: 0.008508682250976562 seconds
 1740:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1740:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-1800:  Transition: 0.005354404449462891 seconds
+1800:  Transition: 0.00501704216003418 seconds
 1800:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1800:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-1860:  Transition: 0.008625507354736328 seconds
+1860:  Transition: 0.0050182342529296875 seconds
 1860:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1860:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-1920:  Transition: 0.007605791091918945 seconds
+1920:  Transition: 0.005024909973144531 seconds
 1920:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1920:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-1980:  Transition: 0.013451814651489258 seconds
+1980:  Transition: 0.007604122161865234 seconds
 1980:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 1980:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-2040:  Transition: 0.008416891098022461 seconds
+2040:  Transition: 0.007953166961669922 seconds
 2040:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 2040:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-2100:  Transition: 0.013691425323486328 seconds
+2100:  Transition: 0.005527019500732422 seconds
 2100:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 2100:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-2160:  Transition: 0.005480766296386719 seconds
+2160:  Transition: 0.013832569122314453 seconds
 2160:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 2160:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-2220:  Transition: 0.006364345550537109 seconds
+2220:  Transition: 0.006411552429199219 seconds
 2220:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 2220:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-2280:  Transition: 0.0060160160064697266 seconds
+2280:  Transition: 0.012170553207397461 seconds
 2280:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 2280:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-2340:  Transition: 0.006025552749633789 seconds
+2340:  Transition: 0.012954950332641602 seconds
 2340:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 2340:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
-2400:  Transition: 0.016305923461914062 seconds
+2400:  Transition: 0.011874198913574219 seconds
 2400:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 2400:  - To   ['c5.large[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 2400:  - Temporal nodes []
@@ -149,7 +149,7 @@
 2506:  Completed the removal of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.xlarge[0]
 2506:  Removing node c5.xlarge[0]
 2516:  Node c5.xlarge[0] is removed
-2520:  Transition: 0.014641046524047852 seconds
+2520:  Transition: 0.009002447128295898 seconds
 2520:  - From ['c5.large[0]', 'c5.4xlarge[0]', 'c5.24xlarge[0]']
 2520:  - To   ['c5.large[0]']
 2520:  - Temporal nodes []
@@ -161,52 +161,52 @@
 2625:  Removing node c5.24xlarge[0]
 2635:  Node c5.4xlarge[0] is removed
 2635:  Node c5.24xlarge[0] is removed
-2640:  Transition: 0.003487825393676758 seconds
+2640:  Transition: 0.0048601627349853516 seconds
 2640:  - From ['c5.large[0]']
 2640:  - To   ['c5.large[0]']
-2700:  Transition: 0.003155231475830078 seconds
+2700:  Transition: 0.002990245819091797 seconds
 2700:  - From ['c5.large[0]']
 2700:  - To   ['c5.large[0]']
-2760:  Transition: 0.003195524215698242 seconds
+2760:  Transition: 0.0021381378173828125 seconds
 2760:  - From ['c5.large[0]']
 2760:  - To   ['c5.large[0]']
-2820:  Transition: 0.0041904449462890625 seconds
+2820:  Transition: 0.0033555030822753906 seconds
 2820:  - From ['c5.large[0]']
 2820:  - To   ['c5.large[0]']
-2880:  Transition: 0.006493568420410156 seconds
+2880:  Transition: 0.00512385368347168 seconds
 2880:  - From ['c5.large[0]']
 2880:  - To   ['c5.large[0]']
-2940:  Transition: 0.0021538734436035156 seconds
+2940:  Transition: 0.0032515525817871094 seconds
 2940:  - From ['c5.large[0]']
 2940:  - To   ['c5.large[0]']
-3000:  Transition: 0.003115415573120117 seconds
+3000:  Transition: 0.0019931793212890625 seconds
 3000:  - From ['c5.large[0]']
 3000:  - To   ['c5.large[0]']
-3060:  Transition: 0.002146005630493164 seconds
+3060:  Transition: 0.002208709716796875 seconds
 3060:  - From ['c5.large[0]']
 3060:  - To   ['c5.large[0]']
-3120:  Transition: 0.0019927024841308594 seconds
+3120:  Transition: 0.0020096302032470703 seconds
 3120:  - From ['c5.large[0]']
 3120:  - To   ['c5.large[0]']
-3180:  Transition: 0.003031015396118164 seconds
+3180:  Transition: 0.001020193099975586 seconds
 3180:  - From ['c5.large[0]']
 3180:  - To   ['c5.large[0]']
-3240:  Transition: 0.0029900074005126953 seconds
+3240:  Transition: 0.0019927024841308594 seconds
 3240:  - From ['c5.large[0]']
 3240:  - To   ['c5.large[0]']
-3300:  Transition: 0.0032477378845214844 seconds
+3300:  Transition: 0.0019927024841308594 seconds
 3300:  - From ['c5.large[0]']
 3300:  - To   ['c5.large[0]']
-3360:  Transition: 0.0031168460845947266 seconds
+3360:  Transition: 0.004891395568847656 seconds
 3360:  - From ['c5.large[0]']
 3360:  - To   ['c5.large[0]']
-3420:  Transition: 0.0022161006927490234 seconds
+3420:  Transition: 0.001992940902709961 seconds
 3420:  - From ['c5.large[0]']
 3420:  - To   ['c5.large[0]']
-3480:  Transition: 0.004285573959350586 seconds
+3480:  Transition: 0.0035800933837890625 seconds
 3480:  - From ['c5.large[0]']
 3480:  - To   ['c5.large[0]']
-3540:  Transition: 0.0023603439331054688 seconds
+3540:  Transition: 0.0023016929626464844 seconds
 3540:  - From ['c5.large[0]']
 3540:  - To   ['c5.large[0]']
 3600:  Current allocation with ('c5.large[0]',)

@@ -26,7 +26,7 @@ class HReactiveAutoscaler(Autoscaler):
     Horizontal and reactive autoscaler for containers and nodes.
     """
     def __init__(self, time_period:int = 60, desired_cpu_utilization: float = 0.6,
-                 node_utilization_threshold:float = 0.5, aggs: dict[App, int] = None,
+                 node_utilization_threshold:float = 0.5, aggs: dict[App, list[int]] = None,
                  timing_args: TimedOps.TimingArgs | None = None):
         """
         Constructor for the horizontal and reactive autoscaler.

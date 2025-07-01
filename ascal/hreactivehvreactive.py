@@ -21,8 +21,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
                  h_node_utilization_threshold: float = 0.5, timing_args: TimedOps.TimingArgs = None,
                  hv_algorithm: AllocationSolver = AllocationSolver.FCMA,
                  hv_time_period: int = 300,
-                 hv_transition_time_budget: int = 0
-                 ):
+                 hv_transition_time_budget: int = 0, hot_node_scale_up: bool = False):
         """
         Constructor for the mixed reactive horizontal and reactive horizontal/vertical autoscaler.
         :param h_time_period: Time period to evaluate a new autoscaling.
@@ -42,6 +41,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         self._allocation_solver = hv_algorithm
         self.transition = None
         self.transition_time_budget = hv_transition_time_budget
+        self.hot_node_scale_up = hot_node_scale_up
         self._new_allocation = None
         self._hv_timedops = TimedOps(self.timing_args)
         self._next_hv_autoscaling_time = self.hv_time_period
@@ -61,7 +61,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             enabled = self.time + offset < self._next_hv_autoscaling_time
             setattr(self, f"_enable_{name}", enabled)
 
-    def run(self, app_workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
+    def run(self, app_workloads: dict[App, RequestsPerTime]) -> AutoscalerStatistics:
         """
         Simulate for 1 second the mixed autoscaling strategy:
             - Fast horizontal reactions are applied unless a HV scaling point is near.
@@ -74,15 +74,16 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         node_recycling_level = Autoscaler.INVALID_RECYCLING
         container_recycling_level = Autoscaler.INVALID_RECYCLING
 
-        # Time required to perform the transition
-        transition_time = 0
+        # Time required to calculate the transition
+        transition_calc_time = 0
 
         # If it is the first execution
         if self.time == 0:
             # Initialize the HV application load in the last period
             self._hv_app_loads = {app: [] for app in app_workloads}
             # Initialize the transition
-            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget)
+            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget,
+                                         hot_node_scale_up=self.hot_node_scale_up)
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
                                               Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
@@ -138,7 +139,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             for node in self.allocation + new_allocation:
                 NodeStates.set_state(node, NodeStates.READY)
             commands, transition_time = self.transition.calculate_sync(self.allocation, new_allocation)
-            transition_time = current_time() - transition_time_start
+            transition_calc_time = current_time() - transition_time_start
 
             self.log(f"Transition: {transition_time} seconds")
             self.log(f"- From {[str(node) for node in self.allocation]}")
@@ -156,13 +157,13 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         self._hv_timedops.dispatch_events(self.time)
 
         # Complete the removal of nodes
-        for node in self.allocation:
+        for node in list(self.allocation):
             if NodeStates.get_state(node) == NodeStates.REMOVED:
                 self.allocation.remove(node)
         self.time += 1
 
         statistics = AutoscalerStatistics(self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed,
-                                          transition_time, current_time() - initial_time, node_recycling_level,
+                                          transition_calc_time, current_time() - initial_time, node_recycling_level,
                                           container_recycling_level)
         return statistics
 

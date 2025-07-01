@@ -18,7 +18,7 @@ class HVPredictiveAutoscaler(Autoscaler):
     def __init__(self, prediction_window: int = 3600, prediction_percentile: int = 95,
                  timing_args: TimedOps.TimingArgs = None,
                  algorithm: AllocationSolver = AllocationSolver.FCMA,
-                 transition_time_budget: int = 0):
+                 transition_time_budget: int = 0, hot_node_scale_up: bool = False):
         """
         Constructor for the horizontal/vertical reactive autoscaler.
         :param prediction_percentile: Load prediction percentile.
@@ -32,6 +32,7 @@ class HVPredictiveAutoscaler(Autoscaler):
         self.predicted_workloads = None
         self.transition = None
         self.transition_time_budget = transition_time_budget
+        self.hot_node_scale_up = hot_node_scale_up
         self.new_allocation = None
         self._timedops = TimedOps(self.timing_args)
         self._app_load = None
@@ -50,7 +51,8 @@ class HVPredictiveAutoscaler(Autoscaler):
         Autoscaler._set_delta_loads_if_zero(self._app_load)
 
         # Initialize the transition
-        self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget // 2)
+        self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget // 2,
+                                     hot_node_scale_up=self.hot_node_scale_up)
 
         # Calculate a new allocation
         self.new_allocation = self._solve_allocation(self._app_load, self._allocation_solver)

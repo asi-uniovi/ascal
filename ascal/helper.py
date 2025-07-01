@@ -6,6 +6,7 @@ from math import ceil
 from json import dumps
 from collections import defaultdict, Counter
 from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, InstanceClass, ContainerGroup, System
+
 from ascal.recycling import Recycling
 
 class Vmt:
@@ -50,6 +51,19 @@ class Vmt:
                 return False
         return True
 
+    def upgrade(self, other: 'Vmt'):
+        """
+        Upgrade a node to a bigger instance class in the same family.
+        :param other: Other node.
+        :raise ValueError: If the node upgrade is not valid.
+        """
+        if self.ic.family != other.ic.family or self.ic.cores > other.ic.cores or self.ic.mem > other.ic.mem:
+            raise ValueError("Invalid node upgrade")
+        self.id = other.id
+        self.free_mem += other.ic.mem - self.ic.mem
+        self.free_cores += other.ic.cores - self.ic.cores
+        self.ic = other.ic
+
 class RecyclingVmt:
     """
     Node and container's recycling class using Vmt nodes.
@@ -67,6 +81,10 @@ class RecyclingVmt:
         self.recycled_node_pairs: dict[Vmt, Vmt] = {
             vm_to_vmt[vm1]: vm_to_vmt[vm2]
             for vm1, vm2 in recycling.recycled_node_pairs.items()
+        }
+        self.upgraded_node_pairs: dict[Vmt, Vmt] = {
+            vm_to_vmt[vm1]: vm_to_vmt[vm2]
+            for vm1, vm2 in recycling.upgraded_node_pairs.items()
         }
         self.new_nodes: list[Vmt] = [
             vm_to_vmt[vm]
@@ -86,7 +104,6 @@ class RecyclingVmt:
         }
         self.node_recycling_level: float = recycling.node_recycling_level
         self.container_recycling_level: float = recycling.container_recycling_level
-
 
 def get_min_max_perf(alloc1: Allocation, alloc2: Allocation) ->\
         tuple[dict[App, RequestsPerTime], dict[App, RequestsPerTime]]:
@@ -131,7 +148,6 @@ def get_min_max_load(load1: dict[App, RequestsPerTime], load2: dict[App, Request
         {app: min(load1.get(app, zero_load), load2.get(app, zero_load)) for app in load1},
         {app: max(load1.get(app, zero_load), load2.get(app, zero_load)) for app in load1},
     )
-
 
 def get_allocation_signature(alloc: list[Vmt]) -> Counter:
     """
@@ -247,7 +263,7 @@ def get_required_nodes(ic_list: list[InstanceClass], cgs: list[ContainerGroup], 
 
     # Sort available instance classes by increasing prices
     ics = list(ic_list)
-    ics.sort(key=lambda ic: ic.price)
+    ics.sort(key=lambda i: i.price)
 
     # Simulate allocation using the minimum number of nodes of the more expensive instance class
     more_expensive_ic = ics[-1]
@@ -320,8 +336,5 @@ def mncf_allocation(system: System, workloads: dict[App, RequestsPerTime]) -> Al
     for fm in allocations:
         if min_cost_fm is None or allocations_cost[fm] < allocations_cost[min_cost_fm]:
             min_cost_fm = fm
-
-    if min_cost_fm is None:
-        a = 1
 
     return allocations[min_cost_fm]

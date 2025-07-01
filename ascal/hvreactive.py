@@ -17,7 +17,7 @@ class HVReactiveAutoscaler(Autoscaler):
 
     def __init__(self, time_period: int = 60, desired_cpu_utilization: float = 0.6,
                  timing_args: TimedOps.TimingArgs = None, algorithm: AllocationSolver = AllocationSolver.FCMA,
-                 transition_time_budget: int = 0):
+                 transition_time_budget: int = 0, hot_node_scale_up: bool = False):
         """
         Constructor for the horizontal/vertical reactive autoscaler.
         :param time_period: Time period to evaluate a new autoscaling.
@@ -33,6 +33,7 @@ class HVReactiveAutoscaler(Autoscaler):
         self._allocation_solver = algorithm
         self.transition = None
         self.transition_time_budget = transition_time_budget
+        self.hot_node_scale_up = hot_node_scale_up
         self._new_allocation = None
         self._timedops = TimedOps(self.timing_args)
 
@@ -55,7 +56,8 @@ class HVReactiveAutoscaler(Autoscaler):
             # At least one application replica
             Autoscaler._set_delta_loads_if_zero(incremented_workloads)
             # Initialize the transition
-            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget)
+            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget,
+                                         hot_node_scale_up=self.hot_node_scale_up)
             # Calculate the first allocation
             self._new_allocation = self._solve_allocation(incremented_workloads, self._allocation_solver)
             self._app_loads = {}  # Application workloads in a time period
@@ -95,7 +97,6 @@ class HVReactiveAutoscaler(Autoscaler):
                     NodeStates.set_state(node, NodeStates.READY)
                 commands, transition_time = self.transition.calculate_sync(self.allocation, self._new_allocation)
                 transition_time = current_time() - transition_time_start
-
                 self.log(f"Transition: {transition_time} seconds")
                 self.log(f"- From {[str(node) for node in self.allocation]}")
                 self.log(f"- To   {[str(node) for node in self._new_allocation]}")

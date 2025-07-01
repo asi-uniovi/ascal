@@ -35,7 +35,7 @@ class AutoscalerStatistics:
     """
     perf_changed: bool # True if the performance has changed
     billing_changed: bool # True if the allocation has changed
-    transition_time: float # Time to perform the transition
+    transition_time: float # Time to calculate the transition
     total_time: float # Time to perform all the autoscaling calculations (includes transition)
     node_recycling_level: float = 0.0 # Node recycling level in [0, 1]
     container_recycling_level: float = 0.0 # Container recycling level in [0,1]
@@ -226,13 +226,16 @@ class Autoscaler(ABC):
             timedops = self._timedops
         curr_time = start_time
         for command in commands:
+            if command.sync_on_nodes_upgrade:
+                curr_time = max(curr_time, start_time + self.timing_args.hot_node_scale_up_time)
             if command.sync_on_nodes_creation:
                 curr_time = max(curr_time, start_time + self.timing_args.node_creation_time)
+            if len(command.upgrade_nodes) > 0:
+                for initial_node, final_ic in command.upgrade_nodes:
+                    timedops.upgrade_node(curr_time, initial_node, final_ic)
             if len(command.create_nodes) > 0:
                 for node in command.create_nodes:
-                    node.free_cores = node.ic.cores
-                    node.free_mem = node.ic.mem
-                    node.cgs.clear()
+                    node.clear()
                     timedops.create_node(curr_time, node)
                     self.allocation.append(node)
             if len(command.remove_containers) > 0:
@@ -246,4 +249,3 @@ class Autoscaler(ABC):
                 for node, cc, replicas in command.allocate_containers:
                     timedops.allocate_container_replicas(curr_time, cc, replicas, node)
                 curr_time += self.timing_args.container_creation_time
-

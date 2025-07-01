@@ -5,7 +5,7 @@ It defines the TimedOps class to create/remove container and nodes using an even
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
-from fcma import ContainerGroup, ContainerClass, Vm, RequestsPerTime
+from fcma import ContainerGroup, ContainerClass, Vm, RequestsPerTime, InstanceClass
 from ascal.nodestates import NodeStates
 
 class TimedOps:
@@ -25,13 +25,15 @@ class TimedOps:
         CREATE_NODE_BEGIN = 1
         CREATE_NODE_BILLED = 2
         CREATE_NODE_END = 3
-        START_REPLICAS_GRACE_PERIOD = 4
-        REMOVE_CONTAINER_REPLICAS_END = 5
-        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 6 # After the end of container removal, since removal frees up resources
-        ALLOCATE_CONTAINER_REPLICAS_END = 7
-        REMOVE_CONTAINER_REPLICAS_BEGIN = 8 # After the end of allocation to meet with performance requeriments
-        REMOVE_NODE_BEGIN = 9 # After the end of container removal, since a node with containers can not be removed
-        REMOVE_NODE_END = 10
+        UPGRADE_NODE_BEGIN = 4
+        UPGRADE_NODE_END = 5
+        START_REPLICAS_GRACE_PERIOD = 6
+        REMOVE_CONTAINER_REPLICAS_END = 7
+        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 8 # After the end of container removal, since removal frees up resources
+        ALLOCATE_CONTAINER_REPLICAS_END = 9
+        REMOVE_CONTAINER_REPLICAS_BEGIN = 10 # After the end of allocation to meet with performance requeriments
+        REMOVE_NODE_BEGIN = 11 # After the end of container removal, since a node with containers can not be removed
+        REMOVE_NODE_END = 12
 
     @dataclass
     class Event:
@@ -40,7 +42,7 @@ class TimedOps:
         """
         type: 'TimedOps.EventTypes'
         containers: tuple[ContainerClass, int, Vm, ContainerClass] | None = None # Information of containers
-        node: Vm | None = None # Node to create/remove
+        node: Vm | tuple[Vm,Vm] | None = None # Node to create/remove, or a nodes pair to upgrade
         message: str = None # Message to log
         callback: Callable[..., None] | None = None # Function called when the event is fired
 
@@ -53,6 +55,7 @@ class TimedOps:
         node_time_to_billing: int = 0 # Time from the beginning of node creation until the node is billed
         node_creation_time: int = 0 # Time from the beginning of node creation until it is ready to allocate containers
         node_removal_time: int = 0 # Time required to remove a node
+        hot_node_scale_up_time: int = 0 # Time to hot scale-up a node
         container_creation_time: int = 0 # Time required to create a container
         container_removal_time: int = 0 # Time required to remove a container
 
@@ -243,7 +246,8 @@ class TimedOps:
         """
         replicas, node, cc = event.containers
 
-        assert NodeStates.get_state(node) == NodeStates.READY, "Can not allocate on nodes that are not ready"
+        assert NodeStates.get_state(node) in (NodeStates.READY, NodeStates.UPGRADING), \
+            "Can not allocate on nodes that are not ready"
 
         # Firstly, allocate containers with zero performance
         zero_perf_cc = ContainerClass(cc.app, cc.ic, cc.fm, cc.cores, cc.mem,
@@ -473,3 +477,46 @@ class TimedOps:
         assert NodeStates.get_state(node) == NodeStates.REMOVING, "The node can not be removed"
         NodeStates.set_state(node, NodeStates.REMOVED)
         self.log(f'Node {node} is removed')
+
+    def upgrade_node(self, at_time: int, initial_node: Vm, final_ic: InstanceClass):
+        """
+        Create an event to upgrade a node to a bigger node in the same instance class family. Once upgraded the node
+        gets higher computational capacity and increases its cost.
+        :param at_time: Node upgrade starts at this time.
+        :param initial_node: Initial node.
+        :param final_ic: Final instance class of the node.
+        """
+        assert at_time >= self._last_dispatched_time, "Can not upgrade nodes in the past"
+        assert initial_node is not None and final_ic is not None, "Invalid upgrade data"
+        assert initial_node.ic.family == final_ic.family, "Instance class families must be the same to upgrade"
+        assert initial_node.ic.cores <= final_ic.cores, "The number of cores can not decrease in an upgrade"
+        assert initial_node.ic.mem <= final_ic.mem, "The memory can not decrease in an upgrade"
+        assert initial_node.ic != final_ic, "Instance classes must be different in an upgrade"
+        event = TimedOps.Event(TimedOps.EventTypes.UPGRADE_NODE_BEGIN, node=(initial_node, final_ic),
+                               callback=self._at_upgrade_node_begin)
+        self._add_event(at_time, event)
+
+    def _at_upgrade_node_begin(self, event: Event):
+        """
+        Start a node upgrading to another node in the same instance class family with higher computational capacities.
+        :param event: Event that has just being fired.
+        """
+        initial_node, final_ic = event.node
+        NodeStates.set_state(initial_node, NodeStates.UPGRADING)
+        event = TimedOps.Event(TimedOps.EventTypes.UPGRADE_NODE_END, node=event.node,
+                               callback=self._at_upgrade_node_end)
+        self._add_event(self._last_dispatched_time + self.time_args.node_removal_time, event)
+        self.log(f"Upgrading node {initial_node} to instance class {final_ic}")
+
+    def _at_upgrade_node_end(self, event: Event):
+        """
+        Complete the upgrading of the node when the event is fired.
+        :param event: Event that has just being fired.
+        """
+        initial_node, final_ic = event.node
+        assert NodeStates.get_state(initial_node) == NodeStates.UPGRADING, "The node can not be removed"
+        initial_node.free_cores += final_ic.cores - initial_node.ic.cores
+        initial_node.free_mem += final_ic.mem - initial_node.ic.mem
+        initial_node.ic = final_ic
+        NodeStates.set_state(initial_node, NodeStates.READY)
+        self.log(f'Node {initial_node} is upgraded to instance class {final_ic}')

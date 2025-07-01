@@ -6,6 +6,8 @@ a given autoscaler and applications
 from math import ceil, floor
 from copy import deepcopy
 from yaml import safe_load
+from yaml import dump as yaml_dump
+from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
@@ -55,7 +57,7 @@ class AscalConfig:
             self.autoscaler = HReactiveHVPredictiveAutoscaler()
 
     @staticmethod
-    def _get_aggs(data, apps: list[App], aggs) -> dict[App, list[int]]:
+    def _get_check_aggs(data, apps: list[App], aggs) -> dict[App, list[int]]:
         """
         Get the aggregation levels for the applications using the horizontal autoscaler.
         :param data: Data read from the YAML file.
@@ -116,7 +118,7 @@ class AscalConfig:
                 data['autoscalers']['h_reactive']['time_period'],
                 data['autoscalers']['h_reactive']['desired_cpu_utilization'],
                 data['autoscalers']['h_reactive']['node_utilization_threshold'],
-                AscalConfig._get_aggs(data, config.apps, aggs=data["autoscalers"]['h_reactive']["aggs"]),
+                AscalConfig._get_check_aggs(data, config.apps, aggs=data["autoscalers"]['h_reactive']["aggs"]),
                 timing_args
             )
         elif data['autoscaler'] == 'hv_reactive':
@@ -134,7 +136,8 @@ class AscalConfig:
                 data['autoscalers']['hv_reactive']['desired_cpu_utilization'],
                 timing_args,
                 algorithm,
-                data['autoscalers']['hv_reactive']['transition_time_budget']
+                data['autoscalers']['hv_reactive']['transition_time_budget'],
+                data['autoscalers']['hv_reactive']['hot_node_scale_up']
             )
         elif data['autoscaler'] == 'hv_predictive':
             algorithm = AllocationSolver.FCMA
@@ -151,7 +154,8 @@ class AscalConfig:
                 data['autoscalers']['hv_predictive']['prediction_percentile'],
                 timing_args,
                 algorithm,
-                data['autoscalers']['hv_predictive']['transition_time_budget']
+                data['autoscalers']['hv_predictive']['transition_time_budget'],
+                data['autoscalers']['hv_predictive']['hot_node_scale_up']
             )
         elif data['autoscaler'] == 'h_reactive_hv_reactive':
             algorithm = AllocationSolver.FCMA
@@ -170,7 +174,8 @@ class AscalConfig:
                 timing_args,
                 algorithm,
                 data['autoscalers']['h_reactive_hv_reactive']['hv_time_period'],
-                data['autoscalers']['h_reactive_hv_reactive']['hv_transition_time_budget']
+                data['autoscalers']['h_reactive_hv_reactive']['hv_transition_time_budget'],
+                data['autoscalers']['h_reactive_hv_reactive']['hot_node_scale_up']
             )
         elif data['autoscaler'] == 'h_reactive_hv_predictive':
             algorithm = AllocationSolver.FCMA
@@ -190,7 +195,8 @@ class AscalConfig:
                 algorithm,
                 data['autoscalers']['h_reactive_hv_predictive']['hv_prediction_window'],
                 data['autoscalers']['h_reactive_hv_predictive']['hv_prediction_percentile'],
-                data['autoscalers']['h_reactive_hv_predictive']['hv_transition_time_budget']
+                data['autoscalers']['h_reactive_hv_predictive']['hv_transition_time_budget'],
+                data['autoscalers']['h_reactive_hv_predictive']['hot_node_scale_up']
             )
 
     @staticmethod
@@ -198,7 +204,7 @@ class AscalConfig:
         """
         Set application's workload from data dictionary.
         :param config: System configuration.
-        :param data: Application data.
+        :param data: Data dictionary.
         """
 
         # 1. Read the set of load samples.
@@ -259,9 +265,7 @@ class AscalConfig:
                 app = App(app_name)
                 config.apps.append(app)
                 app_names.append(app.name)
-                aggs = (1,)
-                if 'aggs' in data['apps'][app_name]['container']:
-                    aggs = tuple(data['apps'][app_name]['container']['aggs'])
+                aggs = tuple(data['apps'][app_name]['container']['aggs'])
                 cores = ComputationalUnits(data['apps'][app_name]['container']['cpu'])
                 mem_agg1 = Storage(data['apps'][app_name]['container']['mem'])
                 gib = tuple(mem_agg1 for _ in aggs)
@@ -272,15 +276,19 @@ class AscalConfig:
         config.autoscaler.system = config.system
 
         # Creation/removal times for containers and nodes
-        timing_args = TimedOps.TimingArgs(data['node_time_to_billing'], data['node_creation_time'],
-                                          data['node_removal_time'], data['container_creation_time'],
-                                          data['container_removal_time'])
-
+        timing_args = data["timing_args"]
+        timing_args = TimedOps.TimingArgs(timing_args['node_time_to_billing'], timing_args['node_creation_time'],
+                                          timing_args['node_removal_time'], timing_args['hot_node_scale_up_time'],
+                                          timing_args['container_creation_time'],
+                                          timing_args['container_removal_time'])
         # Set the autoscaler
         AscalConfig._set_autoscaler(config, data, timing_args)
 
         # Set application's workload
-        AscalConfig._set_apps_workload(config, data)
+        try:
+            AscalConfig._set_apps_workload(config, data)
+        except:
+            raise ValueError("Error reading the workload file")
 
         return config
 
@@ -299,56 +307,66 @@ class AscalConfig:
                 raise ValueError(f"Invalid value of key '{keys[i]}'")
 
     @staticmethod
-    def _validate_autoscaler(config):
+    def _validate_autoscalers(config):
         """
         Validate autoscaler parameters in the configuration.
         :param config: Configuration.
         :raises ValueError: When a validation fails.
         """
-        if "autoscalers" not in config:
-            raise ValueError("'autoscalers' key is missing")
+        valid_autoscalers = ["h_reactive", "hv_reactive", "hv_predictive",
+                             "h_reactive_hv_reactive", "h_reactive_hv_predictive"]
         for key in config["autoscalers"]:
             if not isinstance(config["autoscalers"][key], dict):
                 raise ValueError("Available autoscalers must be dictionaries")
-            valid_autoscalers = ["h_reactive", "hv_reactive", "hv_predictive",
-                                 "h_reactive_hv_reactive", "h_reactive_hv_predictive"]
             if key not in valid_autoscalers:
                 raise ValueError(f"Valid autoscalers: {valid_autoscalers}")
+
             if key == "h_reactive":
-                AscalConfig._check_fields(config["autoscalers"][key],
-                              ["time_period", "desired_cpu_utilization", "node_utilization_threshold"],
-                             [int, float, float])
+                properties = ["time_period", "desired_cpu_utilization", "node_utilization_threshold"]
+                AscalConfig._check_fields(config["autoscalers"][key], properties,[int, float, float])
+                # Check properties. Note that autoscaler aggs are checked by _get_check_aggs()
+                if set(properties) | {"aggs"} != set(config["autoscalers"][key]):
+                    raise ValueError(f"Invalid or missing property in {key}")
                 if config["autoscalers"][key]["time_period"] < 0:
                     raise ValueError("Time period must be possitive")
                 if config["autoscalers"][key]["desired_cpu_utilization"] < 0.1:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
                 if config["autoscalers"][key]["node_utilization_threshold"] < 0.1:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
+
             elif key == "hv_reactive":
-                AscalConfig._check_fields(config["autoscalers"][key],
-                            ["time_period", "desired_cpu_utilization", "algorithm", "transition_time_budget"],
-                           [int, float, str, int])
+                properties = ["time_period", "desired_cpu_utilization", "algorithm", "transition_time_budget",
+                              "hot_node_scale_up"]
+                if set(properties) != set(config["autoscalers"][key]):
+                    raise ValueError(f"Invalid or missing property in {key}")
+                AscalConfig._check_fields(config["autoscalers"][key], properties,[int, float, str, int, bool])
                 if config["autoscalers"][key]["time_period"] < 0:
                     raise ValueError("Time period must be possitive")
                 if config["autoscalers"][key]["desired_cpu_utilization"] < 0.1:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
                 if config["autoscalers"][key]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
+
             elif key == "hv_predictive":
-                AscalConfig._check_fields(config["autoscalers"][key],
-                             ["prediction_window", "prediction_percentile", "algorithm", "transition_time_budget"],
-                             [int, int, str, int])
+                properties = ["prediction_window", "prediction_percentile", "algorithm", "transition_time_budget",
+                              "hot_node_scale_up"]
+                if set(properties) != set(config["autoscalers"][key]):
+                    raise ValueError(f"Invalid or missing property in {key}")
+                AscalConfig._check_fields(config["autoscalers"][key], properties,[int, int, str, int, bool])
                 if config["autoscalers"][key]["prediction_window"] < 10:
                     raise ValueError("Prediction window must be >= 10")
                 if config["autoscalers"][key]["prediction_percentile"] < 0.1:
                     raise ValueError("Prediction percentile must be >= 0.1")
                 if config["autoscalers"][key]["algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
+
             elif key == "h_reactive_hv_reactive":
-                AscalConfig._check_fields(config["autoscalers"][key],
-                             ["h_time_period", "h_node_utilization_threshold", "desired_cpu_utilization",
-                                   "hv_time_period", "hv_algorithm", "hv_transition_time_budget"],
-                             [int, float, float, int, str, int])
+                properties = ["h_time_period", "h_node_utilization_threshold", "desired_cpu_utilization",
+                              "hv_time_period", "hv_algorithm", "hv_transition_time_budget", "hot_node_scale_up"]
+                if set(properties) != set(config["autoscalers"][key]):
+                    raise ValueError(f"Invalid or missing property in {key}")
+                AscalConfig._check_fields(config["autoscalers"][key], properties,
+                                          [int, float, float, int, str, int, bool])
                 h_time_period = config["autoscalers"][key]["h_time_period"]
                 hv_time_period = config["autoscalers"][key]["hv_time_period"]
                 if h_time_period == 0 or hv_time_period % h_time_period > 0 or hv_time_period / h_time_period < 2:
@@ -359,11 +377,15 @@ class AscalConfig:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
                 if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
+
             elif key == "h_reactive_hv_predictive":
-                AscalConfig._check_fields(config["autoscalers"][key],
-                        ["h_time_period", "h_node_utilization_threshold", "h_desired_cpu_utilization",
-                             "hv_prediction_window", "hv_prediction_percentile", "hv_algorithm",
-                             "hv_transition_time_budget"],[int, float, float, int, int, str, int])
+                properties = ["h_time_period", "h_node_utilization_threshold", "h_desired_cpu_utilization",
+                              "hv_prediction_window", "hv_prediction_percentile", "hv_algorithm",
+                              "hv_transition_time_budget", "hot_node_scale_up"]
+                if set(properties) != set(config["autoscalers"][key]):
+                    raise ValueError(f"Invalid or missing property in {key}")
+                AscalConfig._check_fields(config["autoscalers"][key], properties,
+                                          [int, float, float, int, int, str, int, bool])
                 h_time_period = config["autoscalers"][key]["h_time_period"]
                 hv_prediction_window = config["autoscalers"][key]["hv_prediction_window"]
                 hv_prediction_percentile = config["autoscalers"][key]["hv_prediction_percentile"]
@@ -379,10 +401,29 @@ class AscalConfig:
                 if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
 
-        if "autoscaler" not in config:
-            raise ValueError("Field 'autoscaler' is missing")
-        if config["autoscaler"] not in config["autoscalers"].keys():
-            raise ValueError("The selected autoscaler is invalid")
+    @staticmethod
+    def _validate_timing_args(config):
+        """
+        Validate timing arguments in the configuration.
+        :param config: Configuration.
+        :raises ValueError: When a validation fails.
+        """
+        properties = ["node_time_to_billing", "node_creation_time", "node_removal_time",
+                      "container_creation_time", "container_removal_time", "hot_node_scale_up_time"]
+        if set(properties) != set(config["timing_args"]):
+            raise ValueError(f"Invalid or missing property in 'timing_args'")
+        AscalConfig._check_fields(config["timing_args"],
+             ["node_time_to_billing", "node_creation_time", "node_removal_time", "container_creation_time",
+              "container_removal_time", "hot_node_scale_up_time"], [int, int, int, int, int, int])
+
+        # Node creation time can not be lower than hot node scale-up time
+        if config["timing_args"]["node_creation_time"] < config["timing_args"]["hot_node_scale_up_time"]:
+            raise ValueError("Node creation time can not be lower than hot node scale-up time")
+
+        # Avoid a problem with priorities while firing container removal events at the same time:
+        # begin removal, start grace period and end of removal
+        if config["timing_args"]["node_removal_time"] == 0:
+            raise ValueError("Node removal time must be possitive")
 
     @staticmethod
     def _validate_apps(config):
@@ -391,26 +432,29 @@ class AscalConfig:
         :param config: Configuration.
         :raises ValueError: When a validation fails.
         """
-        if "apps" not in config:
-            raise ValueError("key 'apps' is missing")
         if len(config["apps"]) == 0:
             raise ValueError("At least one application is required")
+        properties = ["load", "container"]
         for key, val in config["apps"].items():
-            if not isinstance(key, str):
-                raise ValueError("Application names must be strings")
-            if "load" not in val:
-                raise ValueError(f"'load' key is missing in application '{val}'")
-            if "container" not in val:
-                raise ValueError(f"'container' key is missing in application '{val}'")
+            if set(properties) != set(config["apps"][key]):
+                raise ValueError(f"Invalid or missing property in apps: {key}")
+            load_properties = ["file", "time_interval", "repeat", "load_offset", "load_mult", "time_offset"]
+            if set(load_properties) != set(val["load"]):
+                raise ValueError(f"Invalid or missing property in apps: {key}: load")
             AscalConfig._check_fields(config["apps"][key]["load"],
                          ["file", "time_interval", "repeat", "load_offset", "load_mult", "time_offset"],
                          [str, int, int, int, (int, float), int])
+            container_properties = ["cpu", "mem", "perf", "aggs"]
+            if set(container_properties) != set(val["container"]):
+                raise ValueError(f"Invalid or missing property in apps: {key}: container")
             AscalConfig._check_fields(config["apps"][key]["container"],
                          ["cpu", "mem", "perf", "aggs"],
                          [str, str, str, list])
             for v in config["apps"][key]["container"]["aggs"]:
                 if not (isinstance(v, int) and v >= 1):
-                    raise ValueError("Aggregations must be iinteger equal to or higher than zero")
+                    raise ValueError(f"{key}: Aggregations must be integer equal to or higher than zero")
+            if len(set(config["apps"][key]["container"]["aggs"])) != len(config["apps"][key]["container"]["aggs"]):
+                raise ValueError(f"{key}: Repeated aggregations")
 
     @staticmethod
     def validate_config(config):
@@ -422,17 +466,19 @@ class AscalConfig:
         if not isinstance(config, dict):
             raise ValueError("Configuration must be a dictionary")
 
-        # Validate the autoscaler
-        AscalConfig._validate_autoscaler(config)
+        # Check root properties in the configuration
+        properties = ["autoscalers", "autoscaler", "timing_args", "apps", "simulation_time"]
+        if set(config) != set(properties):
+            raise ValueError("Invalid root property in configuration")
+        if config["autoscaler"] not in config["autoscalers"].keys():
+            raise ValueError("The selected autoscaler is invalid")
+        AscalConfig._check_fields(config,["simulation_time"], [int])
 
-        # Validate temporal parameters
-        AscalConfig._check_fields(config,
-             ["node_time_to_billing", "node_creation_time", "node_removal_time", "container_creation_time",
-              "container_removal_time", "simulation_time"], [int, int, int, int, int, int])
-        # Avoid a problem with priorities while firing container removal events at the same time:
-        # begin removal, start grace period and end of removal
-        if config["node_removal_time"] == 0:
-            raise ValueError("Node removal time must be possitive")
+        # Validate all the autoscalers
+        AscalConfig._validate_autoscalers(config)
+
+        # Validate the timing arguments
+        AscalConfig._validate_timing_args(config)
 
         # Validate applications
         AscalConfig._validate_apps(config)
@@ -457,7 +503,7 @@ class Ascal:
         self.last_time = len(next(iter(self._workload_vectors.values()))) - 1 # Last simulation time
         self.performance_changes: list[(int, Allocation)] = [] # Pairs time and allocation
         self.billing_changes: list[(int, Allocation)] = [] # Pairs time and allocation
-        self.calc_times: dict[str, float] = {"transition_times": [], "total_times": []} # Calculation times
+        self.calc_times: dict[str, list[float]] = {"transition_times": [], "total_times": []} # Calculation times
         self.node_recycling_levels: list[float] = [] # List of node recycling levels
         self.container_recycling_levels: list[float] = [] # List of container recycling levels
 
@@ -668,6 +714,21 @@ class Ascal:
             writer.writerow(['Cost ($/hour)'])
             for cost in self.get_cluster_cost():
                 writer.writerow([f'{cost:.2f}'])
+
+    def write_allocations(self, yaml_file: str):
+        """
+        Write the allocations as a YAML file.
+        :param yaml_file: Output YAML file.
+        """
+        time_alloc = {}
+        with open(yaml_file, "w") as f:
+            for current_time, alloc in self.performance_changes:
+                serializable_alloc = defaultdict(lambda: {})
+                for node in alloc:
+                    for cg in node.cgs:
+                        serializable_alloc[f"{node.ic.name}-{node.id}"][str(cg.cc)] = cg.replicas
+                time_alloc[current_time] = dict(serializable_alloc)
+            yaml_dump(time_alloc, f)
 
     @staticmethod
     def plot(dict_values: dict[str, int], title: str = None, unit:str = None):

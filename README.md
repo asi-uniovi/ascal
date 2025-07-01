@@ -169,13 +169,16 @@ hv_predictive:
     prediction_window: 240 # Seconds
     prediction_percentile: 95 # Percentage 
     algorithm: fcma 
-    transition_time_budget: 200 # Seconds  
+    transition_time_budget: 200 # Seconds
+    hot-node-scale-up: True  
 ```
 _hv_predictive_ autoscaler corresponds to the PHVA, i.e., the predictive and horizontal/vertical autoscaler. This autoscaler wakes every _prediction_window_, and creates/removes containers/nodes of different sizes. 
 
 At the current prediction window, application's workload load (for the given percentile) is assumed to be known for the next prediction window. This workload is used to calculate a new deployment for the next prediction window using the provided algorithm (_fcma_ in the example). Two transitions are scheduled, one that completes before the end of the current prediction window, for those applications with increased workload, and another that completes just at the beginning of the next prediction windod, for those applications with decreased workload.
 
 Property _transition_time_budget_ is the total time available to perform the two transitions, but note again, that the actual time may be higher.
+
+Some systems allow hot node scaling-up, so a node can upgrade to adquire more computational resources without being removed and recreated.
 
 ``` yaml
 h_reactive_hv_reactive:

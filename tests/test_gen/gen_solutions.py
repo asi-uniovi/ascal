@@ -5,31 +5,12 @@ The generated solutions, stored in solution's directory will be compared with th
 
 import os
 import shutil
-from yaml import dump as yaml_dump
-from collections import defaultdict
 from pathlib import Path
-from fcma import Allocation
 from ascal import AscalConfig, Ascal
 import aws_eu_west_1_c5m5r5
 
 PROBLEMS_DIR = "../problems"
 NEW_SOLUTIONS_DIR = "../new-solutions"
-
-def write_allocations(output_file: str, allocations: list[(int, Allocation)]):
-    """
-    Write the allocations as a YAML file in the output file.
-    :param output_file: Output file.
-    :param allocations: Allocations
-    """
-    time_alloc = {}
-    with open(f"{NEW_SOLUTIONS_DIR}/{output_file}", "w") as f:
-        for current_time, alloc in allocations:
-            serializable_alloc = defaultdict(lambda: {})
-            for node in alloc:
-                for cg in node.cgs:
-                    serializable_alloc[f"{node.ic.name}-{node.id}"][str(cg.cc)] = cg.replicas
-            time_alloc[current_time] = dict(serializable_alloc)
-        yaml_dump(time_alloc, f)
 
 # Create the new solutions directory
 if os.path.exists(NEW_SOLUTIONS_DIR):
@@ -49,7 +30,7 @@ for problem_file in problem_files:
     log_file = problem_name + ".log" # Log files are not used for testing, but to explain allocation differences
     ascal_problem = Ascal(ascal_config, log=log_file)
     ascal_problem.run()
-    write_allocations(sol_file, ascal_problem.performance_changes)
+    ascal_problem.write_allocations(f"{NEW_SOLUTIONS_DIR}/{sol_file}")
 
     """ Uncomment to show the plots
     

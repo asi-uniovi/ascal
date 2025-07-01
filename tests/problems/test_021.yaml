@@ -6,7 +6,7 @@ autoscalers:
     hv_time_period: 600 # Time period to evaluate autoscaling for the horizontal/vertical autoscaler
     hv_algorithm: fcma # Allocation algorithm for the horizontal/vertical autoscaler
     hv_transition_time_budget: 100 # Approximate time budget for the transition (0 for simple transaction)
-    hot_node_scale_up: False # True if hot scaling-up of nodes is possible
+    hot_node_scale_up: True # True if hot scaling-up of nodes is possible
 
 # Select autoscaler
 autoscaler: h_reactive_hv_reactive
@@ -56,5 +56,3 @@ apps:
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
 simulation_time: 3600
-
-

@@ -61,6 +61,4 @@ def test_problem_allocation(problem_file_name):
     ascal_problem.run()
     calculated_allocs = allocations_to_serializable_dict(ascal_problem.performance_changes)
     solution_allocs = read_allocations(f"{problem_file_name[:-len('.yaml')]}-alloc.yaml")
-    if calculated_allocs != solution_allocs:
-        print(yaml_dump(calculated_allocs, default_flow_style=False))
     assert calculated_allocs == solution_allocs, f"Check failed for {problem_file_name}"

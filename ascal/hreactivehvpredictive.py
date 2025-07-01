@@ -21,7 +21,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
                  h_node_utilization_threshold: float = 0.5, timing_args: TimedOps.TimingArgs = None,
                  hv_algorithm: AllocationSolver = AllocationSolver.FCMA,
                  hv_prediction_window: int = 600, hv_prediction_percentile: float = 0.95,
-                 hv_transition_time_budget: int = 0):
+                 hv_transition_time_budget: int = 0, hot_node_scale_up: bool = False):
         """
         Constructor for the mixed reactive horizontal and predictive horizontal/vertical autoscaler.
         :param h_time_period: Time period to evaluate a new autoscaling.
@@ -42,6 +42,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         self._allocation_solver = hv_algorithm
         self.transition = None
         self.transition_time_budget = hv_transition_time_budget
+        self.hot_node_scale_up = hot_node_scale_up
         self._hv_timedops = TimedOps(self.timing_args)
         self._next_prediction_window_time = hv_prediction_window
         self._hv_app_loads = {} # Application workloads in a time period for the HV autoscaler
@@ -69,7 +70,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         else:
             self._enable_container_removal = True
 
-    def run(self, app_workloads: dict[App, RequestsPerTime]) -> tuple[bool, bool, float]:
+    def run(self, app_workloads: dict[App, RequestsPerTime]) -> AutoscalerStatistics:
         """
         Simulate for 1 second the mixed reactive horizontal and predictive horizontal/vertical autoscaler.
         :param app_workloads: Workload for all the applications at the current time.
@@ -88,7 +89,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             # Initialize the HV application load in the last period
             self._hv_app_loads = {app: [] for app in app_workloads}
             # Initialize the transition
-            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget)
+            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget,
+                                         hot_node_scale_up=self.hot_node_scale_up)
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
                                               Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
