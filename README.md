@@ -73,7 +73,8 @@ Usage
 [examples](examples) folder, which can be run with:
 
 ```bash
-python examples/ex1/ex1.py
+cd examples/ex1
+python ex1.py
 ```
 A jupyter notebook with the same example can be found in _examples/ex1/ex1.ipynb_.
 
