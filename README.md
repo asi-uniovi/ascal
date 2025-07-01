@@ -38,9 +38,6 @@ Outputs:
 
 Installation
 ------------
-There are two ways to install the package: manually or using poetry.
-
-### Manual install
 
 Clone the repository:
 
@@ -119,7 +116,7 @@ ascal_problem.write_cost_csv('cost.csv')
 ascal_problem.plot(ascal_problem.get_workloads(), "Application Workloads", "req/s")
 ascal_problem.plot(ascal_problem.get_performances(), "Application Performances", "req/s")
 cluster_cost = ascal_problem.get_cluster_cost()
-total_cost_str = f"total cost = {sum(cluster_cost)/(last_time + 1):.3f} $"
+total_cost_str = f"total cost = {sum(cluster_cost)/3600:.3f} $"
 ascal_problem.plot({total_cost_str: cluster_cost}, "Cluster Cost", "$/hour")
 ```
 
@@ -156,8 +153,10 @@ Unlike what happens with HPA in Kubernetes, this autoscaler is able to work with
     desired_cpu_utilization: 0.7
     algorithm: fcma 
     transition_time_budget: 100 # Seconds
+    hot_node_scale_up: False
 ```
 _hv_reactive_ autoscaler corresponds to the RHVA, i.e., the reactive and horizontal/vertical autoscaler. This autoscaler wakes every _time_period_, also named scheduling window, and creates/removes containers/nodes of different sizes. For each application, the total performance of its container replicas is adjusted to obtain the _desired_cpu_utilization_.  Just like with the horizontal autoscaler scaler, a value lower than one is necessary to handle temporary overloads, or those caused by the delay between requesting the creation of a node and the moment the node becomes available.
+_hot_node_scale_up_ enables hot node upgrade withn the same instance class family.
 
 A new deployment of containers and node is calculated at every time period using the specified algorithm. Currently there are three avaliable algorithms: _fcma1_, _fcma2_ and _fcma3_, in order of decreasing cost, but increasing calculation time.
 
@@ -170,7 +169,7 @@ hv_predictive:
     prediction_percentile: 95 # Percentage 
     algorithm: fcma 
     transition_time_budget: 200 # Seconds
-    hot-node-scale-up: True  
+    hot-node-scale-up: True
 ```
 _hv_predictive_ autoscaler corresponds to the PHVA, i.e., the predictive and horizontal/vertical autoscaler. This autoscaler wakes every _prediction_window_, and creates/removes containers/nodes of different sizes. 
 
@@ -188,6 +187,7 @@ h_reactive_hv_reactive:
     hv_time_period: 600
     hv_algorithm: fcma
     hv_transition_time_budget: 100
+    hot_node_scale_up: False
 ```
 
 _h_reactive_hv_reactive_ autoscaler corresponds to the RHA-RHVA, i.e., a combination of a reactive horizontal autoscaler and a reactive horizontal/vertical autoscaler. It basically performs as a reactive horizontal autoscaler that is readjusted every _hv_time_period_ seconds by a reactive horizontal/vertical autoscaler, moving the deployment to a near-optimal one.
@@ -201,6 +201,7 @@ h_reactive_hv_predictive:
     hv_prediction_percentile: 95
     hv_algorithm: fcma 
     hv_transition_time_budget: 100 
+    hot_node_scale_up: False
 ```
 
 _h_reactive_hv_predictive_ autoscaler corresponds to the RHA-PHVA, i.e., a combination of a reactive horizontal autoscaler and a predictive horizontal/vertical autoscaler. It basically performs as a reactive horizontal autoscaler that is readjusted every _hv_time_period_ seconds by a predictive horizontal/vertical autoscaler, moving the deployment to a near-optimal one.
@@ -215,13 +216,16 @@ autoscaler: h_reactive_hv_reactive
 This section defines the timings in seconds related to node creation, node removals, container allocations and container removals.
 
 ``` yaml
-node_time_to_billing: 20
-node_creation_time: 100
-node_removal_time: 10
-container_creation_time: 1 
-container_removal_time: 5 
+timing_args:
+  node_time_to_billing: 20
+  node_creation_time: 100
+  node_removal_time: 10
+  container_creation_time: 1 
+  container_removal_time: 5 
+  hot_node_scale_up_time: 60
 ```
 Property _node_time_to_billing_ is the time between the request of a new node creation and the time the node starts to be billed. Between _node_time_to_billing_ and _node_creation_time_ the node can not allocate containers yet, but it is billed.
+Finally, _hot_node_scale_up_time_ is the time required to perform a node upgrade.
 
 **3. Applications.**
 
