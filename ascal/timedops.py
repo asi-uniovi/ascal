@@ -103,6 +103,7 @@ class TimedOps:
         """
         self.node_billing_changed = (event_type == TimedOps.EventTypes.CREATE_NODE_BILLED) or \
                                     (event_type == TimedOps.EventTypes.REMOVE_NODE_END) or \
+                                    (event_type == TimedOps.EventTypes.UPGRADE_NODE_END) or \
                                     self.node_billing_changed
         self.perf_changed = (event_type == TimedOps.EventTypes.ALLOCATE_CONTAINER_REPLICAS_END) or \
                             (event_type == TimedOps.EventTypes.REMOVE_CONTAINER_REPLICAS_BEGIN) or \

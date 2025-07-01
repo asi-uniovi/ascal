@@ -408,7 +408,7 @@ class HReactiveAutoscaler(Autoscaler):
                     self._app_loads[app].clear()
 
             # At any other time try to allocate replicas of applications with deficit if
-            # new nodes are available or the allocation has changed
+            # new nodes are available or the performance has changed
             if self._timedops.new_nodes_ready or self._timedops.perf_changed:
                 self._allocate_deficit_replicas()
 
