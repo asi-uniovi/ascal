@@ -1,5 +1,5 @@
-0:  Initial allocation with ('c5.large[1]',)
-0:    - Allocated 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[1]
+0:  Initial allocation with ('c5.large[0]',)
+0:    - Allocated 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[0]
 60:  Load of app0: 0.00 req/s
 60:  Current replicas 1x of app0 1, desired 1
 120:  Load of app0: 0.00 req/s
@@ -17,8 +17,8 @@
 476:  Transition at 600:0 seconds
 476:  Predicted loads for 95.0 % percentile:
 476:  - app0 -> 0.00 req/s
-476:  - From ['c5.large[1]']
-476:  - To   ['c5.large[1]']
+476:  - From ['c5.large[0]']
+476:  - To   ['c5.large[0]']
 476:  - Temporal nodes []
 480:  Load of app0: 0.00 req/s
 480:  Current replicas 1x of app0 1, desired 1
@@ -43,7 +43,7 @@
 1076:  Transition at 1084:116 seconds
 1076:  Predicted loads for 95.0 % percentile:
 1076:  - app0 -> 100.00 req/s
-1076:  - From ['c5.large[1]']
+1076:  - From ['c5.large[0]']
 1076:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]']
 1076:  - Temporal nodes ['c5.2xlarge[0]', 'c5.18xlarge[0]']
 1260:  Load of app0: 100.00 req/s

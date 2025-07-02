@@ -1,6 +1,5 @@
 numpy<2.0 # Matplotlib 3.10 problems with NumPy version 2.0 or higher
 matplotlib
-pint
 pulp
 PyYAML
 pytest

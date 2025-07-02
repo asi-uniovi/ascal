@@ -4,7 +4,6 @@ Test ASCAL based on the sequence of allocations
 
 import os
 from yaml import safe_load as yaml_safe_load
-from yaml import dump as yaml_dump
 from collections import defaultdict
 from pathlib import Path
 import pytest

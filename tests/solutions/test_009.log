@@ -6,27 +6,27 @@
 60:  Current replicas 1x of app0 92, desired 113
 60:  Load of app1: 168.00 req/s
 60:  Current replicas 1x of app1 240, desired 241
-60:  Creating node c5.xlarge[1]
-80:  Billing of node c5.xlarge[1] starts
+60:  Creating node c5.xlarge[0]
+80:  Billing of node c5.xlarge[0] starts
 120:  Load of app0: 78.67 req/s
 120:  Current replicas 1x of app0 92, desired 113
 120:  Load of app1: 171.65 req/s
 120:  Current replicas 1x of app1 240, desired 246
 120:  Creating node c5.large[0]
 140:  Billing of node c5.large[0] starts
-160:  Node c5.xlarge[1] is ready to execute containers
-160:  Allocating 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[1]
-160:  Allocating 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[1]
-160:  Allocating 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.xlarge[1]
-161:  Completed the allocation of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[1]
-161:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[1]
-161:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.xlarge[1]
+160:  Node c5.xlarge[0] is ready to execute containers
+160:  Allocating 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[0]
+160:  Allocating 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[0]
+160:  Allocating 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.xlarge[0]
+161:  Completed the allocation of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[0]
+161:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[0]
+161:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.xlarge[0]
 180:  Load of app0: 83.13 req/s
 180:  Current replicas 1x of app0 99, desired 119
 180:  Load of app1: 178.95 req/s
 180:  Current replicas 1x of app1 240, desired 256
-180:  Creating node c5.xlarge[2]
-200:  Billing of node c5.xlarge[2] starts
+180:  Creating node c5.xlarge[1]
+200:  Billing of node c5.xlarge[1] starts
 220:  Node c5.large[0] is ready to execute containers
 220:  Allocating 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.large[0]
 220:  Allocating 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.large[0]
@@ -38,13 +38,13 @@
 240:  Current replicas 1x of app1 240, desired 257
 240:  Creating node c5.large[1]
 260:  Billing of node c5.large[1] starts
-280:  Node c5.xlarge[2] is ready to execute containers
-280:  Allocating 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[2]
-280:  Allocating 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[2]
-280:  Allocating 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.xlarge[2]
-281:  Completed the allocation of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[2]
-281:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[2]
-281:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.xlarge[2]
+280:  Node c5.xlarge[1] is ready to execute containers
+280:  Allocating 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[1]
+280:  Allocating 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[1]
+280:  Allocating 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.xlarge[1]
+281:  Completed the allocation of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[1]
+281:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[1]
+281:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.xlarge[1]
 300:  Load of app0: 86.93 req/s
 300:  Current replicas 1x of app0 109, desired 125
 300:  Load of app1: 183.25 req/s
@@ -75,8 +75,8 @@
 478:  Predicted loads for 95.0 % percentile:
 478:  - app0 -> 120.00 req/s
 478:  - app1 -> 210.00 req/s
-478:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.xlarge[1]', 'c5.large[0]', 'c5.xlarge[2]', 'c5.large[1]', 'c5.2xlarge[0]']
-478:  - To   ['c5.large[1]', 'c5.xlarge[2]', 'c5.4xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[1]']
+478:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.xlarge[0]', 'c5.large[0]', 'c5.xlarge[1]', 'c5.large[1]', 'c5.2xlarge[0]']
+478:  - To   ['c5.large[1]', 'c5.xlarge[1]', 'c5.4xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[1]']
 478:  - Temporal nodes ['c5.4xlarge[0]', 'c5.18xlarge[0]']
 660:  Load of app0: 98.13 req/s
 660:  Current replicas 1x of app0 120, desired 141
@@ -145,8 +145,8 @@
 1078:  Predicted loads for 95.0 % percentile:
 1078:  - app0 -> 128.00 req/s
 1078:  - app1 -> 216.00 req/s
-1078:  - From ['c5.24xlarge[1]', 'c5.xlarge[2]', 'c5.large[1]', 'c5.4xlarge[0]', 'c5.18xlarge[0]', 'c5.4xlarge[1]', 'c5.4xlarge[2]', 'c5.2xlarge[0]']
-1078:  - To   ['c5.large[1]', 'c5.xlarge[2]', 'c5.24xlarge[1]', 'c5.24xlarge[2]']
+1078:  - From ['c5.24xlarge[1]', 'c5.xlarge[1]', 'c5.large[1]', 'c5.4xlarge[0]', 'c5.18xlarge[0]', 'c5.4xlarge[1]', 'c5.4xlarge[2]', 'c5.2xlarge[0]']
+1078:  - To   ['c5.large[1]', 'c5.xlarge[1]', 'c5.24xlarge[1]', 'c5.24xlarge[2]']
 1078:  - Temporal nodes ['c5.24xlarge[2]']
 1260:  Load of app0: 112.93 req/s
 1260:  Current replicas 1x of app0 128, desired 162
@@ -218,7 +218,7 @@
 1678:  Predicted loads for 95.0 % percentile:
 1678:  - app0 -> 132.00 req/s
 1678:  - app1 -> 219.00 req/s
-1678:  - From ['c5.24xlarge[1]', 'c5.xlarge[2]', 'c5.large[1]', 'c5.24xlarge[2]', 'c5.9xlarge[0]', 'c5.2xlarge[0]', 'c5.large[2]', 'c5.2xlarge[1]']
+1678:  - From ['c5.24xlarge[1]', 'c5.xlarge[1]', 'c5.large[1]', 'c5.24xlarge[2]', 'c5.9xlarge[0]', 'c5.2xlarge[0]', 'c5.large[2]', 'c5.2xlarge[1]']
 1678:  - To   ['c5.large[2]', 'c5.2xlarge[1]', 'c5.24xlarge[1]', 'c5.24xlarge[2]']
 1678:  - Temporal nodes []
 1920:  Load of app0: 118.67 req/s
