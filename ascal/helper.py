@@ -265,9 +265,6 @@ def get_required_nodes(ic_list: list[InstanceClass], cgs: list[ContainerGroup], 
     ics = list(ic_list)
     ics.sort(key=lambda i: i.price)
 
-    # Reset VM's id
-    Vm.reset_ids()
-
     # Simulate allocation using the minimum number of nodes of the more expensive instance class
     more_expensive_ic = ics[-1]
     new_node = Vm(more_expensive_ic)
