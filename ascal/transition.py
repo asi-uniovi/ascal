@@ -643,7 +643,7 @@ class Transition:
 
     def get_recycling_levels(self) -> tuple[float, float]:
         """
-        Get node and conytainer recycling levels for the las transition.
+        Get node and container recycling levels for the las transition.
         :return: A tuple with node and container recycling levels.
         """
         return self._recycling.node_recycling_level, self._recycling.container_recycling_level
