@@ -141,6 +141,54 @@ class Recycling:
         return node_recyclings, total_node_recycling / len(initial_nodes)
 
     @staticmethod
+    def greedy_solver(initial_nodes: list[Vm], final_nodes: list[Vm], hot_node_scale_up: bool = False,
+                      dummy: int = 1) -> tuple[list[tuple[Vm, Vm]], float]:
+        """
+        Calculate the recyclings between the list of initial nodes and the list of final nodes using a
+        greedy algorithm. In each  step, it selects the node pair with the highest recycling value, removes
+        the nodes from the list and repeats until no more node pairs can be recycled.
+        :param initial_nodes: Initial nodes.
+        :param final_nodes: Final nodes.
+        :param hot_node_scale_up: Set if hot node scaling-up is enabled.
+        :return: A list of pairs (initial node, final node) that recycle each other, as well as the recycling level.
+        """
+        # Calculate recycling levels for each node pair
+        node_pair_recycling_levels = [
+            (initial_node, final_node,
+             Recycling.node_pair_recycling_level(initial_node, final_node, hot_node_scale_up))
+            for initial_node in initial_nodes
+            for final_node in final_nodes
+            if Recycling._valid_node_recycling(initial_node, final_node, hot_node_scale_up)
+        ]
+
+        # Sort the pairs by decreasing recycling level
+        node_pair_recycling_levels.sort(key=lambda pair: pair[2], reverse=True)
+        recycled_initial_nodes = []
+        recycled_final_nodes = []
+        pair_index = 0
+
+        # Remove node pairs including an initial node or final node of a previous node pair (with higher
+        # recycling level)
+        min_length = min(len(initial_nodes), len(final_nodes))
+        while len(node_pair_recycling_levels) > min_length:
+            initial_node, final_node, _ =  node_pair_recycling_levels[pair_index]
+            if initial_node in recycled_initial_nodes or final_node in recycled_final_nodes:
+                node_pair_recycling_levels.pop(pair_index)
+            else:
+                recycled_initial_nodes.append(initial_node)
+                recycled_final_nodes.append(final_node)
+                pair_index += 1
+
+        # Get the recycled node pairs
+        node_recyclings = [(r[0], r[1]) for r in node_pair_recycling_levels]
+
+        # Get the sum of node recyclings for the solution
+        total_node_recycling = sum(node_pair_recycling_levels[i][2] for i in range(len(node_pair_recycling_levels)))
+
+        return node_recyclings, total_node_recycling / len(initial_nodes)
+
+
+    @staticmethod
     def ilp_solver(initial_nodes: list[Vm], final_nodes: list[Vm], hot_node_scale_up: bool = False,
                    partitions: int = 1) -> tuple[list[tuple[Vm, Vm]], float]:
         """
@@ -217,35 +265,12 @@ class Recycling:
         if min_length == 1:
             return [(initial_nodes, final_nodes)]
 
-        # Calculate recycling levels for each node pair
-        node_pair_recycling_levels = [
-            (initial_node, final_node,
-             Recycling.node_pair_recycling_level(initial_node, final_node, hot_node_scale_up))
-            for initial_node in initial_nodes
-            for final_node in final_nodes
-            if Recycling._valid_node_recycling(initial_node, final_node, hot_node_scale_up)
-        ]
-
-        # Sort the pairs by decreasing recycling level
-        node_pair_recycling_levels.sort(key=lambda pair: pair[2], reverse=True)
-        recycled_initial_nodes = []
-        recycled_final_nodes = []
-        pair_index = 0
-
-        # Remove node pairs including an initial node or final node of a previous node pair (with higher
-        # recycling level).
-        while len(node_pair_recycling_levels) > min_length:
-            initial_node, final_node, _ =  node_pair_recycling_levels[pair_index]
-            if initial_node in recycled_initial_nodes or final_node in recycled_final_nodes:
-                node_pair_recycling_levels.pop(pair_index)
-            else:
-                recycled_initial_nodes.append(initial_node)
-                recycled_final_nodes.append(final_node)
-                pair_index += 1
+        # Get the recycling problem solution from a greedy solver
+        node_recyclings, _ = Recycling.greedy_solver(initial_nodes, final_nodes, hot_node_scale_up)
 
         # Split the node pairs
-        if min_length < n_partitions:
-            return [([node_pair_recycling_levels[i][0]],[node_pair_recycling_levels[i][1]]) for i in range(min_length)]
+        if min_length <= n_partitions:
+            return [([node_recyclings[i][0]],[node_recyclings[i][1]]) for i in range(min_length)]
         partitions = []
         partition_size = min_length // n_partitions
         first_partition_index = 0
@@ -253,8 +278,8 @@ class Recycling:
             last_partition_index = first_partition_index + partition_size
             if partition_index == n_partitions - 1:
                 last_partition_index = min_length
-            inodes = [node_pair_recycling_levels[i][0] for i in range(first_partition_index, last_partition_index)]
-            fnodes = [node_pair_recycling_levels[i][1] for i in range(first_partition_index, last_partition_index)]
+            inodes = [node_recyclings[i][0] for i in range(first_partition_index, last_partition_index)]
+            fnodes = [node_recyclings[i][1] for i in range(first_partition_index, last_partition_index)]
             partitions.append((inodes, fnodes))
             first_partition_index += partition_size
         return partitions
@@ -283,7 +308,7 @@ class Recycling:
             # The recycling calculation is performed on each partition recursively.
             # Neither new nor obsolete nodes are possible, since partitions have the
             # same number of initial and final nodes
-            recycling = base_solver(partition[0], partition[1], hot_node_scale_up)
+            recycling = base_solver(partition[0], partition[1], hot_node_scale_up, 1)
             recycling_node_pairs.extend(recycling[0])
             recycling_sum += recycling[1] * len(partition[0])
         return recycling_node_pairs, recycling_sum / len(initial_nodes)
@@ -527,5 +552,3 @@ class Recycling:
         self._calculate_container_recycling()
         self._calculate_recycling_levels(initial_alloc)
         self._assign_final_node_ids()
-
-
