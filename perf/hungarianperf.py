@@ -6,21 +6,29 @@ from aws_eu_west_1_c5m5r5 import c5_9xlarge, c5_m5_r5_fm
 from ascal.recycling import Recycling, RecyclingSolverType
 from fcma import Vm, ContainerClass, App, ContainerGroup, RequestsPerTime
 
-CONTAINER_CLASSES_RAND_IN = range(1, 101)
+# Default solver for recycling.
+# Options: Recycling.hungarian_solver, Recycling.greedy_solver, Recycling.ilp_solver
+RECYCLING_SOLVER = Recycling.hungarian_solver
+
+CONTAINER_CLASSES_RAND_IN = range(1, 101) 
+M_RAND_IN = range(1, 101) 
 CPU_MEM_PER_CONTAINER_CLASS_RAND_TRUNC = [0.005, 0.999]
 CPU_MEM_CONTAINER_CLASS_RAND_RESOLUTION = 0.0001
 CPU_MEM_PER_CONTAINER_CLASS_RAND_MEAN = 0.0075
 CPU_MEM_PER_CONTAINER_CLASS_RAND_STD = 0.005
 
 # Number of repeated experiments for each number of nodes, M value
-N_EXP_PER_M = 5
+N_EXP_PER_VALUE = 10
 
-# Values for calculating performance
+# Values for calculating performance varying the number of nodes
 M_VALUES = range(1, 101) # Range of M values
-PARTITIONS = (2, 4, 8) # Partitions for all the M values
 
-PERFORMANCE_FILE = "performance.csv"
-RECYCLING_FILE = "recycling.csv"
+# Values for calculating performance varying the number of container classes
+CC_VALUES = range(1, 101) # Range of different container classes
+M_VALUES_CC = (10, 20, 40, 80) # M values for CC experiments
+
+PERFORMANCE_FILE_M = "hungarianperf-m.csv"
+PERFORMANCE_FILE_CC = "hungarianperf-cc.csv"
 
 def sample_truncated_normal(mean, std, low, high, resolution):
     """
@@ -65,11 +73,15 @@ def allocate_random_containers(nodes: list[Vm], ccs: list[ContainerClass]):
         node.free_cores = free_cores
         node.free_mem = free_mem
 
-def random_ccs() -> list[Vm]:
+def random_ccs(n: int = -1) -> list[Vm]:
     """
     Return a list of random container classes.
+    param n: Number of container classes to generate.
+    :return: A list of random container classes.
     """
-    n_container_classes = random.randint(CONTAINER_CLASSES_RAND_IN[0], CONTAINER_CLASSES_RAND_IN[-1])
+    if n == -1:
+        n = random.randint(CONTAINER_CLASSES_RAND_IN[0], CONTAINER_CLASSES_RAND_IN[-1])
+    n_container_classes = random.randint(1, n)
     ccs = []
     for _ in range(n_container_classes):
         rel_cpu = sample_truncated_normal(CPU_MEM_PER_CONTAINER_CLASS_RAND_MEAN,
@@ -117,51 +129,45 @@ def reclying_experiment(initial_nodes, final_nodes, partition: int = 1,
 
 
 def main():
-    # Experiments to get calculation time statistics and estimate optimality using different algorithms
+    # Experiments to get calculation time statistics and estimate optimality using hungarian algorithm
     initial_time = time.time()
+
+    print(f"\nRecycling experiments (from CC={CC_VALUES[0]} to CC={CC_VALUES[-1]}) and M={M_VALUES_CC})")
+    with open(PERFORMANCE_FILE_CC, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["CC"] + [f"\t\tavg({m})" for m in M_VALUES_CC])
+        for number_ccs in CC_VALUES:
+            durations = {m: [] for m in M_VALUES_CC}
+            for _ in range(N_EXP_PER_VALUE):
+                ccs = random_ccs(number_ccs)    
+                for m in M_VALUES_CC:
+                    initial_nodes = random_nodes(m, ccs)
+                    final_nodes = random_nodes(m, ccs)
+                    duration_opt, _ = reclying_experiment(initial_nodes, final_nodes)
+                    durations[m].append(duration_opt)
+            avgs = {m: sum(durations[m]) / N_EXP_PER_VALUE for m in M_VALUES_CC}
+            writer.writerow([number_ccs] + [f"\t\t{avgs[m]:.4f}" for m in M_VALUES_CC])
+            f.flush()
+            print(f"Time: {time.time()-initial_time:.1f} seconds. Completed CC={number_ccs}")
+        f.close
+
     print(f"\nRecycling experiments (from M={M_VALUES[0]} to M={M_VALUES[-1]})")
-    with open(RECYCLING_FILE, "w", newline="") as fr, open(PERFORMANCE_FILE, "w", newline="") as fp:
-        writer_r = csv.writer(fr)
-        writer_p = csv.writer(fp)
-        writer_r.writerow(["M"] + ["\t\tavg(g)"] + ["\t\tmax(g)"] +
-                          [item for p in PARTITIONS for item in (f"\t\tavg({p})", f"\t\tmax({p})")])
-        writer_p.writerow(["M"] + ["\t\tavg(g)"] + ["\t\tmax(g)"] +
-                          [item for p in (1,) + PARTITIONS for item in (f"\t\tavg({p})", f"\t\tmax({p})")])
+    with open(PERFORMANCE_FILE_M, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["M"] + ["\t\tmin"] + ["\t\tavg"] + ["\t\tmax"])
         for m in M_VALUES:
-            recycling_rel_diffs = {p: [] for p in PARTITIONS}
-            recycling_rel_diffs['g'] = []
-            durations = {p: [] for p in (1,) + PARTITIONS}
-            durations['g'] = []
-            for _ in range(N_EXP_PER_M):
+            durations = []
+            for _ in range(N_EXP_PER_VALUE):
                 ccs = random_ccs()
                 initial_nodes = random_nodes(m, ccs)
                 final_nodes = random_nodes(m, ccs)
-                duration_opt, recycling_value_opt = reclying_experiment(initial_nodes, final_nodes, 1)
-                duration_g, recycling_value_greedy = reclying_experiment(initial_nodes, final_nodes, 1,
-                                                                         Recycling.greedy_solver)
-                recycling_rel_diffs['g'].append((recycling_value_opt - recycling_value_greedy) / recycling_value_opt)
-                durations[1].append(duration_opt) 
-                durations['g'].append(duration_g)
-                for p in PARTITIONS:
-                    duration, recycling_value = reclying_experiment(initial_nodes, final_nodes, p)
-                    durations[p].append(duration)
-                    recycling_rel_diffs[p].append((recycling_value_opt - recycling_value) / recycling_value_opt)
-            avg_r_parts = {p: sum(recycling_rel_diffs[p]) / N_EXP_PER_M for p in PARTITIONS}
-            max_r_parts = {p: max(recycling_rel_diffs[p]) for p in PARTITIONS}
-            avg_r_g = sum(recycling_rel_diffs['g']) / N_EXP_PER_M
-            max_r_g = max(recycling_rel_diffs['g'])
-            avg_p_parts = {p: sum(durations[p]) / N_EXP_PER_M for p in (1,) + PARTITIONS}
-            max_p_parts = {p: max(durations[p]) for p in (1,) + PARTITIONS}
-            avg_p_g = sum(durations['g']) / N_EXP_PER_M
-            max_p_g = max(durations['g'])
-            writer_r.writerow([m] + [f"\t\t{avg_r_g:.3f}"] + [f"\t\t{max_r_g:.3f}"] +
-                              [item for p in PARTITIONS for item in (f"\t\t{avg_r_parts[p]:.3f}",
-                                                                     f"\t\t{max_r_parts[p]:.3f}")])
-            writer_p.writerow([m] + [f"\t\t{avg_p_g:.3f}"] + [f"\t\t{max_p_g:.3f}"] +
-                              [item for p in (1,) + PARTITIONS for item in (f"\t\t{avg_p_parts[p]:.3f}",
-                                                                            f"\t\t{max_p_parts[p]:.3f}")])
-            fr.flush()
-            fp.flush()
+                duration_opt, _ = reclying_experiment(initial_nodes, final_nodes)
+                durations.append(duration_opt) 
+            min_p = min(durations)
+            avg_p = sum(durations) / N_EXP_PER_VALUE
+            max_p = max(durations)
+            writer.writerow([m] + [f"\t\t{min_p:.4f}"] + [f"\t\t{avg_p:.4f}"] + [f"\t\t{max_p:.4f}"])
+            f.flush()
             print(f"Time: {time.time()-initial_time:.1f} seconds. Completed M={m}")
 
 if __name__ == "__main__":
