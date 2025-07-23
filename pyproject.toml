@@ -15,6 +15,7 @@ dependencies = [
     "fcma",
     "matplotlib>=3.10.3",
     "pyyaml>=6.0.2",
+    "scipy>=1.16.0",
 ]
 requires-python = ">=3.12"
 
