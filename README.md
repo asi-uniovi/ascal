@@ -46,25 +46,15 @@ git clone https://github.com/asi-uniovi/ascal.git
 cd ascal
 ```
 
-Optionally, create and activate a virtual environment:
+Install `uv` ([instructioons](https://docs.astral.sh/uv/getting-started/installation/))
+
+Synchronize the packages with uv:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+uv sync
 ```
 
-Install the package with `pip`:
-
-```bash
-pip install .
-```
-
-If you want to be able to modify the code and see the changes reflected in the
-package, install it in editable mode:
-
-```bash
-pip install -e .
-```
+`uv` will create a local virtual environment in the `.venv` folder, and install there `ascal` in editable mode, and all the required dependencies. You can manually activate this virtual environment, but it is not required if you run the python scripts via `uv`, with the command `uv run <script>`.
 
 
 Usage
@@ -74,7 +64,7 @@ Usage
 
 ```bash
 cd examples/ex1
-python ex1.py
+uv run ex1.py
 ```
 A jupyter notebook with the same example can be found in _examples/ex1/ex1.ipynb_.
 
@@ -85,7 +75,8 @@ If order to use the package in your own code, the scheme provided in the example
 from ascal import AscalConfig, Ascal
 from examples import aws_eu_west_1_c5m5r5
 ```
-File aws_eu_west_1_c5m5r5 defines the cost, cores and GiB of AWS's C5, M5 and R5 instances and can be used as a reference to define new instance class families.
+
+Module `aws_eu_west_1_c5m5r5` defines the cost, cores and GiB of AWS's C5, M5 and R5 instances and can be used as a reference to define new instance class families.
 
 **3. Set the ASCAL configuration.**
 ```python
