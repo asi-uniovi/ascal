@@ -355,6 +355,7 @@
 1202:
   c5.12xlarge-1:
     None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 2
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 22
   c5.24xlarge-0:
     None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 5
@@ -365,7 +366,7 @@
   c5.24xlarge-1:
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 40
   c5.4xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 2
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 6
   c5.large-0:
