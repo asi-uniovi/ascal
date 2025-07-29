@@ -273,7 +273,10 @@ class HReactiveAutoscaler(Autoscaler):
                     allocatable_replicas = min(allocatable_replicas_cpu, allocatable_replicas_mem,
                                                replicas_agg1 // cc.agg_level)
                     if allocatable_replicas > 0:
-                        if not sim:
+                        if sim:
+                            other_node.free_cores -= allocatable_replicas * cc.cores * cc.agg_level
+                            other_node.free_mem -= allocatable_replicas * cc.mem[0]
+                        else:
                             allocated_replicas = self._timedops.allocate_container_replicas(self.time, cc,
                                                                                             allocatable_replicas,
                                                                                             other_node)
@@ -322,7 +325,7 @@ class HReactiveAutoscaler(Autoscaler):
                 # Simulate the allocation of the node replicas in other nodes
                 if self._allocate_node_replicas(node, other_nodes, sim=True):
                     # Now node replicas are actually allocated in the other nodes
-                    assert self._allocate_node_replicas(node, other_nodes), "Replicas must be allocated"
+                    assert self._allocate_node_replicas(node, other_nodes), f"{self.time}: Replicas must be allocated"
                     # Remove containers in the node
                     cgs = [cg for cg in node.cgs]
                     for cg in cgs:

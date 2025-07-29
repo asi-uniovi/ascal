@@ -1,3 +1,13 @@
+""" Recycling module for calculating node and container recycling levels
+    between two allocations using different algorithms.
+    It supports various solvers including Hungarian, greedy, and ILP methods.
+    The recycling level is calculated based on the number of containers and nodes
+    that can be recycled between the initial and final allocations.
+    The module also supports partitioning the problem to reduce complexity.
+    However, after experimentation, greedy, partition and ILP implementations are not used, 
+    since they do not reduce calculation times versus the Hungarian solver.
+"""
+
 from collections import defaultdict
 from collections.abc import Callable
 from typing import TypeAlias
@@ -163,8 +173,8 @@ class Recycling:
 
         # Sort the pairs by decreasing recycling level
         node_pair_recycling_levels.sort(key=lambda pair: pair[2], reverse=True)
-        recycled_initial_nodes = []
-        recycled_final_nodes = []
+        recycled_initial_nodes = set()
+        recycled_final_nodes = set()
         pair_index = 0
 
         # Remove node pairs including an initial node or final node of a previous node pair (with higher
@@ -175,8 +185,8 @@ class Recycling:
             if initial_node in recycled_initial_nodes or final_node in recycled_final_nodes:
                 node_pair_recycling_levels.pop(pair_index)
             else:
-                recycled_initial_nodes.append(initial_node)
-                recycled_final_nodes.append(final_node)
+                recycled_initial_nodes.add(initial_node)
+                recycled_final_nodes.add(final_node)
                 pair_index += 1
 
         # Get the recycled node pairs

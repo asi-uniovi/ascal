@@ -101,6 +101,27 @@ class Command:
         if len(self.allocate_containers) > 0:
             container_command_time += timing_args.container_creation_time
         return container_command_time
+    
+    def simplification(self):
+        """
+        Simplify the command by removing common allocations and removals.
+        A container can be allocated and removed in the same command when an obsolete container is copied
+        from node 1 to node 2, and later from node 2 to node 3.
+        """
+        # Remove common allocations and removals
+        allocs = defaultdict(int)
+        removes = defaultdict(int)
+        for node, cc, replicas in self.allocate_containers:
+            allocs[(node, cc)] += replicas
+        for node, cc, replicas in self.remove_containers:
+            removes[(node, cc)] += replicas
+        for node, cc, replicas in self.allocate_containers:
+            if (node, cc) in removes:
+                common_replicas = min(allocs[(node, cc)], removes[(node, cc)])
+                allocs[(node, cc)] -= common_replicas
+                removes[(node, cc)] -= common_replicas
+        self.allocate_containers = [(node, cc, allocs[(node, cc)]) for (node, cc) in allocs if allocs[(node, cc)] > 0]
+        self.remove_containers = [(node, cc, removes[(node, cc)]) for (node, cc) in removes if removes[(node, cc)] > 0] 
 
     def replace_nodes(self, node_pairs: dict[Vm, Vm]) -> 'Command':
         """
@@ -612,7 +633,8 @@ class Transition:
         # Next, try copying obsolete containers from the node to other nodes (destination nodes),
         # yielding enough application's performance surplus to allocate the replicas of unallocated
         # containers in the next transition step
-        unalloc_node_cs = self._unalloc_node_cs[:]
+        unalloc_node_cs = self._unalloc_node_cs[:]        
+        elegible_nodes = copy_nodes[:] # Nodes elegible to copy obsolete containers
         node_obsolete_containers = {
             node: {cc: replicas for cc, replicas in cc_replicas.items()}
             for node, cc_replicas in self._recycling.obsolete_containers.items()
@@ -623,8 +645,11 @@ class Transition:
             if node in node_obsolete_containers:
                 allocatable_replicas, command2 = \
                     self._allocate_copying_obsolete_containers(unalloc_node_cc, node_obsolete_containers[node],
-                                                               copy_nodes)
+                                                               elegible_nodes)
                 if allocatable_replicas > 0:
+                    # Remove the node from the elegible nodes, since it will be modified
+                    if node in elegible_nodes:
+                        elegible_nodes.remove(node) 
                     # Complete the list of containers allocatable in the next transisition step and remove them
                     # from the list of unallocated containers
                     self._allocatable_cs_next_step.append((node, cc, allocatable_replicas))
@@ -635,6 +660,10 @@ class Transition:
                     else:
                         self._unalloc_node_cs.pop(index)
                     command.extend(command2)
+
+        # Remove common allocations and removals. One container can be allocated and removed in the same command
+        # when an obsolete container is copied from node 1 to node 2, and later from node 2 to node 3
+        command.simplification()  
 
         # Check if obsolete nodes can be removed and update the command
         self.remove_obsolete_nodes(command)

@@ -46,7 +46,7 @@ git clone https://github.com/asi-uniovi/ascal.git
 cd ascal
 ```
 
-Install `uv` ([instructioons](https://docs.astral.sh/uv/getting-started/installation/))
+Install `uv` ([instructions](https://docs.astral.sh/uv/getting-started/installation/))
 
 Synchronize the packages with uv:
 
