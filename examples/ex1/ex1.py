@@ -7,10 +7,12 @@ from ascal import AscalConfig, Ascal
 from examples import aws_eu_west_1_c5m5r5
 
 import os
-script_dir = os.path.dirname(os.path.abspath(__file__))
 
 config_file = "config.yaml"
 log_file = "config.log"
+# Set directory to the script directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_dir)
 
 # Check config.yaml existence
 if not os.path.exists(config_file):

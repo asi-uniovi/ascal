@@ -26,7 +26,7 @@ timing_args:
 apps:
   app0:
     load:
-      file: trapezoid.csv # Integer load samples in req/s
+      file: ../../traces/trapezoid.csv # Integer load samples in req/s
       time_interval: 24 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
       load_offset: 0 # Integer value to be added to every load sample
@@ -39,7 +39,7 @@ apps:
       aggs: [1, 2, 4]
   app1:
     load:
-      file: trapezoid.csv # Integer load samples in req/s
+      file: ../../traces/trapezoid.csv # Integer load samples in req/s
       time_interval: 24 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
       load_offset: 20 # Integer value to be added to every load sample

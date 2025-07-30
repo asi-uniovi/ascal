@@ -31,6 +31,13 @@ class Vmt:
         :return: The string representation.
         """
         return f"Vmt-{self.ic.name}[{self.id}]"
+    
+    def __repr__(self) -> str:
+        """
+        String representation of the node.
+        :return: The string representation.
+        """
+        return self.__str__()
 
     def clear(self) -> 'Vmt':
         """

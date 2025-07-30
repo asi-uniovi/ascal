@@ -1,14 +1,14 @@
 # All available autoscalers
 autoscalers:
-  hv_reactive: # Horizontal/vertical+reactive autoscaling
-    time_period: 150 # Time period to evaluate autoscaling
-    desired_cpu_utilization: 0.7  # Desired CPU utilization
-    algorithm: fcma # Allocation algorithm
+  hv_predictive: # Horizontal/vertical+predictive autoscaling
+    prediction_window: 300 # Prediction window in seconds
+    prediction_percentile: 95 # Percentile for application's load in the prediction window
+    algorithm: fcma  # Allocation algorithm
     transition_time_budget: 0 # Approximate time budget for the transition (0 for simple transaction)
-    hot_node_scale_up: False # True if hot scaling-up of nodes is possible
-
+    hot_node_scale_up: False
+  
 # Select autoscaler
-autoscaler: hv_reactive
+autoscaler: hv_predictive
 
 # Times in seconds for node/container creation/removal
 timing_args:
@@ -26,7 +26,7 @@ timing_args:
 apps:
   app0:
     load:
-      file: trapezoid.csv # Integer load samples in req/s
+      file: ../../traces/trapezoid.csv # Integer load samples in req/s
       time_interval: 24 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
       load_offset: 0 # Integer value to be added to every load sample
@@ -39,7 +39,7 @@ apps:
       aggs: [1, 2, 4]
   app1:
     load:
-      file: trapezoid.csv # Integer load samples in req/s
+      file: ../../traces/trapezoid.csv # Integer load samples in req/s
       time_interval: 24 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
       load_offset: 20 # Integer value to be added to every load sample
