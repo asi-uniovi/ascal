@@ -1,4 +1,5 @@
 # All available autoscalers
+autoscalers:
   h_reactive_hv_predictive:
     h_desired_cpu_utilization: 0.7  # Desired CPU utilization for the horizontal autoscaler
     h_time_period: 60 # Time period to evaluate autoscaling for the horizontal autoscaler
