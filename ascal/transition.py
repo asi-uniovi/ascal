@@ -823,12 +823,12 @@ class Transition:
                 break
         return elapsed_time
 
-    def _complete_allocation_in_temporal_nodes(self, create_nodes_command: Command,
+    def _complete_allocation_in_temporary_nodes(self, create_nodes_command: Command,
                                                allocate_new_nodes_command: Command):
         """
-        Complete the allocation using temporal nodes.
-        :param create_nodes_command: Command where temporal nodes creations are appended.
-        :param allocate_new_nodes_command: Command where container allocations in temporal nodes are appended.
+        Complete the allocation using temporary nodes.
+        :param create_nodes_command: Command where temporary nodes creations are appended.
+        :param allocate_new_nodes_command: Command where container allocations in temporary nodes are appended.
         """
 
         # Add a dummy node with enough capacity to allocate any number of containers
@@ -837,7 +837,7 @@ class Transition:
         dummy_node.free_mem *= 10E12
         self._current_alloc.append(dummy_node)
 
-        # Calculate application's performance provided by temporal nodes to allocate the
+        # Calculate application's performance provided by temporary nodes to allocate the
         # remaining containers
         copy_nodes = None if self._time_limit > 0 else [dummy_node]
         command = self._remove_allocate_copy(copy_nodes)
@@ -847,10 +847,10 @@ class Transition:
             if node == dummy_node:
                 tmp_app_perf[cc.app] += cc.perf * replicas
 
-        # Get an allocation for application's performance on temporal nodes
+        # Get an allocation for application's performance on temporary nodes
         tmp_nodes = [Vmt(node) for node in self.get_allocation(tmp_app_perf)]
         for tmp_node_index in range(len(tmp_nodes)):
-            # Change the id of temporal nodes to negative values to be easily identified
+            # Change the id of temporary nodes to negative values to be easily identified
             tmp_nodes[tmp_node_index].id = -(tmp_node_index + 1)
             tmp_nodes[tmp_node_index].vm.id = -(tmp_node_index + 1)
         create_nodes_command.create_nodes.extend(tmp_nodes)
@@ -859,7 +859,7 @@ class Transition:
             for node in tmp_nodes for cc, replicas in node.replicas.items()
         ]
 
-        # Move allocations in the command from the dummy node to the temporal nodes
+        # Move allocations in the command from the dummy node to the temporary nodes
         command.allocate_containers = [
             (node, cc, replicas)
             for node, cc, replicas in command.allocate_containers[:]
@@ -874,7 +874,7 @@ class Transition:
             self._recycling.obsolete_containers[tmp_node] = dict(tmp_node.replicas)
             self._recycling.obsolete_nodes.append(tmp_node)
 
-        # Replace the dummy node with temporal nodes
+        # Replace the dummy node with temporary nodes
         self._current_alloc.remove(dummy_node)
         self._current_alloc.extend(tmp_nodes)
 
@@ -943,7 +943,7 @@ class Transition:
 
         # Node creation and node upgrade operations are the most time-consuming. Therefore, they are the first
         # operations to be performed. This command may be empty and extended later to include the creation of
-        # temporal nodes
+        # temporary nodes
         upgrade_node_info = [(n1, n2.ic) for n1, n2 in self._recycling.upgraded_node_pairs.items()]
         create_upgrade_nodes_command = Command(create_nodes=self._recycling.new_nodes, upgrade_nodes=upgrade_node_info)
         self._append_command(create_upgrade_nodes_command, append_null_command=True)
@@ -969,7 +969,7 @@ class Transition:
 
         # Allocate new containers in new nodes. The corresponding command may be empty if there
         # are no new nodes in the final allocation. This command can be extended later to include
-        # containers in temporal nodes.
+        # containers in temporary nodes.
         allocate_in_new_nodes_command = Command(allocate_containers=self._unallocated_containers_in_new_nodes[:])
         allocate_in_new_nodes_command.sync_on_nodes_creation = True
         for _, cc, replicas in self._unallocated_containers_in_new_nodes:
@@ -986,15 +986,15 @@ class Transition:
         # If there are still unallocated containers in recycled nodes
         if len(self._allocatable_cs_next_step) > 0 or len(self._unalloc_node_cs) > 0:
             if len(self._unalloc_node_cs) == 0 and self._time_limit > 0:
-                # Extend a little the transition time instead of creating temporal nodes
+                # Extend a little the transition time instead of creating temporary nodes
                 self._append_command(self._remove_allocate_copy())
-            # If new nodes are not enough to complete the transition of recycled nodes, temporal nodes are required
+            # If new nodes are not enough to complete the transition of recycled nodes, temporary nodes are required
             else:
-                self._complete_allocation_in_temporal_nodes(create_upgrade_nodes_command, allocate_in_new_nodes_command)
+                self._complete_allocation_in_temporary_nodes(create_upgrade_nodes_command, allocate_in_new_nodes_command)
 
         # Two remove-allocate-copy steps may be necessary to complete the transition. The first
         # command to remove obsolete containers and next allocate the remaining new containers in recycled nodes.
-        # The second command to remove containers from the temporal nodes and next the temporal nodes
+        # The second command to remove containers from the temporary nodes and next the temporary nodes
         first_command = self._remove_allocate_copy()
         if not first_command.is_null():
             self._append_command(first_command)
@@ -1006,9 +1006,7 @@ class Transition:
         self._post_process_commands()
 
         # Check whether the commands implement a valid transition between the initial and the final allocations
-        #assert Transition.check_transition(initial_alloc, final_alloc, self._commands), "Invalid transition"
-        if not Transition.check_transition(initial_alloc, final_alloc, self._commands):
-            a = 1
+        assert Transition.check_transition(initial_alloc, final_alloc, self._commands), "Invalid transition"
 
         return self._commands, Transition.get_transition_time(self._commands, self._timing_args)
 

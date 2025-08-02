@@ -44,5 +44,3 @@ apps:
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
 simulation_time: 3600
-
-

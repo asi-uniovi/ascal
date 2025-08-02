@@ -45,7 +45,7 @@ ascal_problem.write_allocations('allocations.yaml')
 # Get application overloads as workload/performance
 workloads = ascal_problem.get_workloads()
 performances = ascal_problem.get_performances()
-overloads = {app: [w/p for w, p in zip(workloads[app], performances[app])] for app in workloads}
+overloads = {app: [(w-p)/p for w, p in zip(workloads[app], performances[app])] for app in workloads}
 
 # Get queue waiting times relative to service times, assuming each container is a server in a heterogenous D/D/n queue
 relative_queue_waiting_times = ascal_problem.get_relative_queue_waiting_times()
