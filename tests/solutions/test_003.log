@@ -222,9 +222,7 @@
 1348:  Billing of node c5.xlarge[-1] starts
 1428:  Node c5.xlarge[-1] is ready to execute containers
 1428:  Allocating 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[-1]
-1428:  Allocating 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[-1]
 1429:  Completed the allocation of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[-1]
-1429:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[-1]
 1429:  Removing 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.24xlarge[1]
 1434:  Completed the removal of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.24xlarge[1]
 1434:  Allocating 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.24xlarge[1]
@@ -232,10 +230,8 @@
 1435:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.24xlarge[1]
 1435:  Completed the allocation of 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) on node c5.24xlarge[1]
 1435:  Removing 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.xlarge[-1]
-1435:  Removing 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.xlarge[-1]
 1440:  Creating node c5.large[0]
 1440:  Completed the removal of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.xlarge[-1]
-1440:  Completed the removal of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.xlarge[-1]
 1440:  Allocating 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.xlarge[-1]
 1440:  Allocating 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[-1]
 1440:  Allocating 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.xlarge[-1]

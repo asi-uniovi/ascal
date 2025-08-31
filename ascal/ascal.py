@@ -248,7 +248,7 @@ class AscalConfig:
     @staticmethod
     def get_from_config_yaml(yaml_file:str, ic_family: InstanceClassFamily):
         """
-        Get Ascal configuration from a YAML file and a familiy of instance classes.
+        Get Ascal configuration from a YAML file and a family of instance classes.
         :param yaml_file: YAML file with the configuration.
         :param ic_family: Family containing instance classes for nodes with the same base hardware.
         :return: An Ascal configuration object.
@@ -298,7 +298,7 @@ class AscalConfig:
         Check the fields type and value for the given data.
         :param data: Dictionary with the data to check.
         :param keys: List of keys to check.
-        :param types: List of epected types for the keys.
+        :param types: List of expected types for the keys.
         """
         for i in range(len(keys)):
             if keys[i] not in data:
@@ -491,7 +491,7 @@ class Ascal:
 
     def __init__(self, ascal_config: AscalConfig, log=None):
         """
-        Ascal contructor.
+        Ascal constructor.
         :param ascal_config: Configuration for the Ascal problem.
         """
         self._workload_vectors = ascal_config.workload_vectors
@@ -507,12 +507,12 @@ class Ascal:
         self.node_recycling_levels: list[float] = [] # List of node recycling levels
         self.container_recycling_levels: list[float] = [] # List of container recycling levels
 
-    def run(self, break_point: int = None):
+    def run(self, break_point: int | None = None):
         """
         Continue simulating autoscaling until the given breakpoint.
-        :param break_point: Simulate until this time. When it is -1 it simulates until the end.
+        :param break_point: Simulate until this time. When it is None it simulates until the end.
         """
-        if break_point is None or break_point >= self.time:
+        if break_point is None:
             # The breakpoint is placed at the last time in simulation
             break_point = self.last_time
         while self.time < break_point:
@@ -608,9 +608,9 @@ class Ascal:
 
     def _get_weighted_aggs(self) -> dict[str, list[int]]:
         """
-        Get the weighted aggreation among application containers. . For example, if one applications has 2 containers
-        # with aggregation level 4 and 1 container with aggregation level 2, the weithted aggregation would be
-        # 2 x 4 + 1 x 2 = 10
+        Get the weighted aggregation among application containers. For example, if one applications has 2 containers
+        with aggregation level 4 and 1 container with aggregation level 2, the weitghted aggregation would be
+        2 x 4 + 1 x 2 = 10
         :return: Samples of weigthed aggregations, starting at 0 seconds.
         """
         weighted_aggs = {str(app): [] for app in self._workload_vectors}

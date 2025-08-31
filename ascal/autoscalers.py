@@ -42,7 +42,7 @@ class AutoscalerStatistics:
 
 class Autoscaler(ABC):
     """
-    Base autoscaler class
+    Abstract class for autoscalers.
     """
 
     # Constant used to deal with numerical approximations
@@ -54,9 +54,6 @@ class Autoscaler(ABC):
     # Invalid recycling value
     INVALID_RECYCLING = -1
 
-    """
-    Abstract class for autoscalers.
-    """
     def __init__(self, timing_args: TimedOps.TimingArgs | None = None):
         """
         Constructor for the abstract autoscaler. It sets properties common to all the autoscalers.
@@ -127,7 +124,7 @@ class Autoscaler(ABC):
 
     @staticmethod
     def workload_predictions(predictive_autoscaler: 'Autoscaler',
-                             app_workloads: dict[App, [RequestsPerTime]]):
+                             app_workloads: dict[App, list[RequestsPerTime]]):
         """
         Calculate the load predictions at times multiple of the configured prediction window.
         :param predictive_autoscaler: A predictive autoscaler

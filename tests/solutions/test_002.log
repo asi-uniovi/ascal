@@ -2,7 +2,7 @@
 0:    - Allocated 40 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
 0:    - Allocated 20 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
 0:    - Allocated 23 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.24xlarge[1]
-60:  Transition: 0.006220817565917969 seconds
+60:  Transition: 0.008380651473999023 seconds
 60:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]']
 60:  - To   ['c5.9xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 60:  - Temporal nodes []
@@ -26,7 +26,7 @@
 166:  Completed the removal of 23 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.24xlarge[1]
 166:  Removing node c5.24xlarge[1]
 176:  Node c5.24xlarge[1] is removed
-180:  Transition: 0.013702154159545898 seconds
+180:  Transition: 0.015620231628417969 seconds
 180:  - From ['c5.9xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 180:  - To   ['c5.18xlarge[0]', 'c5.18xlarge[1]', 'c5.18xlarge[2]']
 180:  - Temporal nodes []
@@ -60,7 +60,7 @@
 292:  Removing node c5.24xlarge[0]
 296:  Node c5.9xlarge[0] is removed
 302:  Node c5.24xlarge[0] is removed
-360:  Transition: 0.022882461547851562 seconds
+360:  Transition: 0.026256799697875977 seconds
 360:  - From ['c5.18xlarge[0]', 'c5.18xlarge[1]', 'c5.18xlarge[2]']
 360:  - To   ['c5.large[0]', 'c5.2xlarge[0]', 'c5.12xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 360:  - Temporal nodes []
@@ -112,7 +112,7 @@
 472:  Removing node c5.18xlarge[2]
 482:  Node c5.18xlarge[1] is removed
 482:  Node c5.18xlarge[2] is removed
-540:  Transition: 0.017353296279907227 seconds
+540:  Transition: 0.025275468826293945 seconds
 540:  - From ['c5.large[0]', 'c5.2xlarge[0]', 'c5.12xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 540:  - To   ['c5.xlarge[0]', 'c5.xlarge[1]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 540:  - Temporal nodes []
@@ -178,7 +178,7 @@
 656:  Node c5.2xlarge[0] is removed
 656:  Node c5.12xlarge[0] is removed
 656:  Node c5.18xlarge[0] is removed
-660:  Transition: 0.02937150001525879 seconds
+660:  Transition: 0.03262948989868164 seconds
 660:  - From ['c5.xlarge[0]', 'c5.xlarge[1]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 660:  - To   ['c5.xlarge[0]', 'c5.2xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 660:  - Temporal nodes []
@@ -213,7 +213,7 @@
 767:  Removing 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) from node c5.xlarge[0]
 772:  Completed the removal of 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) from node c5.xlarge[0]
 776:  Node c5.xlarge[1] is removed
-780:  Transition: 0.027446746826171875 seconds
+780:  Transition: 0.03186297416687012 seconds
 780:  - From ['c5.xlarge[0]', 'c5.2xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 780:  - To   ['c5.4xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 780:  - Temporal nodes []
@@ -248,7 +248,7 @@
 892:  Removing node c5.xlarge[0]
 896:  Node c5.2xlarge[0] is removed
 902:  Node c5.xlarge[0] is removed
-960:  Transition: 0.03779458999633789 seconds
+960:  Transition: 0.03783464431762695 seconds
 960:  - From ['c5.4xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 960:  - To   ['c5.large[0]', 'c5.2xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 960:  - Temporal nodes []
@@ -301,7 +301,7 @@
 1078:  Removing node c5.9xlarge[0]
 1088:  Node c5.4xlarge[0] is removed
 1088:  Node c5.9xlarge[0] is removed
-1140:  Transition: 0.024950742721557617 seconds
+1140:  Transition: 0.029041051864624023 seconds
 1140:  - From ['c5.large[0]', 'c5.2xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1140:  - To   ['c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1140:  - Temporal nodes []
@@ -332,7 +332,7 @@
 1247:  Completed the allocation of 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) on node c5.24xlarge[1]
 1256:  Node c5.large[0] is removed
 1256:  Node c5.2xlarge[0] is removed
-1260:  Transition: 0.016612529754638672 seconds
+1260:  Transition: 0.020044326782226562 seconds
 1260:  - From ['c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1260:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1260:  - Temporal nodes []
@@ -355,7 +355,7 @@
 1366:  Completed the removal of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.24xlarge[1]
 1366:  Allocating 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
 1367:  Completed the allocation of 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
-1380:  Transition: 0.01930689811706543 seconds
+1380:  Transition: 0.022051334381103516 seconds
 1380:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1380:  - To   ['c5.xlarge[1]', 'c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1380:  - Temporal nodes []
@@ -378,7 +378,7 @@
 1493:  Completed the allocation of 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
 1493:  Removing 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.xlarge[1]
 1498:  Completed the removal of 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.xlarge[1]
-1500:  Transition: 0.030744314193725586 seconds
+1500:  Transition: 0.037937164306640625 seconds
 1500:  - From ['c5.xlarge[1]', 'c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1500:  - To   ['c5.large[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1500:  - Temporal nodes []
@@ -430,7 +430,7 @@
 1618:  Completed the removal of 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) from node c5.xlarge[1]
 1618:  Removing node c5.xlarge[1]
 1628:  Node c5.xlarge[1] is removed
-1680:  Transition: 0.011925458908081055 seconds
+1680:  Transition: 0.014557361602783203 seconds
 1680:  - From ['c5.large[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1680:  - To   ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1680:  - Temporal nodes []
@@ -449,7 +449,7 @@
 1786:  Removing node c5.large[0]
 1787:  Completed the allocation of 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) on node c5.24xlarge[1]
 1796:  Node c5.large[0] is removed
-1800:  Transition: 0.007139921188354492 seconds
+1800:  Transition: 0.009598493576049805 seconds
 1800:  - From ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1800:  - To   ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1800:  - Temporal nodes []
@@ -459,7 +459,7 @@
 1805:  Allocating 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.24xlarge[1]
 1806:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.xlarge[0]
 1806:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.24xlarge[1]
-1860:  Transition: 0.007315874099731445 seconds
+1860:  Transition: 0.009203910827636719 seconds
 1860:  - From ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1860:  - To   ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1860:  - Temporal nodes []
@@ -467,7 +467,7 @@
 1865:  Completed the removal of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) from node c5.24xlarge[1]
 1865:  Allocating 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) on node c5.24xlarge[1]
 1866:  Completed the allocation of 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) on node c5.24xlarge[1]
-1920:  Transition: 0.024900197982788086 seconds
+1920:  Transition: 0.02803325653076172 seconds
 1920:  - From ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1920:  - To   ['c5.large[0]', 'c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1920:  - Temporal nodes ['c5.xlarge[-1]']
@@ -499,7 +499,7 @@
 2033:  Completed the removal of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.xlarge[-1]
 2033:  Removing node c5.xlarge[-1]
 2043:  Node c5.xlarge[-1] is removed
-2100:  Transition: 0.03619885444641113 seconds
+2100:  Transition: 0.0387570858001709 seconds
 2100:  - From ['c5.large[0]', 'c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2100:  - To   ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2100:  - Temporal nodes ['c5.xlarge[-1]']
@@ -536,7 +536,7 @@
 2213:  Removing node c5.xlarge[-1]
 2223:  Node c5.large[0] is removed
 2223:  Node c5.xlarge[-1] is removed
-2280:  Transition: 0.011104106903076172 seconds
+2280:  Transition: 0.014543294906616211 seconds
 2280:  - From ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2280:  - To   ['c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.large[0]']
 2280:  - Temporal nodes []
@@ -561,7 +561,7 @@
 2386:  Completed the removal of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) from node c5.xlarge[0]
 2386:  Removing node c5.xlarge[0]
 2396:  Node c5.xlarge[0] is removed
-2400:  Transition: 0.00724482536315918 seconds
+2400:  Transition: 0.00783228874206543 seconds
 2400:  - From ['c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.large[0]']
 2400:  - To   ['c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2400:  - Temporal nodes []
@@ -571,7 +571,7 @@
 2405:  Completed the removal of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) from node c5.24xlarge[1]
 2405:  Removing node c5.large[0]
 2415:  Node c5.large[0] is removed
-2460:  Transition: 0.023895978927612305 seconds
+2460:  Transition: 0.025705814361572266 seconds
 2460:  - From ['c5.18xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2460:  - To   ['c5.large[0]', 'c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2460:  - Temporal nodes []
@@ -603,10 +603,8 @@
 2561:  Completed the allocation of 7 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.4xlarge[0]
 2561:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.4xlarge[0]
 2561:  Completed the allocation of 23 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.12xlarge[0]
-2561:  Removing 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.18xlarge[0]
-2561:  Removing 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.18xlarge[0]
-2566:  Completed the removal of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.18xlarge[0]
-2566:  Completed the removal of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.18xlarge[0]
+2561:  Removing 2 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.18xlarge[0]
+2566:  Completed the removal of 2 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.18xlarge[0]
 2566:  Allocating 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.18xlarge[0]
 2567:  Completed the allocation of 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.18xlarge[0]
 2567:  Removing 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) from node c5.24xlarge[1]
@@ -615,13 +613,15 @@
 2572:  Allocating 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) on node c5.24xlarge[1]
 2573:  Completed the allocation of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) on node c5.24xlarge[1]
 2573:  Completed the allocation of 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) on node c5.24xlarge[1]
-2573:  Removing 33 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.18xlarge[0]
+2573:  Removing 32 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.18xlarge[0]
+2573:  Removing 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.18xlarge[0]
 2573:  Removing 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) from node c5.18xlarge[0]
-2578:  Completed the removal of 33 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.18xlarge[0]
+2578:  Completed the removal of 32 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.18xlarge[0]
+2578:  Completed the removal of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.18xlarge[0]
 2578:  Completed the removal of 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) from node c5.18xlarge[0]
 2578:  Removing node c5.18xlarge[0]
 2588:  Node c5.18xlarge[0] is removed
-2640:  Transition: 0.015406608581542969 seconds
+2640:  Transition: 0.017148971557617188 seconds
 2640:  - From ['c5.large[0]', 'c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2640:  - To   ['c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2640:  - Temporal nodes []
@@ -647,7 +647,7 @@
 2651:  Removing node c5.xlarge[0]
 2661:  Node c5.large[0] is removed
 2661:  Node c5.xlarge[0] is removed
-2700:  Transition: 0.029593944549560547 seconds
+2700:  Transition: 0.029732704162597656 seconds
 2700:  - From ['c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2700:  - To   ['c5.large[0]', 'c5.9xlarge[0]', 'c5.12xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 2700:  - Temporal nodes []
@@ -694,7 +694,7 @@
 2812:  Removing node c5.24xlarge[1]
 2822:  Node c5.4xlarge[0] is removed
 2822:  Node c5.24xlarge[1] is removed
-2880:  Transition: 0.03928565979003906 seconds
+2880:  Transition: 0.04521322250366211 seconds
 2880:  - From ['c5.large[0]', 'c5.9xlarge[0]', 'c5.12xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 2880:  - To   ['c5.large[0]', 'c5.2xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 2880:  - Temporal nodes []
@@ -756,7 +756,7 @@
 2986:  Removing node c5.18xlarge[0]
 2996:  Node c5.9xlarge[0] is removed
 2996:  Node c5.18xlarge[0] is removed
-3000:  Transition: 0.015564680099487305 seconds
+3000:  Transition: 0.018336057662963867 seconds
 3000:  - From ['c5.large[0]', 'c5.2xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 3000:  - To   ['c5.4xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.large[0]']
 3000:  - Temporal nodes []
@@ -794,7 +794,7 @@
 3106:  Removing node c5.12xlarge[0]
 3116:  Node c5.2xlarge[0] is removed
 3116:  Node c5.12xlarge[0] is removed
-3120:  Transition: 0.02190399169921875 seconds
+3120:  Transition: 0.02542853355407715 seconds
 3120:  - From ['c5.4xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.large[0]']
 3120:  - To   ['c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 3120:  - Temporal nodes []
@@ -835,7 +835,7 @@
 3236:  Node c5.4xlarge[0] is removed
 3236:  Node c5.9xlarge[0] is removed
 3236:  Node c5.large[0] is removed
-3240:  Transition: 0.012942075729370117 seconds
+3240:  Transition: 0.01473093032836914 seconds
 3240:  - From ['c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 3240:  - To   ['c5.large[0]', 'c5.xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 3240:  - Temporal nodes []
@@ -874,7 +874,7 @@
 3346:  Completed the removal of 23 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.12xlarge[0]
 3346:  Removing node c5.12xlarge[0]
 3356:  Node c5.12xlarge[0] is removed
-3360:  Transition: 0.011949777603149414 seconds
+3360:  Transition: 0.014736652374267578 seconds
 3360:  - From ['c5.large[0]', 'c5.xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 3360:  - To   ['c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 3360:  - Temporal nodes []
@@ -896,7 +896,7 @@
 3371:  Removing node c5.xlarge[0]
 3381:  Node c5.large[0] is removed
 3381:  Node c5.xlarge[0] is removed
-3420:  Transition: 0.01103663444519043 seconds
+3420:  Transition: 0.014681100845336914 seconds
 3420:  - From ['c5.9xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 3420:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.9xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 3420:  - Temporal nodes []
@@ -933,7 +933,7 @@
 3526:  Completed the removal of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) from node c5.24xlarge[1]
 3526:  Removing node c5.24xlarge[1]
 3536:  Node c5.24xlarge[1] is removed
-3540:  Transition: 0.026145219802856445 seconds
+3540:  Transition: 0.028590679168701172 seconds
 3540:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.9xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 3540:  - To   ['c5.18xlarge[0]', 'c5.18xlarge[1]', 'c5.18xlarge[2]']
 3540:  - Temporal nodes []
