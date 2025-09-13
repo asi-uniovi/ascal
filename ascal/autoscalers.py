@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from numpy import percentile
 from fcma import Fcma, SolvingPars, Allocation, App, RequestsPerTime
 from ascal.timedops import TimedOps
-from ascal.transition import Command
+from ascal.transition import Command, Vmt
 from ascal.helper import mncf_allocation
 
 
@@ -143,10 +143,11 @@ class Autoscaler(ABC):
             time += predictive_autoscaler.prediction_window
 
     @staticmethod
-    def _handle_node_removals(commands1: list[Command], commands2: list[Command]):
+    def _handle_node_removals(commands1: list[Command], commands2: list[Command], allocation: list[Vmt]):
         """
         A node removal operation in the first command list is deleted if the corresponding node is used
-        to allocate containers in the second command list. If this is not the case and the node removal
+        to allocate containers in the second command list or appears in the allocation. 
+        If this is not the case and the node removal
         operation remains in the first command list, it is then removed from the second command list.
         :param commands1: First list of commands.
         :param commands2: Second list of commands.
@@ -163,13 +164,21 @@ class Autoscaler(ABC):
             for node in command2.remove_nodes
         }
 
+        # Names of nodes in the allocation. Recycled nodes preserve their names
+        allocation_node_names = (str(node) for node in allocation)
+
         for command1 in commands1[:]:
             if len(command1.remove_nodes) > 0:
-                for removed_node1 in command1.remove_nodes:
-                    # Check if the node removed in the first cmomand list
-                    # was used in allocations in the second command list
-                    if removed_node1 in nodes_used2:
+                for removed_node1 in command1.remove_nodes[:]:
+                    # Check if the node removed in the first command list was used in allocations 
+                    # in the second command list or is in the allocation
+                    if removed_node1 in nodes_used2 or str(removed_node1) in allocation_node_names:
+                        # Remove the command from the first command list
                         command1.remove_nodes.remove(removed_node1)
+                        if command1.is_null():
+                            commands1.remove(command1)
+                    # If the node removal remains in the first command list, 
+                    # it must be removed from the second command list
                     elif removed_node1 in nodes_removed_commands2:
                         command2 = nodes_removed_commands2[removed_node1]
                         command2.remove_nodes.remove(removed_node1)

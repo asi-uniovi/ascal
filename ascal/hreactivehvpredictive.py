@@ -145,7 +145,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             # Recycling levels coming from the first transition
             node_recycling_level1, container_recycling_level1 = self.transition.get_recycling_levels()
 
-            # Get a dictionary with the initial node corresponding to each recycled node.
+            # Get a dictionary with the initial node corresponding to each recycled node
             recycled_node_pairs1 = self.transition.get_recycled_node_pairs()
             inverse_recycled_node_pairs1 = {
                 final_node: initial_node
@@ -163,7 +163,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             for node in removed_nodes:
                 node.free_cores, node.free_mem, node.cgs, node.history = removed_nodes_backup[node]
 
-            # Recycling levels coming from the first transition
+            # Recycling levels coming from the second transition
             node_recycling_level2, container_recycling_level2 = self.transition.get_recycling_levels()
 
             # Commands of the second transition work with the intermediate nodes, but need to work
@@ -171,7 +171,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             commands2 = [command2.replace_nodes(inverse_recycled_node_pairs1) for command2 in commands2]
 
             # Common node removals in both transitions must be handled
-            Autoscaler._handle_node_removals(commands1, commands2)
+            Autoscaler._handle_node_removals(commands1, commands2, new_allocation)
 
             # Time required to perform the transition
             transition_time = current_time() - transition_time_start

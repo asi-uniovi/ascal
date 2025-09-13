@@ -26,8 +26,8 @@ until the nodes really exist. Note that the command with container allocations i
 any individual node removal is suspended until its containers have been removed. Similarly, any individual
 container allocation is suspended until the destination node exist (if the node required to be created) and has enough
 computational resources.
-
 """
+
 from math import ceil, floor
 from json import loads
 from collections import defaultdict
@@ -91,7 +91,7 @@ class Command:
 
     def get_container_command_time(self, timing_args: TimedOps.TimingArgs) -> int:
         """
-        Get the time required to complete a command ignoring node operations.
+        Get the time required to complete a command ignoring node creation/removal operations.
         :param timing_args: Times for creation/removal of nodes/containers.
         :return: The time to complete the command.
         """
@@ -106,9 +106,7 @@ class Command:
         """
         Labels in container classes are removed, and after that, performs following simplifications:
         - Summing up replicas of the same container class in the same node.
-        - Removing allocations and removals of the same continers.
-        These simplifications are required when a container can be allocated and removed in the same command when an obsolete container is copied
-        from node 1 to node 2, and later from node 2 to node 3.
+        - Removing allocations and removals of the same containers.
         """
         # Remove labels in container classes
         self.allocate_containers = [
@@ -176,8 +174,9 @@ class Command:
 class Transition:
     """
     Class to perform transitions between initial allocation and final allocations for a given system.
+    There are two types of transitions: synchronous and asynchronous. In addition, there are
+    two variants of each type: one for time_limit = 0 and other for time_limit > 0.
     """
-
     # Constant used to deal with numerical approximations
     _DELTA = 0.000001
 
@@ -490,7 +489,6 @@ class Transition:
         Initialize the remove-allocate-copy algorithm.
         :param min_perf: Minimum application performances, to be fulfilled during the transition.
         """
-
         # Calculate the total cores and memory of new containers in recycled and upgraded nodes.
         # They are necessary to calculate container sizes
         total_new_cpu = 0
@@ -626,7 +624,6 @@ class Transition:
         :param dest_nodes: Elegible destination node to allocate copies of obsolete containers.
         :return: A tuple with the number of allocatable new containers and a command with the operations.
         """
-
         # Source node, container class and number of replicas to allocate
         src_node, cc, replicas_to_allocate = node_cc_replicas
 
@@ -729,6 +726,22 @@ class Transition:
 
         return allocatable_replicas, command
 
+    def _allocate_with_free_obsolete(self, command: Command):
+        """
+        Allocate unallocated new containers using free computational resources in the same node and removing    
+        obsolete containers from the same node if it were necessary.
+        :param command: A command with container allocations and removals.
+        """
+        unalloc_node_cs = self._unalloc_node_cs[:]
+        for src_node, cc, replicas_to_allocate in unalloc_node_cs:
+            node_cc_replicas_index = self._unalloc_node_cs.index((src_node, cc, replicas_to_allocate))
+            allocated_replicas, _ = self._remove_allocate(cc, replicas_to_allocate, src_node, command)
+            if allocated_replicas > 0:
+                self._unalloc_node_cs.pop(node_cc_replicas_index)
+                replicas_to_allocate -= allocated_replicas
+                if replicas_to_allocate > 0:
+                    self._unalloc_node_cs.insert(node_cc_replicas_index, (src_node, cc, replicas_to_allocate))
+        
     def _remove_allocate_copy(self, copy_nodes: list[Vmt] = None) -> Command:
         """
         Perform one transition step by removing obsolete containers and nodes, allocating unallocated new
@@ -756,15 +769,8 @@ class Transition:
 
         # Allocate using free computational resources in the same node and removing obsolete
         # containers from the same node if it were necessary
-        unalloc_node_cs = self._unalloc_node_cs[:]
-        for src_node, cc, replicas_to_allocate in unalloc_node_cs:
-            node_cc_replicas_index = self._unalloc_node_cs.index((src_node, cc, replicas_to_allocate))
-            allocated_replicas, _ = self._remove_allocate(cc, replicas_to_allocate, src_node, command)
-            if allocated_replicas > 0:
-                self._unalloc_node_cs.pop(node_cc_replicas_index)
-                replicas_to_allocate -= allocated_replicas
-                if replicas_to_allocate > 0:
-                    self._unalloc_node_cs.insert(node_cc_replicas_index, (src_node, cc, replicas_to_allocate))
+        self._allocate_with_free_obsolete(command)
+
         if len(self._unalloc_node_cs) == 0:
             # Check if obsolete nodes can be removed and update the command
             self.remove_obsolete_nodes(command)
@@ -893,33 +899,45 @@ class Transition:
     def _post_process_commands(self):
         """
         Perform post-processing on the comand list:
-        - Remove empty commands.
         - For each obsolete node, remove all except its last remove operation. Note that obsolete nodes are not
         actually removed from the allocation.
+        - Remove empty commands.
         - Replace Vmt nodes by Vm nodes.
+        - Remove obsolete nodes from the current allocation.
         """
+        # Node removal commands are generated when all the containers of an obsolete node are removed.
+        # However, the nodes could be useful in future to help in the transition of recycled nodes, so
+        # they could be used after a removal command. A node removal command is removed when there is
+        # a later allocation in the node.
+        null_command = Command() 
+        node_removal_command = defaultdict(lambda: null_command) # Start with no removals for any node
+        nodes_removed_once = set()
+        for command in self._commands:
+            for node, _, _ in command.allocate_containers:
+                if not node_removal_command[node].is_null():
+                    node_removal_command[node].remove_nodes.remove(node)
+                    node_removal_command[node] = null_command
+            for node_to_remove in command.remove_nodes:
+                nodes_removed_once.add(node_to_remove)
+                if node_removal_command[node_to_remove].is_null():
+                    # First removal command for the node or the previous removal command has been removed
+                    node_removal_command[node_to_remove] = command
+
+        # Check the removals
+        for node in nodes_removed_once:
+            assert node in node_removal_command, "Node removal command not found"
+            assert not node_removal_command[node].is_null(), "Node removal command is null"
 
         # Remove empty commands
         for command in self._commands:
             if command.is_null():
                 self._commands.remove(command)
 
-        # Node removal commands are generated by the transition step when all the containers of an obsolete
-        # node are removed. However, the nodes can be useful in future to help in the transition of recycled
-        # nodes, so they could be used after a removal command. Therefore, only the last removal command
-        # for a node must remain, and any previous removal command must be deleted from the command list
-        last_node_removal_command = defaultdict(lambda: Command())
-        for command in self._commands:
-            if len(command.remove_nodes) > 0:
-                for node_to_remove in command.remove_nodes:
-                    previous_command = last_node_removal_command[node_to_remove]
-                    if not previous_command.is_null():
-                        previous_command.remove_nodes.remove(node_to_remove)
-                        if previous_command.is_null():
-                            self._commands.remove(previous_command)
-                    last_node_removal_command[node_to_remove] = command
-        for node_to_remove in last_node_removal_command:
-            self._current_alloc.remove(node_to_remove)
+        # Remove the nodes from the current allocation
+        for node, command in node_removal_command.items():
+            if not command.is_null():
+                # The node is removed in the last removal command
+                self._current_alloc.remove(node)
 
         # Replace Vmt nodes by nodes Vm nodes in the commands
         for command in self._commands:
@@ -973,7 +991,6 @@ class Transition:
         :param create_nodes_command: Command where temporary nodes creations are appended.
         :param allocate_new_nodes_command: Command where container allocations in temporary nodes are appended.
         """
-
         # Add a dummy node with enough capacity to allocate any number of containers
         dummy_node = Vmt(Vm(self._current_alloc[0].ic, ignore_ic_index=True))
         dummy_node.free_cores *= 10E12
@@ -988,6 +1005,12 @@ class Transition:
         tmp_app_perf = {app: zero_rps for app in self._app_perf_surplus}
         for node, cc, replicas in command.allocate_containers:
             if node == dummy_node:
+                # The allocations in the dummy node will be performed in a previous command, so
+                # the performance surplus can be inmediately updated. It is required when
+                # time_limit == to avoid and additional command. It is related to the
+                # self._allocate_with_free_obsolete(command) call at the end of this method
+                self._app_perf_increment[cc.app] -= replicas * cc.perf
+                self._app_perf_surplus[cc.app] += replicas * cc.perf
                 tmp_app_perf[cc.app] += cc.perf * replicas
 
         # Get an allocation for application's performance on temporary nodes
@@ -1020,6 +1043,10 @@ class Transition:
         # Replace the dummy node with temporary nodes
         self._current_alloc.remove(dummy_node)
         self._current_alloc.extend(tmp_nodes)
+
+        # Some replicas can be allocated after the copies to temporary nodes
+        if self._time_limit == 0:
+            self._allocate_with_free_obsolete(command)
 
         self._append_command(command)
 
@@ -1079,7 +1106,6 @@ class Transition:
         :param final_alloc: Final allocation.
         :return: A list of commands and the time to perform the transition.
         """
-
         # Initialize the transition and check if a transition is necessary
         if not self._transition_init(initial_alloc, final_alloc):
             return [], 0
@@ -1122,7 +1148,7 @@ class Transition:
         self._unallocated_containers_in_new_nodes.clear()
         self._append_command(allocate_in_new_nodes_command, append_null_command=True)
 
-        # Allocation loop until the time limit
+        # Allocation loop until the time limit. It does not execute with time limit = 0
         if elapsed_time < self._time_limit:
             self.allocation_loop(self._time_limit - elapsed_time)
 
@@ -1149,7 +1175,7 @@ class Transition:
         self._post_process_commands()
 
         # Check whether the commands implement a valid transition between the initial and the final allocations
-        assert Transition.check_transition(initial_alloc, final_alloc, self._commands), "Invalid transition"
+        assert self.check_transition(initial_alloc, final_alloc, self._commands), "Invalid transition"
 
         return self._commands, Transition.get_transition_time(self._commands, self._timing_args)
 
@@ -1199,8 +1225,7 @@ class Transition:
                 balance[cc.app] -= cc.perf * replicas
         return balance
 
-    @staticmethod
-    def check_transition(initial_alloc: Allocation, final_alloc: Allocation, commands: list[Command]) -> bool:
+    def check_transition(self, initial_alloc: Allocation, final_alloc: Allocation, commands: list[Command]) -> bool:
         """
         Check the transition between the initial and final allocations.
         :param initial_alloc: Initial allocation
@@ -1214,6 +1239,9 @@ class Transition:
         final_alloc_vmt = [Vmt(node) for node in final_alloc]
         vm_to_vmt = dict(zip(initial_alloc + final_alloc, initial_alloc_vmt + final_alloc_vmt))
         app_perf_surplus = get_app_perf_surplus(min_perf, initial_alloc_vmt)
+
+        # Four commands must be enough for time_limit = 0
+        assert self._time_limit > 0 or len(commands) <= 4, "Too many commands"
 
         command_index = 0
         for command in commands:

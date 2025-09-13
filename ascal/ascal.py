@@ -606,56 +606,20 @@ class Ascal:
             previous_time = current_time
         return node_costs
 
-    def _get_weighted_aggs(self) -> dict[str, list[int]]:
+    def get_queue_waiting_times(self) -> dict[str, list[float]]:
         """
-        Get the weighted aggregation among application containers. For example, if one applications has 2 containers
-        with aggregation level 4 and 1 container with aggregation level 2, the weitghted aggregation would be
-        2 x 4 + 1 x 2 = 10
-        :return: Samples of weigthed aggregations, starting at 0 seconds.
-        """
-        weighted_aggs = {str(app): [] for app in self._workload_vectors}
-
-        previous_time = -1
-        for current_time, current_nodes in self.performance_changes:
-            # Repeat the previous allocation performances
-            if current_time - previous_time > 1:
-                for app_name, wagg in weighted_aggs.items():
-                    weighted_aggs[app_name].extend([wagg[-1]] * (current_time - previous_time - 1))
-            # Get weighted aggregations for the current allocation
-            current_aggs = {str(app): 0 for app in self._workload_vectors}
-            current_replicas = {str(app): 0 for app in self._workload_vectors}
-            for node in current_nodes:
-                for cg in node.cgs:
-                    app = cg.cc.app
-                    if app is not None:
-                        current_replicas[str(app)] += cg.replicas
-                        current_aggs[str(app)] += cg.cc.agg_level * cg.replicas
-
-            # Append the current weighted aggregations. Applications have at least one application
-            for app_name in weighted_aggs:
-                weighted_aggs[app_name].append(current_aggs[app_name] / current_replicas[app_name])
-
-            # Prepare for the next allocation change
-            previous_time = current_time
-        return weighted_aggs
-
-    def get_relative_queue_waiting_times(self) -> dict[str, list[float]]:
-        """
-        Get the waiting times of requests in the processing queues, relative to the service time. Requests of
-        a given application can be served by different containers (servers), with different service time.
-        A D/D/n queue with heterogeneous servers and infinite queues is considered, so that requests coming from an
-        application arrive at constant rate and service times depend on the server.
-        Some assumptions/approximations are considered:
-        - One application has as many servers as application containers, where the service time of each container
-        is (1/p), being p the container performance in reqs/s.
-        - Perfect load balancing, so the queue length of each container is proportional to container's performance, p.
-        :return: One-second samples of queue relative waiting times.
+        Get the waiting times of requests in the processing queues. Requests of
+        a given application can be served by different containers (servers), with different performance in req/s.
+        Each application is modelled as a D/D/m queue with heterogeneous servers:
+        - One application has as many servers as application containers.
+        - Perfect load balancing, so the queue length of each container is proportional to container's performance.
+        :return: One-second samples of queue waiting times.
         """
 
         app_workloads = self._workload_vectors
         app_performances = self.get_performances()
 
-        # Calculate samples of the queue length. Difference (w-p) doesn't have to be multiple of 1 second
+        # Calculate samples of the queue length. Difference (w-p) may not be multiple of 1 second
         frac_surplus = {app_name: 0.0 for app_name in app_performances}
         queue_length = {app_name: [0] for app_name in app_performances}
         for app in app_workloads:
@@ -670,15 +634,12 @@ class Ascal:
                     w = ceil(w)
                 queue_length[app_name].append(max(0, queue_length[app_name][-1] + w - p))
 
-        # Calculate samples of application's weighted aggregations
-        weighted_perf = self._get_weighted_aggs()
-
-        # Samples of waiting factors
-        waiting_factors = {
-            app_name: [ql / wperf for ql, wperf in zip(queue_length[app_name], weighted_perf[app_name])]
+        # Samples of waiting times
+        waiting_times = {
+            app_name: [ql / wperf for ql, wperf in zip(queue_length[app_name], app_performances[app_name])]
             for app_name in queue_length
         }
-        return waiting_factors
+        return waiting_times
 
     def write_workload_csv(self, csv_file: str) -> None:
         """

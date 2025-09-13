@@ -157,7 +157,7 @@ class HVPredictiveAutoscaler(Autoscaler):
             node_recycling_level2, container_recycling_level2 = self.transition.get_recycling_levels()
 
             # Common node removals in both transitions must be handled
-            Autoscaler._handle_node_removals(commands1, commands2)
+            Autoscaler._handle_node_removals(commands1, commands2, self.new_allocation)
 
             # Time required to perform the transition
             transition_time = current_time() - transition_time_start
