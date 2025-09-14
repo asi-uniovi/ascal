@@ -164,6 +164,11 @@ class Command:
                 new_command.create_nodes.append(node_pairs[node])
             else:
                 new_command.create_nodes.append(node)
+        for node1, node2 in self.upgrade_nodes:
+            if node1 in node_pairs:
+                new_command.upgrade_nodes.append((node_pairs[node1], node2))
+            else:
+                new_command.upgrade_nodes.append((node1, node2))
         for node in self.remove_nodes:
             if node in node_pairs:
                 new_command.remove_nodes.append(node_pairs[node])
@@ -915,8 +920,9 @@ class Transition:
         for command in self._commands:
             for node, _, _ in command.allocate_containers:
                 if not node_removal_command[node].is_null():
-                    node_removal_command[node].remove_nodes.remove(node)
-                    node_removal_command[node] = null_command
+                    removal_command = node_removal_command[node]
+                    removal_command.remove_nodes.remove(node)
+                    removal_command = null_command
             for node_to_remove in command.remove_nodes:
                 nodes_removed_once.add(node_to_remove)
                 if node_removal_command[node_to_remove].is_null():
