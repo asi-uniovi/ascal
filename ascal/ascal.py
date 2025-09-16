@@ -699,6 +699,7 @@ class Ascal:
         :param title: Title of the plot.
         :param unit: Unit for the vertical axis
         """
+        plt.figure()
         colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
         color_index = 0
         last_time = len(dict_values[list(dict_values.keys())[0]])
@@ -727,7 +728,7 @@ class Ascal:
         :param title: Title of the plot.
         :param unit: Label for the vertical axis (e.g., "MB", "requests", etc.).
         """
-
+        plt.figure()
         # Prepare labels and values
         labels = list(dict_values.keys())
         values = [np.array(dict_values[label]) for label in labels]
