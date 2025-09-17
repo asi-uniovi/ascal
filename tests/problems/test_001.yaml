@@ -3,6 +3,8 @@ autoscalers:
     time_period: 60 # Time period to evaluate autoscaling
     desired_cpu_utilization: 0.7  # Desired CPU utilization
     node_utilization_threshold: 0.5 # Below this utilization, node removal is tried
+    replica_scale_down_stabilization_time: 300 # Minimum time from a previous replica scale-up to a replica scale-down
+    node_scale_down_stabilization_time: 600 # Minimum time from a previous node scale-up to a node scale-down
     aggs: 2 # Aggregation level for applications. Equivalent to {app0: 2, app1: 2}
 
 # Select autoscaler

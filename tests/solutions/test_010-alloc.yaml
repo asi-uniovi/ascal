@@ -6,7 +6,7 @@
     app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS): 1
   c5.large-1:
     app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS): 1
-180:
+480:
   c5.large-0:
     None-c5_m5_r5(0.4C, 0.42G), 0.0RPS: 1
   c5.large-1:

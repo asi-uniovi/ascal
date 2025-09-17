@@ -18,7 +18,10 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
     """
 
     def __init__(self, h_time_period: int = 60, desired_cpu_utilization: float = 0.6,
-                 h_node_utilization_threshold: float = 0.5, timing_args: TimedOps.TimingArgs = None,
+                 h_node_utilization_threshold: float = 0.5, 
+                 h_replica_scale_down_stabilization_time: int = 300,
+                 h_node_scale_down_stabilization_time: int = 600, 
+                 timing_args: TimedOps.TimingArgs = None,
                  hv_algorithm: AllocationSolver = AllocationSolver.FCMA,
                  hv_time_period: int = 300,
                  hv_transition_time_budget: int = 0, hot_node_scale_up: bool = False):
@@ -27,12 +30,18 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         :param h_time_period: Time period to evaluate a new autoscaling.
         :param desired_cpu_utilization: Desired CPU utilization for the application containers.
         :param h_node_utilization_threshold: Below this threshold, a node is tried to be removed.
+        :param h_replica_scale_down_stabilization_time: Minimum time from a previous replica scale-up 
+        to a replica scale-down.
+        :param h_node_scale_down_stabilization_time: Minimum time from a previous node scale-up
+        to a node scale-down.
         :param timing_args: Timings for creation/removal of nodes and containers.
         :param hv_algorithm: Allocation algorithm.
         :param hv_time_period: Time period for H/V autoscaling.
         :param hv_transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
         """
-        super().__init__(h_time_period, desired_cpu_utilization, h_node_utilization_threshold, None, timing_args)
+        super().__init__(h_time_period, desired_cpu_utilization, h_node_utilization_threshold, 
+                         h_replica_scale_down_stabilization_time,
+                         h_node_scale_down_stabilization_time, None, timing_args)
         self.h_time_period = h_time_period
         self.hv_time_period = hv_time_period
         self.desired_cpu_utilization = desired_cpu_utilization

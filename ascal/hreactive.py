@@ -26,13 +26,20 @@ class HReactiveAutoscaler(Autoscaler):
     Horizontal and reactive autoscaler for containers and nodes.
     """
     def __init__(self, time_period:int = 60, desired_cpu_utilization: float = 0.6,
-                 node_utilization_threshold:float = 0.5, aggs: dict[App, list[int]] = None,
+                 node_utilization_threshold:float = 0.5, 
+                 replica_scale_down_stabilization_time: int = 300,
+                 node_scale_down_stabilization_time: int = 600, 
+                 aggs: dict[App, list[int]] = None,
                  timing_args: TimedOps.TimingArgs | None = None):
         """
         Constructor for the horizontal and reactive autoscaler.
         :param time_period: Time period to evaluate a new autoscaling.
         :param desired_cpu_utilization: Desired CPU utilization for the application containers.
         :param node_utilization_threshold: Below this threshold, a node is tried to be removed.
+        :param replica_scale_down_stabilization_time: Minimum time from a previous replica scale-up 
+        to a replica scale-down.
+        :param node_scale_down_stabilization_time: Minimum time from a previous node scale-up
+        to a node scale-down.
         :param aggs: The aggregation level for each application. A None value allows the use of the
         application aggregation levels.
         :param timing_args: Timings for creation/removal of nodes and containers.
@@ -41,6 +48,10 @@ class HReactiveAutoscaler(Autoscaler):
         self.time_period = time_period
         self.desired_cpu_utilization = desired_cpu_utilization
         self.node_utilization_threshold = node_utilization_threshold
+        self._last_node_scale_up_time = 0
+        self._last_replica_scale_up_time = defaultdict(lambda: 0)
+        self._replica_scale_down_stabilization_time = replica_scale_down_stabilization_time
+        self._node_scale_down_stabilization_time = node_scale_down_stabilization_time
         self._app_loads: dict[App, list[RequestsPerTime]] = {} # Application workloads in a time period
         self._ics: list[InstanceClass] = [] # Instance class family
         self._app_ccs: dict[App, list[ContainerClass]] = {} # Application container classes
@@ -115,6 +126,8 @@ class HReactiveAutoscaler(Autoscaler):
         nodes.sort(key=lambda node: nodes_size[node])
 
         for app, replicas in replicas_to_remove.items():
+            if self.time - self._last_replica_scale_up_time[app] < self._replica_scale_down_stabilization_time:
+                continue
             for node in nodes:
                 # Select container groups allocating the application containers, sorted by decreasing
                 # aggregation levels
@@ -161,6 +174,7 @@ class HReactiveAutoscaler(Autoscaler):
                         allocated_replicas =\
                             self._timedops.allocate_container_replicas(self.time, cc, replicas_to_allocate, node)
                         replicas_agg1 -= allocated_replicas * cc.agg_level
+                        self._last_replica_scale_up_time[app] = self.time
                     if replicas_agg1 == 0:
                         break
                 if replicas_agg1 == 0:
@@ -404,7 +418,10 @@ class HReactiveAutoscaler(Autoscaler):
                     self._remove_excess_of_replicas()
                 unallocatable_replicas = self._allocate_deficit_replicas()
                 self._new_nodes_required = self._create_required_nodes(unallocatable_replicas)
-                if self._enable_node_removal:
+                if self._new_nodes_required:
+                    self._last_node_scale_up_time = self.time
+                if self._enable_node_removal and self.time - self._last_node_scale_up_time >= \
+                        self._node_scale_down_stabilization_time:
                     self._remove_low_utilization_nodes()
                 # Reset loads
                 for app in self._app_loads:

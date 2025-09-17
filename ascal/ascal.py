@@ -118,6 +118,8 @@ class AscalConfig:
                 data['autoscalers']['h_reactive']['time_period'],
                 data['autoscalers']['h_reactive']['desired_cpu_utilization'],
                 data['autoscalers']['h_reactive']['node_utilization_threshold'],
+                data['autoscalers']['h_reactive']['replica_scale_down_stabilization_time'],
+                data['autoscalers']['h_reactive']['node_scale_down_stabilization_time'],
                 AscalConfig._get_check_aggs(data, config.apps, aggs=data["autoscalers"]['h_reactive']["aggs"]),
                 timing_args
             )
@@ -171,6 +173,8 @@ class AscalConfig:
                 data['autoscalers']['h_reactive_hv_reactive']['h_time_period'],
                 data['autoscalers']['h_reactive_hv_reactive']['desired_cpu_utilization'],
                 data['autoscalers']['h_reactive_hv_reactive']['h_node_utilization_threshold'],
+                data['autoscalers']['h_reactive_hv_reactive']['h_replica_scale_down_stabilization_time'],
+                data['autoscalers']['h_reactive_hv_reactive']['h_node_scale_down_stabilization_time'],
                 timing_args,
                 algorithm,
                 data['autoscalers']['h_reactive_hv_reactive']['hv_time_period'],
@@ -191,6 +195,8 @@ class AscalConfig:
                 data['autoscalers']['h_reactive_hv_predictive']['h_time_period'],
                 data['autoscalers']['h_reactive_hv_predictive']['h_desired_cpu_utilization'],
                 data['autoscalers']['h_reactive_hv_predictive']['h_node_utilization_threshold'],
+                data['autoscalers']['h_reactive_hv_predictive']['h_replica_scale_down_stabilization_time'],
+                data['autoscalers']['h_reactive_hv_predictive']['h_node_scale_down_stabilization_time'],
                 timing_args,
                 algorithm,
                 data['autoscalers']['h_reactive_hv_predictive']['hv_prediction_window'],
@@ -322,8 +328,14 @@ class AscalConfig:
                 raise ValueError(f"Valid autoscalers: {valid_autoscalers}")
 
             if key == "h_reactive":
-                properties = ["time_period", "desired_cpu_utilization", "node_utilization_threshold"]
-                AscalConfig._check_fields(config["autoscalers"][key], properties,[int, float, float])
+                properties = [
+                    "time_period", 
+                    "desired_cpu_utilization", 
+                    "node_utilization_threshold",
+                    "replica_scale_down_stabilization_time",
+                    "node_scale_down_stabilization_time"
+                ]
+                AscalConfig._check_fields(config["autoscalers"][key], properties,[int, float, float, int, int])
                 # Check properties. Note that autoscaler aggs are checked by _get_check_aggs()
                 if set(properties) | {"aggs"} != set(config["autoscalers"][key]):
                     raise ValueError(f"Invalid or missing property in {key}")
@@ -332,7 +344,11 @@ class AscalConfig:
                 if config["autoscalers"][key]["desired_cpu_utilization"] < 0.1:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
                 if config["autoscalers"][key]["node_utilization_threshold"] < 0.1:
-                    raise ValueError("Desired CPU utilization must be >= 0.1")
+                    raise ValueError("Node utilization must be >= 0.1")
+                if config["autoscalers"][key]["replica_scale_down_stabilization_time"] < 0:
+                    raise ValueError("Replica scale-down stabilization time must be >= 0")
+                if config["autoscalers"][key]["node_scale_down_stabilization_time"] < 0:
+                    raise ValueError("Node scale-down stabilization time must be >= 0")
 
             elif key == "hv_reactive":
                 properties = ["time_period", "desired_cpu_utilization", "algorithm", "transition_time_budget",
@@ -361,12 +377,14 @@ class AscalConfig:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
 
             elif key == "h_reactive_hv_reactive":
-                properties = ["h_time_period", "h_node_utilization_threshold", "desired_cpu_utilization",
+                properties = ["h_time_period", "h_replica_scale_down_stabilization_time",
+                              "h_node_scale_down_stabilization_time", 
+                              "h_node_utilization_threshold", "desired_cpu_utilization",
                               "hv_time_period", "hv_algorithm", "hv_transition_time_budget", "hot_node_scale_up"]
                 if set(properties) != set(config["autoscalers"][key]):
                     raise ValueError(f"Invalid or missing property in {key}")
                 AscalConfig._check_fields(config["autoscalers"][key], properties,
-                                          [int, float, float, int, str, int, bool])
+                                          [int, int, int, float, float, int, str, int, bool])
                 h_time_period = config["autoscalers"][key]["h_time_period"]
                 hv_time_period = config["autoscalers"][key]["hv_time_period"]
                 if h_time_period == 0 or hv_time_period % h_time_period > 0 or hv_time_period / h_time_period < 2:
@@ -374,18 +392,24 @@ class AscalConfig:
                 if config["autoscalers"][key]["desired_cpu_utilization"] < 0.1:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
                 if config["autoscalers"][key]["h_node_utilization_threshold"] < 0.1:
-                    raise ValueError("Desired CPU utilization must be >= 0.1")
+                    raise ValueError("Node utilization threshold must be >= 0.1")
+                if config["autoscalers"][key]["h_replica_scale_down_stabilization_time"] < 0:
+                    raise ValueError("Replica scale-down stabilization time must be >= 0")
+                if config["autoscalers"][key]["h_node_scale_down_stabilization_time"] < 0:
+                    raise ValueError("Node scale-down stabilization time must be >= 0")
                 if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
 
             elif key == "h_reactive_hv_predictive":
-                properties = ["h_time_period", "h_node_utilization_threshold", "h_desired_cpu_utilization",
+                properties = ["h_time_period", "h_replica_scale_down_stabilization_time",
+                              "h_node_scale_down_stabilization_time", 
+                              "h_node_utilization_threshold", "h_desired_cpu_utilization",
                               "hv_prediction_window", "hv_prediction_percentile", "hv_algorithm",
                               "hv_transition_time_budget", "hot_node_scale_up"]
                 if set(properties) != set(config["autoscalers"][key]):
                     raise ValueError(f"Invalid or missing property in {key}")
                 AscalConfig._check_fields(config["autoscalers"][key], properties,
-                                          [int, float, float, int, int, str, int, bool])
+                                          [int, int, int, float, float, int, int, str, int, bool])
                 h_time_period = config["autoscalers"][key]["h_time_period"]
                 hv_prediction_window = config["autoscalers"][key]["hv_prediction_window"]
                 hv_prediction_percentile = config["autoscalers"][key]["hv_prediction_percentile"]
@@ -397,7 +421,11 @@ class AscalConfig:
                 if config["autoscalers"][key]["h_desired_cpu_utilization"] < 0.1:
                     raise ValueError("Desired CPU utilization must be >= 0.1")
                 if config["autoscalers"][key]["h_node_utilization_threshold"] < 0.1:
-                    raise ValueError("Desired CPU utilization must be >= 0.1")
+                    raise ValueError("Node utilization threshold must be >= 0.1")
+                if config["autoscalers"][key]["h_replica_scale_down_stabilization_time"] < 0:
+                    raise ValueError("Replica scale-down stabilization time must be >= 0")
+                if config["autoscalers"][key]["h_node_scale_down_stabilization_time"] < 0:
+                    raise ValueError("Node scale-down stabilization time must be >= 0")
                 if config["autoscalers"][key]["hv_algorithm"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
                     raise ValueError("Valid algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
 

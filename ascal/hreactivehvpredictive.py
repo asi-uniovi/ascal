@@ -18,7 +18,10 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
     """
 
     def __init__(self, h_time_period: int = 60, h_desired_cpu_utilization: float = 0.6,
-                 h_node_utilization_threshold: float = 0.5, timing_args: TimedOps.TimingArgs = None,
+                 h_node_utilization_threshold: float = 0.5, 
+                 h_replica_scale_down_stabilization_time: int = 300,
+                 h_node_scale_down_stabilization_time: int = 600, 
+                 timing_args: TimedOps.TimingArgs = None,
                  hv_algorithm: AllocationSolver = AllocationSolver.FCMA,
                  hv_prediction_window: int = 600, hv_prediction_percentile: float = 0.95,
                  hv_transition_time_budget: int = 0, hot_node_scale_up: bool = False):
@@ -27,14 +30,19 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         :param h_time_period: Time period to evaluate a new autoscaling.
         :param h_desired_cpu_utilization: Desired CPU utilization for the application containers.
         :param h_node_utilization_threshold: Below this threshold, a node is tried to be removed.
+        :param h_replica_scale_down_stabilization_time: Minimum time from a previous replica scale-up 
+        to a replica scale-down.
+        :param h_node_scale_down_stabilization_time: Minimum time from a previous node scale-up
+        to a node scale-down.
         :param timing_args: Timings for creation/removal of nodes and containers.
         :param hv_algorithm: Allocation algorithm.
         :param hv_prediction_window: Prediction window for the H/V autoscaler.
         :àram hv_prediction_percentile: Prediction percentile for the H/V autoscaler.
         :param hv_transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
         """
-        super().__init__(h_time_period, h_desired_cpu_utilization,
-                         h_node_utilization_threshold, None, timing_args)
+        super().__init__(h_time_period, h_desired_cpu_utilization, h_node_utilization_threshold, 
+                         h_replica_scale_down_stabilization_time,
+                         h_node_scale_down_stabilization_time, None, timing_args)
         self.time_period = h_time_period
         self.prediction_window = hv_prediction_window
         self.prediction_percentile = hv_prediction_percentile

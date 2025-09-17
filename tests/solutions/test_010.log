@@ -11,27 +11,26 @@
 161:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.large[1]
 180:  Load of app0: 0.00 req/s
 180:  Current replicas 1x of app0 3, desired 2
-180:  Removing 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.large[0]
-180:  Moving containers from node c5.large[0] to other nodes
-185:  Completed the removal of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.large[0]
-186:  Removing node c5.large[0]
-196:  Node c5.large[0] is removed
 240:  Load of app0: 0.00 req/s
-240:  Current replicas 1x of app0 2, desired 2
+240:  Current replicas 1x of app0 3, desired 2
 300:  Load of app0: 0.00 req/s
-300:  Current replicas 1x of app0 2, desired 2
+300:  Current replicas 1x of app0 3, desired 2
 360:  Load of app0: 0.00 req/s
-360:  Current replicas 1x of app0 2, desired 2
+360:  Current replicas 1x of app0 3, desired 2
 420:  Load of app0: 0.00 req/s
-420:  Current replicas 1x of app0 2, desired 2
+420:  Current replicas 1x of app0 3, desired 2
 480:  Load of app0: 0.00 req/s
-480:  Current replicas 1x of app0 2, desired 2
+480:  Current replicas 1x of app0 3, desired 2
+480:  Removing 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.large[0]
+485:  Completed the removal of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.large[0]
 540:  Load of app0: 0.00 req/s
 540:  Current replicas 1x of app0 2, desired 2
 600:  Load of app0: 0.00 req/s
 600:  Current replicas 1x of app0 2, desired 2
 660:  Load of app0: 0.00 req/s
 660:  Current replicas 1x of app0 2, desired 2
+660:  Removing node c5.large[0]
+670:  Node c5.large[0] is removed
 720:  Load of app0: 0.00 req/s
 720:  Current replicas 1x of app0 2, desired 2
 780:  Load of app0: 0.00 req/s

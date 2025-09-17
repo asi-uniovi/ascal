@@ -42,12 +42,12 @@ ascal_problem.write_cost_csv('cost.csv')
 # Write allocations in a YAML file
 ascal_problem.write_allocations('allocations.yaml')
 
-# Get application overloads as workload/performance
+# Get application traffic intensity as workload/performance
 workloads = ascal_problem.get_workloads()
 performances = ascal_problem.get_performances()
-overloads = {app: [(w-p)/p for w, p in zip(workloads[app], performances[app])] for app in workloads}
+traffic_intensity = {app: [w/p for w, p in zip(workloads[app], performances[app])] for app in workloads}
 
-# Get queue waiting times relative to service times, assuming each container is a server in a heterogenous D/D/n queue
+# Get queue waiting times relative to service times, assuming each container is a server in a heterogenous D/D/mqueue
 queue_waiting_times = ascal_problem.get_queue_waiting_times()
 avgs = {
     app_name: mean(waiting_times)
@@ -62,8 +62,8 @@ ascal_problem.plot(ascal_problem.get_performances(), "Application Performances",
 cluster_cost = ascal_problem.get_cluster_cost()
 total_cost_str = f"total cost = {sum(cluster_cost)/3600:.3f} $"
 ascal_problem.plot({total_cost_str: cluster_cost}, "Cluster Cost", "$/hour")
-ascal_problem.plot(overloads, "Application Overloads")
-ascal_problem.plot(queue_waiting_times, "Relative queue waiting times")
+ascal_problem.plot(traffic_intensity, "Traffic Intensity")
+ascal_problem.plot(queue_waiting_times, "Relative Queue Waiting Times")
 
 # Useful properties
 last_time = ascal_problem.last_time # Last time that can be simulated
@@ -77,8 +77,8 @@ node_recycling_levels, container_recycling_levels = ascal_problem.get_recycling_
 
 # Plot times to calculate transitions
 transition_times = calculation_times["transition_times"]
-ascal_problem.plot({'_nolegend_': transition_times}, "Transition times", "Seconds")
+ascal_problem.plot({'_nolegend_': transition_times}, "Transition Times", "Seconds")
 
 # Plot recyclings
-ascal_problem.plot_bar({'nodes': node_recycling_levels, 'containers': container_recycling_levels},
-                   "Recyclings", "Recycling value")
+ascal_problem.plot_bar({'Nodes': node_recycling_levels, 'Containers': container_recycling_levels},
+                       "Recyclings", "Recycling value")
