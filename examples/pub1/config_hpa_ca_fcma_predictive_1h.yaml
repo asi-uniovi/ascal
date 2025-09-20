@@ -1,13 +1,19 @@
 # All available autoscalers
 autoscalers:
-  h_reactive: # Horizontal+reactive autoscaling
-    time_period: 60 # Time period to evaluate autoscaling
-    desired_cpu_utilization: 0.7  # Desired CPU utilization
-    node_utilization_threshold: 0.5 # Below this utilization, node removal is tried
-    aggs: 2 # Aggregation level for applications. Equivalent to {app0: 2, app1: 2}
+  h_reactive_hv_predictive:
+    h_desired_cpu_utilization: 0.7  # Desired CPU utilization for the horizontal autoscaler
+    h_time_period: 60 # Time period to evaluate autoscaling for the horizontal autoscaler
+    h_node_utilization_threshold: 0.5 # Below this utilization, node removal is tried by the horizontal autoscaler
+    h_replica_scale_down_stabilization_time: 300 # Minimum time from a previous replica scale-up to a replica scale-down
+    h_node_scale_down_stabilization_time: 600 # Minimum time from a previous node scale-up to a node scale-down
+    hv_prediction_window: 600 # Prediction window for the horizontal/vertical autoscaler
+    hv_prediction_percentile: 95 # Percentile for application's load in the prediction window for the H/V autoscaler
+    hv_algorithm: fcma # Allocation algorithm for the H/V autoscaler
+    hv_transition_time_budget: 0 # Approximate time budget for the transition (0 for simple transaction)
+    hot_node_scale_up: False # True if hot scaling-up of nodes is possible
 
 # Select autoscaler
-autoscaler: h_reactive
+autoscaler: h_reactive_hv_predictive
 
 # Times in seconds for node/container creation/removal
 timing_args:
@@ -23,26 +29,26 @@ timing_args:
 
 # Define applications
 apps:
-  app0:
+  $A_0$:
     load:
-      file: trapezoid.csv # Integer load samples in req/s
-      time_interval: 24 # Integer time in seconds between two consecutive samples
+      file: triangle1.csv # Integer load samples in req/s
+      time_interval: 60 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
       load_offset: 0 # Integer value to be added to every load sample
-      load_mult: 2 # Multiplier for the load samples (multiplies also the load offset)
+      load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
       cpu: 260 mcores
       mem: 0.420 GiB
       perf: 1 req/s
       aggs: [1, 2, 4]
-  app1:
+  $A_1$:
     load:
-      file: trapezoid.csv # Integer load samples in req/s
-      time_interval: 24 # Integer time in seconds between two consecutive samples
+      file: triangle2.csv # Integer load samples in req/s
+      time_interval: 60 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
-      load_offset: 20 # Integer value to be added to every load sample
-      load_mult: 4 # Multiplier for the load samples (multiplies also the load offset)
+      load_offset: 0 # Integer value to be added to every load sample
+      load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
       cpu: 300 mcores
@@ -53,4 +59,4 @@ apps:
 # Simulation time in seconds.
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
-simulation_time: 86400 # 24 hours
+simulation_time: 3600 # 1 hour

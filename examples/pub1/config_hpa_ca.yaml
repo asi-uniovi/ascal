@@ -25,7 +25,7 @@ timing_args:
 
 # Define applications
 apps:
-  A0:
+  $A_0$:
     load:
       file: trapezoid1.csv # Integer load samples in req/s
       time_interval: 60 # Integer time in seconds between two consecutive samples
@@ -38,7 +38,7 @@ apps:
       mem: 0.420 GiB
       perf: 1 req/s
       aggs: [1, 2, 4]
-  A1:
+  $A_1$:
     load:
       file: trapezoid2.csv # Integer load samples in req/s
       time_interval: 60 # Integer time in seconds between two consecutive samples

@@ -63,7 +63,7 @@ cluster_cost = ascal_problem.get_cluster_cost()
 total_cost_str = f"total cost = {sum(cluster_cost)/3600:.3f} $"
 ascal_problem.plot({total_cost_str: cluster_cost}, "Cluster Cost", "$/hour")
 ascal_problem.plot(traffic_intensity, "Traffic Intensity")
-ascal_problem.plot(queue_waiting_times, "Relative Queue Waiting Times")
+ascal_problem.plot(queue_waiting_times, "Queue Waiting Times")
 
 # Useful properties
 last_time = ascal_problem.last_time # Last time that can be simulated
