@@ -10,6 +10,7 @@ dependencies = [
     { name = "fcma" },
     { name = "ipympl" },
     { name = "matplotlib" },
+    { name = "numpy" },
     { name = "pyyaml" },
     { name = "scipy" },
 ]
@@ -25,6 +26,7 @@ requires-dist = [
     { name = "fcma", git = "https://github.com/asi-uniovi/fcma.git" },
     { name = "ipympl", specifier = ">=0.9.7" },
     { name = "matplotlib", specifier = ">=3.10.3" },
+    { name = "numpy", specifier = ">=1.26.4" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "scipy", specifier = ">=1.16.0" },
 ]
