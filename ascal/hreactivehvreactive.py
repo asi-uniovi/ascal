@@ -24,7 +24,9 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
                  timing_args: TimedOps.TimingArgs = None,
                  hv_algorithm: AllocationSolver = AllocationSolver.FCMA,
                  hv_time_period: int = 300,
-                 hv_transition_time_budget: int = 0, hot_node_scale_up: bool = False):
+                 hv_transition_time_budget: int = 0, 
+                 hot_node_scale_up: bool = False,
+                 hot_container_scale: bool = False):
         """
         Constructor for the mixed reactive horizontal and reactive horizontal/vertical autoscaler.
         :param h_time_period: Time period to evaluate a new autoscaling.
@@ -38,6 +40,8 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         :param hv_algorithm: Allocation algorithm.
         :param hv_time_period: Time period for H/V autoscaling.
         :param hv_transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
+        :param hot_node_scale_up: If True, hot vertical scale-up of nodes is used.
+        :param hot_container_scale: If True, hot vertical scaling of containers is used.
         """
         super().__init__(h_time_period, desired_cpu_utilization, h_node_utilization_threshold, 
                          h_replica_scale_down_stabilization_time,

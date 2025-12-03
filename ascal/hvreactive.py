@@ -17,7 +17,8 @@ class HVReactiveAutoscaler(Autoscaler):
 
     def __init__(self, time_period: int = 60, desired_cpu_utilization: float = 0.6,
                  timing_args: TimedOps.TimingArgs = None, algorithm: AllocationSolver = AllocationSolver.FCMA,
-                 transition_time_budget: int = 0, hot_node_scale_up: bool = False):
+                 transition_time_budget: int = 0, hot_node_scale_up: bool = False,
+                 hot_replicas_scale: bool = False ):
         """
         Constructor for the horizontal/vertical reactive autoscaler.
         :param time_period: Time period to evaluate a new autoscaling.
@@ -25,6 +26,8 @@ class HVReactiveAutoscaler(Autoscaler):
         :param timing_args: Timings for creation/removal of nodes and containers.
         :param algorithm: Allocation algorithm.
         :param transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
+        :param hot_node_scale_up: Set to enable hot node scaling-up.
+        :param hot_replicas_scale: Set to enable hot scaling of replicas' computational parameters.
         """
         super().__init__(timing_args)
         self.time_period = time_period
@@ -34,6 +37,7 @@ class HVReactiveAutoscaler(Autoscaler):
         self.transition = None
         self.transition_time_budget = transition_time_budget
         self.hot_node_scale_up = hot_node_scale_up
+        self.hot_replicas_scale = hot_replicas_scale
         self._new_allocation = None
         self._timedops = TimedOps(self.timing_args)
 
@@ -57,7 +61,8 @@ class HVReactiveAutoscaler(Autoscaler):
             Autoscaler._set_delta_loads_if_zero(incremented_workloads)
             # Initialize the transition
             self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget,
-                                         hot_node_scale_up=self.hot_node_scale_up)
+                                         hot_node_scale_up=self.hot_node_scale_up,
+                                         hot_replicas_scale=self.hot_replicas_scale)
             # Calculate the first allocation
             self._new_allocation = self._solve_allocation(incremented_workloads, self._allocation_solver)
             self._app_loads = {}  # Application workloads in a time period

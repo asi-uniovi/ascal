@@ -21,7 +21,6 @@ timing_args:
   container_creation_time: 1 # Time from the request of container creation until it can process load.
   container_removal_time: 5 # Time from the request of container removal until it is removed from the node.
                             # Meanwhile. it can not process new load, but consumes computational resources.
-  hot_node_scale_up_time: 60 # Time to hot scale up (upgrade) a node.
 
 # Define applications
 apps:

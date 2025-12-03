@@ -52,6 +52,8 @@ class Command:
     """
     allocate_containers: list[tuple[Vm|Vmt, ContainerClass, int]] = field(default_factory=list)
     remove_containers: list[tuple[Vm|Vmt, ContainerClass, int]] = field(default_factory=list)
+    scale_up_containers: list[tuple[Vm|Vmt, ContainerClass, int, int]] = field(default_factory=list)
+    scale_down_containers: list[tuple[Vm|Vmt, ContainerClass, int, int]] = field(default_factory=list)
     remove_nodes: list[Vm|Vmt] = field(default_factory=list)
     # Only the first command can create or upgrade nodes. Some commands must delay command execution until
     # completing node creations or node upgrades in the first command
@@ -186,13 +188,14 @@ class Transition:
     _DELTA = 0.000001
 
     def __init__(self, timing_args: TimedOps.TimingArgs, system: System, time_limit: int = None,
-                 hot_node_scale_up: bool = False):
+                 hot_node_scale_up: bool = False, hot_replicas_scale: bool = False):
         """
         Creates an object for transition between two allocations.
         :param timing_args: Creation and removal times for containers and nodes.
         :param system: System performance and computational requirements.
         :param time_limit: Maximum time to carry out transitions. By default, this is set to the node creation time.
         :param hot_node_scale_up: Set to enable hot node scaling-up.
+        :param hot_replicas_scale: Set to enable hot scaling of replicas' computational parameters.
         Anyway, transition times can be longer, specially when they are set to a value less than the node creation
         time and new nodes need to be created.
         """
@@ -209,6 +212,7 @@ class Transition:
         self._unallocated_containers_in_new_nodes: list[tuple[Vm, ContainerClass, int]] = None
         self._time_limit = time_limit if time_limit is not None else self._timing_args.node_creation_time
         self._hot_node_scale_up = hot_node_scale_up
+        self._hot_replicas_scale = hot_replicas_scale
         self._commands: list[Command] = None
         self._sync_on_next_alloc_upgraded_nodes = True
 
@@ -464,7 +468,7 @@ class Transition:
 
     def remove_last_obsolete_containers(self, command: Command):
         """
-        Remove the las obsolete containers of applications with all its new containers allocated.
+        Remove the last obsolete containers of applications with all its new containers allocated.
         :param command: A command with the removal of containers.
         """
         for node, obsolete_cc_replicas in self._recycling.obsolete_containers.items():
@@ -1076,7 +1080,7 @@ class Transition:
 
         # Calculate recycled node pairs, new nodes, nodes to remove, recycled containers, new containers
         # and containers to remove when transitioning from the initial allocation to the final allocation
-        self._recycling_vm = Recycling(initial_alloc, final_alloc, self._hot_node_scale_up)
+        self._recycling_vm = Recycling(initial_alloc, final_alloc, self._hot_node_scale_up, self._hot_replicas_scale)
         self._recycling = RecyclingVmt(self._recycling_vm, vm_to_vmt)
 
         # Check whether the initial allocation is identical to the final allocation
@@ -1206,7 +1210,8 @@ class Transition:
         return sync_commands, worst_case_time
 
     def _debug_check_label_obsolete_containers(self) -> bool:            
-        """ Check if at least one obsolete replica in self._recycling.obsolete_containers has label 'c'
+        """ 
+        Check if at least one obsolete replica in self._recycling.obsolete_containers has label 'c'
         :return: True if no obsolete replicas have label 'c'.
         """
         for node in self._recycling.obsolete_containers:

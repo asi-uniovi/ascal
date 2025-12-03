@@ -18,12 +18,17 @@ class HVPredictiveAutoscaler(Autoscaler):
     def __init__(self, prediction_window: int = 3600, prediction_percentile: int = 95,
                  timing_args: TimedOps.TimingArgs = None,
                  algorithm: AllocationSolver = AllocationSolver.FCMA,
-                 transition_time_budget: int = 0, hot_node_scale_up: bool = False):
+                 transition_time_budget: int = 0, hot_node_scale_up: bool = False,
+                 hot_container_scale: bool = False):
         """
         Constructor for the horizontal/vertical reactive autoscaler.
         :param prediction_percentile: Load prediction percentile.
         :param prediction_window: Prediction window in seconds.
         :param timing_args: Timings for creation/removal of nodes and containers.
+        :param algorithm: Allocation algorithm.
+        :param transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
+        :param hot_node_scale_up: Set to enable hot node scaling-up.
+        :param hot_container_scale: Set to enable hot scaling up and down of container computational parameters.
         """
         super().__init__(timing_args)
         self.prediction_percentile = prediction_percentile

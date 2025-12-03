@@ -24,7 +24,9 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
                  timing_args: TimedOps.TimingArgs = None,
                  hv_algorithm: AllocationSolver = AllocationSolver.FCMA,
                  hv_prediction_window: int = 600, hv_prediction_percentile: float = 0.95,
-                 hv_transition_time_budget: int = 0, hot_node_scale_up: bool = False):
+                 hv_transition_time_budget: int = 0, 
+                 hot_node_scale_up: bool = False,
+                 hot_container_scale: bool = False):
         """
         Constructor for the mixed reactive horizontal and predictive horizontal/vertical autoscaler.
         :param h_time_period: Time period to evaluate a new autoscaling.
@@ -39,6 +41,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         :param hv_prediction_window: Prediction window for the H/V autoscaler.
         :àram hv_prediction_percentile: Prediction percentile for the H/V autoscaler.
         :param hv_transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
+        :param hot_node_scale_up: If True, hot vertical scale-up of nodes is used.
+        :param hot_container_scale: If True, hot vertical scaling of containers is used.
         """
         super().__init__(h_time_period, h_desired_cpu_utilization, h_node_utilization_threshold, 
                          h_replica_scale_down_stabilization_time,
@@ -51,6 +55,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         self.transition = None
         self.transition_time_budget = hv_transition_time_budget
         self.hot_node_scale_up = hot_node_scale_up
+        self.hot_container_scale = hot_container_scale
         self._hv_timedops = TimedOps(self.timing_args)
         self._next_prediction_window_time = hv_prediction_window
         self._hv_app_loads = {} # Application workloads in a time period for the HV autoscaler

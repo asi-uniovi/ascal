@@ -46,12 +46,14 @@ class Recycling:
     """
 
     @staticmethod
-    def _valid_node_recycling(initial_node: Vm, final_node: Vm, hot_node_scale_up: bool = False):
+    def _valid_node_recycling(initial_node: Vm, final_node: Vm, hot_node_scale_up: bool = False,
+                              hot_container_scale: bool = False) -> bool:
         """
         Return whether the initial node may be recycled to the final node.
         :param initial_node: Initial node.
         :param final_node: Final node.
         :param hot_node_scale_up: Set if hot node scaling-up is enabled.
+        :param hot_container_scale: Set if hot scale up and down of containers is enabled.
         :return: True when it is a valid recycling.
         """
         if initial_node.ic.family != final_node.ic.family:
@@ -523,13 +525,15 @@ class Recycling:
             last_initial_node_ids[node.ic] += 1
             node.id = last_initial_node_ids[node.ic]
 
-    def __init__(self, initial_alloc: Allocation, final_alloc: Allocation, hot_node_scale_up: bool = False):
+    def __init__(self, initial_alloc: Allocation, final_alloc: Allocation, 
+                 hot_node_scale_up: bool = False, hot_container_scale: bool = False):
         """
         Constructor for the Recycling class. Computes node and container recycling between two allocations
         using the same instance class family.
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
         :param hot_node_scale_up: Set when hot node scaling-up is possible.
+        :param hot_container_scale: Set when hot container scaling is possible.
         """
         # Check that we are working with a single instance class family
         assert len(set(node.ic.family for node in initial_alloc + final_alloc)) == 1, "Invalid recycling problem"

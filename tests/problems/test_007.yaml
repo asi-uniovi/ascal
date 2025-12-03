@@ -3,9 +3,7 @@ autoscalers:
   hv_predictive: # Horizontal/vertical+predictive autoscaling
     prediction_window: 240 # Prediction window in seconds
     prediction_percentile: 95 # Percentile for application's load in the prediction window
-    algorithm: fcma  # Allocation algorithm
     transition_time_budget: 0 # Approximate time budget for the transition (0 for simple transaction)
-    hot_node_scale_up: False # True if hot scaling-up of nodes is possible
 
 # Select autoscaler
 autoscaler: hv_predictive
@@ -20,7 +18,6 @@ timing_args:
   container_creation_time: 1 # Time from the request of container creation until it can process load.
   container_removal_time: 5 # Time from the request of container removal until it is removed from the node.
                             # Meanwhile. it can not process new load, but consumes computational resources.
-  hot_node_scale_up_time: 60 # Time to hot scale up (upgrade) a node.
 
 # Define applications
 apps:
