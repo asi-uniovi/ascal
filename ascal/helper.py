@@ -156,7 +156,7 @@ def get_min_max_load(load1: dict[App, RequestsPerTime], load2: dict[App, Request
         {app: max(load1.get(app, zero_load), load2.get(app, zero_load)) for app in load1},
     )
 
-def get_allocation_signature(alloc: list[Vmt]) -> Counter:
+def get_vmt_allocation_signature(alloc: list[Vmt]) -> Counter:
     """
     Get a signature to compare allocations.
     :param alloc: Allocation.

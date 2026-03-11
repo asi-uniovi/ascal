@@ -45,6 +45,9 @@ class Recycling:
     Class to calculate the recyclings between two consecutive allocations.
     """
 
+    # Invalid recycling value
+    INVALID_RECYCLING = -1
+
     @staticmethod
     def _valid_node_recycling(initial_node: Vm, final_node: Vm, hot_node_scale_up: bool = False):
         """

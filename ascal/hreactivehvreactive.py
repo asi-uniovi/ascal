@@ -7,9 +7,10 @@ from time import time as current_time
 from fcma import App, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
-from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
+from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
 from ascal.hreactive import HReactiveAutoscaler
-from ascal.transition import Transition
+from ascal.recycling import Recycling
+from ascal.transition import TransitionBaseline, TransitionRAC
 
 
 class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
@@ -47,7 +48,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         self.desired_cpu_utilization = desired_cpu_utilization
         self._hv_app_loads = {} # Application workloads in a time period for the HV autoscaler
         self._aggs = None # H autoscaler works with all the aggregation levels
-        self._allocation_solver = hv_algorithm
+        self._allocation_solver, self._transition_algorithm = hv_algorithm
         self.transition = None
         self.transition_time_budget = hv_transition_time_budget
         self.hot_node_scale_up = hot_node_scale_up
@@ -80,8 +81,8 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         """
         initial_time = current_time() # Reference to calculate the processing time
 
-        node_recycling_level = Autoscaler.INVALID_RECYCLING
-        container_recycling_level = Autoscaler.INVALID_RECYCLING
+        node_recycling_level = Recycling.INVALID_RECYCLING
+        container_recycling_level = Recycling.INVALID_RECYCLING
 
         # Time required to calculate the transition
         transition_calc_time = 0
@@ -91,11 +92,14 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             # Initialize the HV application load in the last period
             self._hv_app_loads = {app: [] for app in app_workloads}
             # Initialize the transition
-            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget,
-                                         hot_node_scale_up=self.hot_node_scale_up)
+            if self._transition_algorithm == TransitionAlgorithm.BASELINE:
+                self.transition = TransitionBaseline(self.timing_args, self.system)
+            else:
+                self.transition = TransitionRAC(self.timing_args, self.system, time_limit=self.transition_time_budget,
+                                                hot_node_scale_up=self.hot_node_scale_up)
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
-                                              Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
+                                              Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
             return statistics
 
         # Update the application loads
@@ -124,8 +128,8 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             self.time += 1
             self._timedops.dispatch_events(self.time)
             statistics = AutoscalerStatistics(self._timedops.node_billing_changed, self._timedops.perf_changed,
-                                              0, current_time() - initial_time, Autoscaler.INVALID_RECYCLING,
-                                              Autoscaler.INVALID_RECYCLING)
+                                              0, current_time() - initial_time, Recycling.INVALID_RECYCLING,
+                                              Recycling.INVALID_RECYCLING)
             return statistics
 
         elif self._hv_timedops.is_event_list_empty():

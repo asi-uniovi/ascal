@@ -6,8 +6,9 @@ from time import time as current_time
 from fcma import App, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
-from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
-from ascal.transition import Transition
+from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
+from ascal.recycling import Recycling
+from ascal.transition import TransitionRAC, TransitionBaseline
 
 
 class HVReactiveAutoscaler(Autoscaler):
@@ -16,21 +17,22 @@ class HVReactiveAutoscaler(Autoscaler):
     """
 
     def __init__(self, time_period: int = 60, desired_cpu_utilization: float = 0.6,
-                 timing_args: TimedOps.TimingArgs = None, algorithm: AllocationSolver = AllocationSolver.FCMA,
+                 timing_args: TimedOps.TimingArgs = None, 
+                 algorithm: tuple[AllocationSolver, TransitionAlgorithm] = (AllocationSolver.FCMA, TransitionAlgorithm.RAC),
                  transition_time_budget: int = 0, hot_node_scale_up: bool = False):
         """
         Constructor for the horizontal/vertical reactive autoscaler.
         :param time_period: Time period to evaluate a new autoscaling.
         :param desired_cpu_utilization: Desired CPU utilization for the application containers.
         :param timing_args: Timings for creation/removal of nodes and containers.
-        :param algorithm: Allocation algorithm.
+        :param algorithm: Allocation/transition algorithm.
         :param transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
         """
         super().__init__(timing_args)
         self.time_period = time_period
         self.desired_cpu_utilization = desired_cpu_utilization
         self._app_loads = {}  # Application workloads in a time period
-        self._allocation_solver = algorithm
+        self._allocation_solver, self._transition_algorithm = algorithm
         self.transition = None
         self.transition_time_budget = transition_time_budget
         self.hot_node_scale_up = hot_node_scale_up
@@ -46,8 +48,8 @@ class HVReactiveAutoscaler(Autoscaler):
 
         initial_time = current_time() # Reference to calculate the processing time
 
-        node_recycling_level = Autoscaler.INVALID_RECYCLING
-        container_recycling_level = Autoscaler.INVALID_RECYCLING
+        node_recycling_level = Recycling.INVALID_RECYCLING
+        container_recycling_level = Recycling.INVALID_RECYCLING
 
         if self.time == 0:
             # Start with average loads equal to the first loads. Loads are incremented to obtain
@@ -56,18 +58,22 @@ class HVReactiveAutoscaler(Autoscaler):
             # At least one application replica
             Autoscaler._set_delta_loads_if_zero(incremented_workloads)
             # Initialize the transition
-            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget,
-                                         hot_node_scale_up=self.hot_node_scale_up)
+            if self._transition_algorithm == TransitionAlgorithm.BASELINE:
+                self.transition = TransitionBaseline(self.timing_args, self.system)
+            else:
+                self.transition = TransitionRAC(self.timing_args, self.system, time_limit=self.transition_time_budget,
+                                                hot_node_scale_up=self.hot_node_scale_up)
             # Calculate the first allocation
             self._new_allocation = self._solve_allocation(incremented_workloads, self._allocation_solver)
             self._app_loads = {}  # Application workloads in a time period
             self.allocation = self._new_allocation
             self.log_allocation_summary()
-            for node in set(self.allocation + self._new_allocation):
+            for node in set(self.allocation):
                 NodeStates.set_state(node, NodeStates.READY)
             self._app_loads = {app: [workload] for app, workload in app_workloads.items()}
             self.time += 1
-            statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time, -1, -1)
+            statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time, 
+                                              Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
             return statistics
 
         # Update the application loads
