@@ -277,13 +277,13 @@ class Transition(ABC):
                 elif node_vmt.replicas[cc] < 0:
                     raise ValueError(f'{op_str} -> Invalid container removal. Replicas < 0')
                 app_perf_surplus[cc.app] -= cc.perf * replicas
-                if app_perf_surplus[cc.app].magnitude < -TransitionRAC._DELTA:
+                if app_perf_surplus[cc.app].magnitude < -TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. app surplus < 0')
                 node_vmt.free_cores += cc.cores * replicas
-                if (node_vmt.free_cores - node_vmt.ic.cores).magnitude > TransitionRAC._DELTA:
+                if (node_vmt.free_cores - node_vmt.ic.cores).magnitude > TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. Too many cores')
                 node_vmt.free_mem += cc.mem[0] * replicas
-                if (node_vmt.free_mem - node_vmt.ic.mem).magnitude > TransitionRAC._DELTA:
+                if (node_vmt.free_mem - node_vmt.ic.mem).magnitude > TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. Too many mem')
 
             # Add node commands
@@ -306,10 +306,10 @@ class Transition(ABC):
                 node_vmt.replicas[cc] += replicas
                 app_perf_increment[cc.app] += cc.perf * replicas
                 node_vmt.free_cores -= cc.cores * replicas
-                if node_vmt.free_cores.magnitude < -TransitionRAC._DELTA:
+                if node_vmt.free_cores.magnitude < -TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container addition. Not enough cores are available')
                 node_vmt.free_mem -= cc.mem[0] * replicas
-                if node_vmt.free_mem.magnitude < -TransitionRAC._DELTA:
+                if node_vmt.free_mem.magnitude < -TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. Not enough memory is available')
 
             # Remove node commands
@@ -405,6 +405,13 @@ class TransitionBaseline(Transition):
         return self._timing_args.node_creation_time + self._timing_args.container_creation_time + \
             self._timing_args.container_removal_time + self._timing_args.node_removal_time
     
+    def get_creation_in_transition_time(self) -> int:
+        """
+        Get the total time required to create nodes and next allocate containers in the transition.
+        :return: The creation total time.
+        """
+        return self._timing_args.node_creation_time + self._timing_args.container_creation_time
+    
     def get_recycling_levels(self) -> tuple[float, float]:
         """
         Get node and container recycling levels for the last transition.
@@ -490,13 +497,13 @@ class TransitionBaseline(Transition):
         return self._commands, self.get_transition_time(self._commands, self._timing_args)
 
 
-class TransitionRAC(Transition):
+class TransitionRBT(Transition):
     """
-    Class to implement the remove-allocate-copy transition algorithm. There are
+    Class to implement the recycling based transition algorithm. There are
     two variants: 
-    - Remove-allocate transition when time_limit = 0. Simplified version of the algorithm that focus on reducing the
+    - time_limit = 0. Simplified version of the algorithm that focus on reducing the
     transition time. 
-    - Remove-allocate-copy transition when time_limit > 0. Complete version that focus on reducing the transition cost.
+    - time_limit > 0. Complete version that focus on reducing the transition cost.
     """
     def __init__(self, timing_args: TimedOps.TimingArgs, system: System, time_limit: int = None,
                  hot_node_scale_up: bool = False):
@@ -587,8 +594,8 @@ class TransitionRAC(Transition):
         # Calculate how many new container replicas could be allocated after the removals
         allocatable_replicas = min(
             replicas,
-            int((node.free_cores.magnitude + removed_cores.magnitude + TransitionRAC._DELTA) / cc.cores.magnitude),
-            int((node.free_mem.magnitude + removed_mem.magnitude + TransitionRAC._DELTA) / cc.mem[0].magnitude)
+            int((node.free_cores.magnitude + removed_cores.magnitude + TransitionRBT._DELTA) / cc.cores.magnitude),
+            int((node.free_mem.magnitude + removed_mem.magnitude + TransitionRBT._DELTA) / cc.mem[0].magnitude)
         )
 
         # Allocate the replicas. At this point, the removals and allocations are actually performed
@@ -613,19 +620,19 @@ class TransitionRAC(Transition):
         """
         allocatable_replicas = min(
             replicas,
-            int((node.free_cores.magnitude + TransitionRAC._DELTA) / cc.cores.magnitude),
-            int((node.free_mem.magnitude + TransitionRAC._DELTA) / cc.mem[0].magnitude)
+            int((node.free_cores.magnitude + TransitionRBT._DELTA) / cc.cores.magnitude),
+            int((node.free_mem.magnitude + TransitionRBT._DELTA) / cc.mem[0].magnitude)
         )
         if allocatable_replicas > 0:
             node.free_cores = node.free_cores - allocatable_replicas * cc.cores
-            assert node.free_cores.magnitude > - TransitionRAC._DELTA, "Node free cores cannot not be negative"
+            assert node.free_cores.magnitude > - TransitionRBT._DELTA, "Node free cores cannot not be negative"
             node.free_mem = node.free_mem - allocatable_replicas * cc.mem[0]
-            assert node.free_mem.magnitude > - TransitionRAC._DELTA, "Node free memory cannot not be negative"
+            assert node.free_mem.magnitude > - TransitionRBT._DELTA, "Node free memory cannot not be negative"
             node.replicas[cc] += allocatable_replicas
             command.allocate_containers.append((node, cc, allocatable_replicas))
             if not obsolete:
                 self._app_unalloc_perf[cc.app] -= allocatable_replicas * cc.perf
-                assert self._app_unalloc_perf[cc.app].magnitude > -TransitionRAC._DELTA, "Invalid performance"
+                assert self._app_unalloc_perf[cc.app].magnitude > -TransitionRBT._DELTA, "Invalid performance"
             else:
                 if node not in self._recycling.obsolete_containers:
                     self._recycling.obsolete_containers[node] = {cc: allocatable_replicas}
@@ -668,9 +675,9 @@ class TransitionRAC(Transition):
         if node.replicas[cc] == 0:
             del node.replicas[cc]
         node.free_cores += cc.cores * removed_replicas
-        assert (node.free_cores - node.ic.cores).magnitude < TransitionRAC._DELTA, "Invalid node free cores"
+        assert (node.free_cores - node.ic.cores).magnitude < TransitionRBT._DELTA, "Invalid node free cores"
         node.free_mem += cc.mem[0] * removed_replicas
-        assert (node.free_mem - node.ic.mem).magnitude < TransitionRAC._DELTA, "Invalid node free mem"
+        assert (node.free_mem - node.ic.mem).magnitude < TransitionRBT._DELTA, "Invalid node free mem"
         performance_surplus[cc.app] -= cc.perf * removed_replicas
         self._recycling.obsolete_containers[node][cc] -= removed_replicas
         if self._recycling.obsolete_containers[node][cc] == 0:
@@ -716,8 +723,8 @@ class TransitionRAC(Transition):
 
         for node in nodes_to_sort:
             # Check if node is empty
-            if (node.ic.cores - node.free_cores).magnitude < TransitionRAC._DELTA and \
-                    (node.ic.mem - node.free_mem).magnitude < TransitionRAC._DELTA:
+            if (node.ic.cores - node.free_cores).magnitude < TransitionRBT._DELTA and \
+                    (node.ic.mem - node.free_mem).magnitude < TransitionRBT._DELTA:
                 empty_nodes_list.append(node)
                 continue
             free_cores = node.free_cores
@@ -730,7 +737,7 @@ class TransitionRAC(Transition):
                 if node in self._recycling.obsolete_containers and cc in self._recycling.obsolete_containers[node]:
                     app = cc.app
                     cc_perf_surplus = min(app_perf_surplus[app], cc.perf * replicas)
-                    surplus_replicas = floor(cc_perf_surplus / cc.perf + TransitionRAC._DELTA)
+                    surplus_replicas = floor(cc_perf_surplus / cc.perf + TransitionRBT._DELTA)
                     free_cores += surplus_replicas * cc.cores
                     free_mem += surplus_replicas * cc.mem[0]
                     app_perf_surplus[app] -= cc_perf_surplus
@@ -759,7 +766,7 @@ class TransitionRAC(Transition):
         """
         for node, obsolete_cc_replicas in self._recycling.obsolete_containers.items():
             for obsolete_cc, replicas in dict(obsolete_cc_replicas.items()).items():
-                if self._app_unalloc_perf[obsolete_cc.app].magnitude < TransitionRAC._DELTA:
+                if self._app_unalloc_perf[obsolete_cc.app].magnitude < TransitionRBT._DELTA:
                     replicas_count = self._remove_obsolete_replicas(obsolete_cc, replicas, node, command)
                     assert replicas_count == replicas, "All the replicas must be removable"
 
@@ -772,8 +779,8 @@ class TransitionRAC(Transition):
         """
         for node in self._recycling.obsolete_nodes[:]:
             if node.is_empty():
-                assert (node.free_cores - node.ic.cores).magnitude < TransitionRAC._DELTA, "Can not remove the node"
-                assert (node.free_mem - node.ic.mem).magnitude < TransitionRAC._DELTA, "Can not remove the node"
+                assert (node.free_cores - node.ic.cores).magnitude < TransitionRBT._DELTA, "Can not remove the node"
+                assert (node.free_mem - node.ic.mem).magnitude < TransitionRBT._DELTA, "Can not remove the node"
                 command.remove_nodes.append(node)
                 if node in self._recycling.obsolete_containers:
                     del self._recycling.obsolete_containers[node]
@@ -971,7 +978,7 @@ class TransitionRAC(Transition):
                 ((required_cores - free_src_cores) / removable_cc.cores).magnitude,
                 ((required_mem - free_src_mem) / removable_cc.mem[0]).magnitude
             )
-            required_obsolete_replicas = int(ceil(required_obsolete_replicas - TransitionRAC._DELTA))
+            required_obsolete_replicas = int(ceil(required_obsolete_replicas - TransitionRBT._DELTA))
             replicas_to_remove = min(required_obsolete_replicas, available_replicas)
 
             # If no more replicas are required to free up enough computational resources
@@ -1001,8 +1008,8 @@ class TransitionRAC(Transition):
         free_mem = free_src_mem + replicas_to_allocate * cc.mem[0] - required_mem
         allocatable_replicas = min(
             replicas_to_allocate,
-            int((free_cores.magnitude + TransitionRAC._DELTA) / cc.cores.magnitude),
-            int((free_mem.magnitude + TransitionRAC._DELTA) / cc.mem[0].magnitude),
+            int((free_cores.magnitude + TransitionRBT._DELTA) / cc.cores.magnitude),
+            int((free_mem.magnitude + TransitionRBT._DELTA) / cc.mem[0].magnitude),
         )
         if allocatable_replicas == 0:
             # Recover from backups
@@ -1429,7 +1436,7 @@ class TransitionRAC(Transition):
         for _, cc, replicas in self._unallocated_containers_in_new_nodes:
             self._app_perf_increment[cc.app] += replicas * cc.perf
             self._app_unalloc_perf[cc.app] -= replicas * cc.perf
-            assert self._app_unalloc_perf[cc.app].magnitude >= - TransitionRAC._DELTA, "Invalid performance"
+            assert self._app_unalloc_perf[cc.app].magnitude >= - TransitionRBT._DELTA, "Invalid performance"
         self._unallocated_containers_in_new_nodes.clear()
         self._append_command(allocate_in_new_nodes_command, append_null_command=True)
 

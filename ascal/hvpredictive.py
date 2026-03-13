@@ -7,7 +7,7 @@ from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
 from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
 from ascal.recycling import Recycling
-from ascal.transition import TransitionBaseline, TransitionRAC
+from ascal.transition import TransitionBaseline, TransitionRBT
 from ascal.helper import get_min_max_load
 
 
@@ -55,7 +55,7 @@ class HVPredictiveAutoscaler(Autoscaler):
         if self._transition_algorithm == TransitionAlgorithm.BASELINE:
             self.transition = TransitionBaseline(self.timing_args, self.system)
         else:
-            self.transition = TransitionRAC(self.timing_args, self.system, time_limit=self.transition_time_budget // 2,
+            self.transition = TransitionRBT(self.timing_args, self.system, time_limit=self.transition_time_budget // 2,
                                             hot_node_scale_up=self.hot_node_scale_up)
 
         # Calculate a new allocation
@@ -84,8 +84,8 @@ class HVPredictiveAutoscaler(Autoscaler):
         if self.time == 0:
             return self._initialize_allocation(current_time())
         
-        if self._transition_algorithm == TransitionAlgorithm.RAC:
-            return self.run_rac()
+        if self._transition_algorithm == TransitionAlgorithm.RBT:
+            return self.run_rbt()
         else:
             return self.run_baseline()
 
@@ -135,8 +135,10 @@ class HVPredictiveAutoscaler(Autoscaler):
             self.log(f"- To   {[str(node) for node in self.new_allocation]}")
             if len(commands) > 0:
                 self.log(f"- Temporal nodes {[str(node) for node in commands[0].create_nodes if node.id < 0]}")
-                # Generate transition events from the current time
-                self._transition_execute_sync(commands)
+                # Generate transition events
+                node_container_creation_time = self.transition.get_creation_in_transition_time()
+                transition_start_time = next_prediction_window_time - node_container_creation_time
+                self._transition_execute_sync(commands, transition_start_time)
             # Get recycling levels
             node_recycling_level, container_recycling_level = self.transition.get_recycling_levels()
 
@@ -155,10 +157,10 @@ class HVPredictiveAutoscaler(Autoscaler):
                                           container_recycling_level)
         return statistics
 
-    def run_rac(self) -> tuple[bool, bool, float]:
+    def run_rbt(self) -> tuple[bool, bool, float]:
         """
         Simulate for 1 second the horizontal/vertical and predictive autoscaling of containers and nodes
-        using RAC transition algorithm.
+        using RBT transitions.
         :return: Simulation statistics.
         """
 

@@ -116,7 +116,7 @@ class AscalConfig:
             allocation_str, transition_str = algorithm_str.split(", ")
         else:
             allocation_str = algorithm_str
-            transition_str = "rca"
+            transition_str = "rbt"
         if allocation_str == 'fcma' or allocation_str == 'fcma1':
             allocation = AllocationSolver.FCMA1
         elif allocation_str == 'fcma2':
@@ -127,12 +127,12 @@ class AscalConfig:
             allocation = AllocationSolver.MNCF
         else:
             raise ValueError("Valid allocation algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
-        if transition_str == 'rca':
-            transition = TransitionAlgorithm.RAC
+        if transition_str == 'rbt':
+            transition = TransitionAlgorithm.RBT
         elif transition_str == 'baseline':
             transition = TransitionAlgorithm.BASELINE
         else:
-            raise ValueError("Valid transition algorithms are 'rca' or 'baseline'")
+            raise ValueError("Valid transition algorithms are 'rbt' and 'baseline'")
         return allocation, transition
 
     @staticmethod

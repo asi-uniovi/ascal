@@ -8,7 +8,7 @@ from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
 from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
 from ascal.recycling import Recycling
-from ascal.transition import TransitionRAC, TransitionBaseline
+from ascal.transition import TransitionRBT, TransitionBaseline
 
 
 class HVReactiveAutoscaler(Autoscaler):
@@ -18,7 +18,7 @@ class HVReactiveAutoscaler(Autoscaler):
 
     def __init__(self, time_period: int = 60, desired_cpu_utilization: float = 0.6,
                  timing_args: TimedOps.TimingArgs = None, 
-                 algorithm: tuple[AllocationSolver, TransitionAlgorithm] = (AllocationSolver.FCMA, TransitionAlgorithm.RAC),
+                 algorithm: tuple[AllocationSolver, TransitionAlgorithm] = (AllocationSolver.FCMA, TransitionAlgorithm.RBT),
                  transition_time_budget: int = 0, hot_node_scale_up: bool = False):
         """
         Constructor for the horizontal/vertical reactive autoscaler.
@@ -61,7 +61,7 @@ class HVReactiveAutoscaler(Autoscaler):
             if self._transition_algorithm == TransitionAlgorithm.BASELINE:
                 self.transition = TransitionBaseline(self.timing_args, self.system)
             else:
-                self.transition = TransitionRAC(self.timing_args, self.system, time_limit=self.transition_time_budget,
+                self.transition = TransitionRBT(self.timing_args, self.system, time_limit=self.transition_time_budget,
                                                 hot_node_scale_up=self.hot_node_scale_up)
             # Calculate the first allocation
             self._new_allocation = self._solve_allocation(incremented_workloads, self._allocation_solver)

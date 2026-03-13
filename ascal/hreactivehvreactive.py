@@ -10,7 +10,7 @@ from ascal.nodestates import NodeStates
 from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
 from ascal.hreactive import HReactiveAutoscaler
 from ascal.recycling import Recycling
-from ascal.transition import TransitionBaseline, TransitionRAC
+from ascal.transition import TransitionBaseline, TransitionRBT
 
 
 class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
@@ -95,7 +95,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             if self._transition_algorithm == TransitionAlgorithm.BASELINE:
                 self.transition = TransitionBaseline(self.timing_args, self.system)
             else:
-                self.transition = TransitionRAC(self.timing_args, self.system, time_limit=self.transition_time_budget,
+                self.transition = TransitionRBT(self.timing_args, self.system, time_limit=self.transition_time_budget,
                                                 hot_node_scale_up=self.hot_node_scale_up)
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,

@@ -29,7 +29,7 @@ class AllocationSolver(Enum):
 
 class TransitionAlgorithm(Enum):
     BASELINE = 1      # Baseline transition algorithm
-    RAC      = 2      # Remove-allocate-copy based transition algorithm
+    RBT      = 2      # Remove-allocate-copy based transition algorithm
 
 
 @dataclass(frozen=True)

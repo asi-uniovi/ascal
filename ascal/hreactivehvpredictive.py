@@ -9,7 +9,7 @@ from ascal.nodestates import NodeStates
 from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
 from ascal.hreactive import HReactiveAutoscaler
 from ascal.recycling import Recycling
-from ascal.transition import TransitionBaseline, TransitionRAC
+from ascal.transition import TransitionBaseline, TransitionRBT
 from ascal.helper import get_min_max_load
 
 
@@ -98,8 +98,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             # Initialize the HV application load in the last period
             self._hv_app_loads = {app: [] for app in app_workloads}
             # Initialize the transition
-            if self._transition_algorithm == TransitionAlgorithm.RAC:
-                self.transition = TransitionRAC(self.timing_args, self.system, time_limit=self.transition_time_budget,
+            if self._transition_algorithm == TransitionAlgorithm.RBT:
+                self.transition = TransitionRBT(self.timing_args, self.system, time_limit=self.transition_time_budget,
                                                 hot_node_scale_up=self.hot_node_scale_up)
             else:
                 ValueError("'baseline' transition is not valid for the horizontal/vertical predictive autoscaler")
