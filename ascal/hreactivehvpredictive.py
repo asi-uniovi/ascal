@@ -6,9 +6,10 @@ from time import time as current_time
 from fcma import App, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
-from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
+from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
 from ascal.hreactive import HReactiveAutoscaler
-from ascal.transition import Transition
+from ascal.recycling import Recycling
+from ascal.transition import TransitionRBT
 from ascal.helper import get_min_max_load
 
 
@@ -51,7 +52,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         self.prediction_window = hv_prediction_window
         self.prediction_percentile = hv_prediction_percentile
         self.predicted_workloads = None
-        self._allocation_solver = hv_algorithm
+        self._allocation_solver, self._transition_algorithm = hv_algorithm
         self.transition = None
         self.transition_time_budget = hv_transition_time_budget
         self.hot_node_scale_up = hot_node_scale_up
@@ -92,21 +93,24 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
 
         initial_time = current_time() # Reference to calculate the processing time
 
-        node_recycling_level1 = Autoscaler.INVALID_RECYCLING
-        node_recycling_level2 = Autoscaler.INVALID_RECYCLING
-        container_recycling_level1 = Autoscaler.INVALID_RECYCLING
-        container_recycling_level2 = Autoscaler.INVALID_RECYCLING
+        node_recycling_level1 = Recycling.INVALID_RECYCLING
+        node_recycling_level2 = Recycling.INVALID_RECYCLING
+        container_recycling_level1 = Recycling.INVALID_RECYCLING
+        container_recycling_level2 = Recycling.INVALID_RECYCLING
 
         # If it is the first execution
         if self.time == 0:
             # Initialize the HV application load in the last period
             self._hv_app_loads = {app: [] for app in app_workloads}
             # Initialize the transition
-            self.transition = Transition(self.timing_args, self.system, time_limit=self.transition_time_budget,
-                                         hot_node_scale_up=self.hot_node_scale_up)
+            if self._transition_algorithm == TransitionAlgorithm.RBT:
+                self.transition = TransitionRBT(self.timing_args, self.system, time_limit=self.transition_time_budget,
+                                                hot_node_scale_up=self.hot_node_scale_up)
+            else:
+                ValueError("'baseline' transition is not valid for the horizontal/vertical predictive autoscaler")
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
-                                              Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
+                                              Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
             return statistics
 
         # Update the HV application loads
@@ -190,8 +194,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             transition_time = current_time() - transition_time_start
 
             # Calculate the times for the two transitions
-            transition1_time = Transition.get_transition_time(commands1, self.timing_args)
-            transition2_time = Transition.get_transition_time(commands2, self.timing_args)
+            transition1_time = self.transition.get_transition_time(commands1, self.timing_args)
+            transition2_time = self.transition.get_transition_time(commands2, self.timing_args)
 
             self.log(f"Transition at {self._next_prediction_window_time - transition1_time}:"
                      f"{transition1_time + transition2_time} seconds")

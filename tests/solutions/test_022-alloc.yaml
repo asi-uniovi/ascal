@@ -88,7 +88,7 @@
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-573:
+519:
   c5.24xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 23
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 20
@@ -112,7 +112,7 @@
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-579:
+525:
   c5.24xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 23
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 20
@@ -136,7 +136,7 @@
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-633:
+579:
   c5.18xlarge-0:
     None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 3
@@ -160,7 +160,7 @@
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-639:
+585:
   c5.18xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 20
     app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
@@ -267,7 +267,7 @@
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-1239:
+1179:
   c5.24xlarge-0:
     None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 20
@@ -300,7 +300,7 @@
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-1245:
+1185:
   c5.24xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 30
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 14
@@ -332,7 +332,7 @@
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-1321:
+1261:
   c5.24xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 30
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 14
@@ -345,17 +345,33 @@
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-1421:
+1361:
   c5.24xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 30
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 14
   c5.24xlarge-1:
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 40
   c5.9xlarge-0:
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 9
+    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 7
+  c5.large-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 8
+  c5.xlarge-0:
+    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1481:
+  c5.24xlarge-0:
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 30
+    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 14
+  c5.24xlarge-1:
+    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 40
+  c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
+  c5.9xlarge-0:
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 9
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 7
   c5.large-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
@@ -370,24 +386,23 @@
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 14
   c5.24xlarge-1:
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 40
-  c5.4xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
-  c5.9xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 8
+  c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
+  c5.9xlarge-0:
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 9
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 7
   c5.large-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.large-1:
+    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
   c5.xlarge-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-1661:
+1601:
   c5.24xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 30
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 14
@@ -396,24 +411,23 @@
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
-  c5.4xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
-  c5.9xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 8
+  c5.2xlarge-1:
     app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
+  c5.9xlarge-0:
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 9
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 7
   c5.large-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.large-1:
+    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
   c5.xlarge-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-1773:
+1724:
   c5.24xlarge-0:
     None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 29
@@ -423,24 +437,23 @@
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
-  c5.4xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
-  c5.9xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 8
+  c5.2xlarge-1:
     app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
+  c5.9xlarge-0:
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 9
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 7
   c5.large-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.large-1:
+    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
   c5.xlarge-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-1779:
+1730:
   c5.24xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 29
     app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
@@ -451,24 +464,23 @@
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 3
-  c5.4xlarge-0:
-    None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 6
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-  c5.9xlarge-0:
+  c5.2xlarge-1:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 3
+  c5.9xlarge-0:
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 7
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 8
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 9
   c5.large-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.large-1:
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
   c5.xlarge-0:
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-1834:
+1785:
   c5.24xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 29
     app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
@@ -480,16 +492,13 @@
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 3
-  c5.4xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
   c5.9xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
-    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 8
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 9
   c5.large-0:
     None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
     app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+  c5.large-1:
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
 1861:
   c5.24xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 29

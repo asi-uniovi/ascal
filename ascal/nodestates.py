@@ -7,7 +7,7 @@ class NodeStates(Enum):
     READY    =  3 # The node is ready to allocate containers
     MOVINGC  =  4 # Containers in the node are in the process of being moved to other nodes
     REMOVING =  5 # The node is in the process of being removed
-    REMOVED  =  6  # The node has been removed, so it is not billed
+    REMOVED  =  6 # The node has been removed, so it is not billed
     UPGRADING = 7 # The node is in the process of being upgraded
 
     @staticmethod

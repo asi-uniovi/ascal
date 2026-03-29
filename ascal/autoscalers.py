@@ -27,6 +27,9 @@ class AllocationSolver(Enum):
     FCMA =  FCMA1     # FCMA algorithm with speed level 1
     MNCF = 5          # Minimum Node Cost Fit allocation
 
+class TransitionAlgorithm(Enum):
+    BASELINE = 1      # Baseline transition algorithm
+    RBT      = 2      # Remove-allocate-copy based transition algorithm
 
 @dataclass(frozen=True)
 class AutoscalerStatistics:
@@ -50,9 +53,6 @@ class Autoscaler(ABC):
 
     # Very small load
     _DELTA_LOAD = RequestsPerTime(f"{_DELTA} req/s")
-
-    # Invalid recycling value
-    INVALID_RECYCLING = -1
 
     def __init__(self, timing_args: TimedOps.TimingArgs | None = None):
         """

@@ -15,6 +15,7 @@ from fcma import (
     ContainerGroup,
     RequestsPerTime,
 )
+from ascal.recycling import Recycling
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
 from ascal.autoscalers import Autoscaler, AutoscalerStatistics
@@ -401,7 +402,7 @@ class HReactiveAutoscaler(Autoscaler):
             self.allocation = self._initial_allocation(app_workloads)
             self.time += 1
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
-                                              Autoscaler.INVALID_RECYCLING, Autoscaler.INVALID_RECYCLING)
+                                              Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
             return statistics
         else:
             # Update the application loads
@@ -434,7 +435,7 @@ class HReactiveAutoscaler(Autoscaler):
 
             self.time += 1
             statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
-                                              0, current_time() - initial_time, Autoscaler.INVALID_RECYCLING,
-                                              Autoscaler.INVALID_RECYCLING)
+                                              0, current_time() - initial_time, Recycling.INVALID_RECYCLING,
+                                              Recycling.INVALID_RECYCLING)
             return statistics
 
