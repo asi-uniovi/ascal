@@ -3,7 +3,7 @@ autoscalers:
   hv_predictive: # Horizontal/vertical+predictive autoscaling
     prediction_window: 300 # Prediction window in seconds
     prediction_percentile: 95 # Percentile for application's load in the prediction window
-    algorithm: fcma  # Allocation algorithm
+    algorithm: fcma, baseline # Allocation and transition algorithms
   
 # Select autoscaler
 autoscaler: hv_predictive

@@ -146,32 +146,20 @@ Unlike what happens with HPA in Kubernetes, this autoscaler is able to work with
     time_period: 60 # Seconds
     desired_cpu_utilization: 0.7
     algorithm: fcma 
-    transition_time_budget: 100 # Seconds
-    hot_node_scale_up: False
 ```
 _hv_reactive_ autoscaler corresponds to the RHVA, i.e., the reactive and horizontal/vertical autoscaler. This autoscaler wakes every _time_period_, also named scheduling window, and creates/removes containers/nodes of different sizes. For each application, the total performance of its container replicas is adjusted to obtain the _desired_cpu_utilization_.  Just like with the horizontal autoscaler scaler, a value lower than one is necessary to handle temporary overloads, or those caused by the delay between requesting the creation of a node and the moment the node becomes available.
-_hot_node_scale_up_ enables hot node upgrade withn the same instance class family.
 
-A new deployment of containers and node is calculated at every time period using the specified algorithm. Currently there are three avaliable algorithms: _fcma1_, _fcma2_ and _fcma3_, in order of decreasing cost, but increasing calculation time.
-
-Transitioning between two consecutive scheduling windows requires a sequence of creations/removals of containers of nodes. Property _transition_time_budget_ provides a budget for the transition algorithm, but the actual time to perform the transition may be higher when the value is too small a ned nodes need to be created.
-Setting this parameter to zero uses a simple transition algorithm that tries to minimize the transition time.
+A new deployment of containers and node is calculated at every time period using the specified algorithm.
 
 ``` yaml
 hv_predictive: 
     prediction_window: 240 # Seconds
     prediction_percentile: 95 # Percentage 
     algorithm: fcma 
-    transition_time_budget: 200 # Seconds
-    hot-node-scale-up: True
 ```
 _hv_predictive_ autoscaler corresponds to the PHVA, i.e., the predictive and horizontal/vertical autoscaler. This autoscaler wakes every _prediction_window_, and creates/removes containers/nodes of different sizes. 
 
 At the current prediction window, application's workload load (for the given percentile) is assumed to be known for the next prediction window. This workload is used to calculate a new deployment for the next prediction window using the provided algorithm (_fcma_ in the example). Two transitions are scheduled, one that completes before the end of the current prediction window, for those applications with increased workload, and another that completes just at the beginning of the next prediction windod, for those applications with decreased workload.
-
-Property _transition_time_budget_ is the total time available to perform the two transitions, but note again, that the actual time may be higher.
-
-Some systems allow hot node scaling-up, so a node can upgrade to adquire more computational resources without being removed and recreated.
 
 ``` yaml
 h_reactive_hv_reactive:
@@ -182,8 +170,6 @@ h_reactive_hv_reactive:
     h_node_scale_down_stabilization_time: 600
     hv_time_period: 600
     hv_algorithm: fcma
-    hv_transition_time_budget: 100
-    hot_node_scale_up: False
 ```
 
 _h_reactive_hv_reactive_ autoscaler corresponds to the RHA-RHVA, i.e., a combination of a reactive horizontal autoscaler and a reactive horizontal/vertical autoscaler. It basically performs as a reactive horizontal autoscaler that is readjusted every _hv_time_period_ seconds by a reactive horizontal/vertical autoscaler, moving the deployment to a near-optimal one.
@@ -198,8 +184,6 @@ h_reactive_hv_predictive:
     hv_prediction_window: 600
     hv_prediction_percentile: 95
     hv_algorithm: fcma 
-    hv_transition_time_budget: 100 
-    hot_node_scale_up: False
 ```
 
 _h_reactive_hv_predictive_ autoscaler corresponds to the RHA-PHVA, i.e., a combination of a reactive horizontal autoscaler and a predictive horizontal/vertical autoscaler. It basically performs as a reactive horizontal autoscaler that is readjusted every _hv_time_period_ seconds by a predictive horizontal/vertical autoscaler, moving the deployment to a near-optimal one.
@@ -220,7 +204,6 @@ timing_args:
   node_removal_time: 10
   container_creation_time: 1 
   container_removal_time: 5 
-  hot_node_scale_up_time: 60
 ```
 Property _node_time_to_billing_ is the time between the request of a new node creation and the time the node starts to be billed. Between _node_time_to_billing_ and _node_creation_time_ the node can not allocate containers yet, but it is billed.
 Finally, _hot_node_scale_up_time_ is the time required to perform a node upgrade.

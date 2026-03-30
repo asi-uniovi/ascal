@@ -376,49 +376,53 @@ class AscalConfig:
         :param config: Configuration.
         :raises ValueError: When a validation fails.
         """
-        mandatory = ["time_period", "desired_cpu_utilization", "transition_time_budget"]
-        optional = ["allocation", "hot_node_scale_up", "hot_container_scale"]
-        if "allocation" not in config["autoscalers"]["hv_reactive"]:
-            config["autoscalers"]["hv_reactive"]["allocation"] = "fcma"
+        mandatory = ["time_period", "desired_cpu_utilization"]
+        optional = ["algorithm", "hot_node_scale_up", "hot_container_scale", "transition_time_budget"]
+        if "algorithm" not in config["autoscalers"]["hv_reactive"]:
+            config["autoscalers"]["hv_reactive"]["algorithm"] = "fcma"
         if "hot_node_scale_up" not in config["autoscalers"]["hv_reactive"]:
             config["autoscalers"]["hv_reactive"]["hot_node_scale_up"] = False
         if "hot_container_scale" not in config["autoscalers"]["hv_reactive"]:
             config["autoscalers"]["hv_reactive"]["hot_container_scale"] = False
-        AscalConfig._check_fields(config["autoscalers"]["hv_reactive"], mandatory ,[int, float, int])
-        AscalConfig._check_fields(config["autoscalers"]["hv_reactive"], optional, [str, bool, bool])
+        if "transition_time_budget" not in config["autoscalers"]["hv_reactive"]:
+            config["autoscalers"]["hv_reactive"]["transition_time_budget"] = 0
+        AscalConfig._check_fields(config["autoscalers"]["hv_reactive"], mandatory ,[int, float])
+        AscalConfig._check_fields(config["autoscalers"]["hv_reactive"], optional, [str, bool, bool, int])
         if set(mandatory + optional) != set(list(config["autoscalers"]["hv_reactive"].keys()) + optional):
-            raise ValueError(f"Invalid property in hv_reactive need to be removed in hv_reactive")
+            raise ValueError(f"Invalid property in hv_reactive need to be removed")
         if config["autoscalers"]["hv_reactive"]["time_period"] < 0:
             raise ValueError("Time period must be possitive in hv_reactive")
         if config["autoscalers"]["hv_reactive"]["desired_cpu_utilization"] < 0.1:
             raise ValueError("Desired CPU utilization must be >= 0.1 in hv_reactive")
         if config["autoscalers"]["hv_reactive"]["transition_time_budget"] < 0:
             raise ValueError("Transition time budget must be >= 0 in hv_reactive")
-        if config["autoscalers"]["hv_reactive"]["allocation"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
-            raise ValueError("Valid allocations in hv_reactive are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
+        # Check allocation and transition algorithms
+        AscalConfig._get_algoritm(config["autoscalers"]["hv_reactive"]["algorithm"]) 
 
     @staticmethod
     def _validate_hv_predictive(config):
-        mandatory = ["prediction_window", "prediction_percentile", "transition_time_budget"]
-        optional = ["allocation", "hot_node_scale_up", "hot_container_scale"]   
-        if "allocation" not in config["autoscalers"]["hv_predictive"]:
-            config["autoscalers"]["hv_predictive"]["allocation"] = "fcma"
+        mandatory = ["prediction_window", "prediction_percentile"]
+        optional = ["algorithm", "hot_node_scale_up", "hot_container_scale", "transition_time_budget"]
+        if "algorithm" not in config["autoscalers"]["hv_predictive"]:
+            config["autoscalers"]["hv_predictive"]["algorithm"] = "fcma"
         if "hot_node_scale_up" not in config["autoscalers"]["hv_predictive"]:
             config["autoscalers"]["hv_predictive"]["hot_node_scale_up"] = False
         if "hot_container_scale" not in config["autoscalers"]["hv_predictive"]:
             config["autoscalers"]["hv_predictive"]["hot_container_scale"] = False
+        if "transition_time_budget" not in config["autoscalers"]["hv_predictive"]:
+            config["autoscalers"]["hv_predictive"]["transition_time_budget"] = 0
         if set(mandatory + optional) != set(list(config["autoscalers"]["hv_predictive"].keys()) + optional):
             raise ValueError(f"Invalid property in hv_predictive need to be removed")
-        AscalConfig._check_fields(config["autoscalers"]["hv_predictive"], mandatory,[int, int, int])
-        AscalConfig._check_fields(config["autoscalers"]["hv_predictive"], optional, [str, bool, bool])
+        AscalConfig._check_fields(config["autoscalers"]["hv_predictive"], mandatory,[int, int])
+        AscalConfig._check_fields(config["autoscalers"]["hv_predictive"], optional, [str, bool, bool, int])
         if config["autoscalers"]["hv_predictive"]["prediction_window"] < 10:
             raise ValueError("Prediction window must be >= 10 in hv_predictive")
         if config["autoscalers"]["hv_predictive"]["prediction_percentile"] == 0:
             raise ValueError("Prediction percentile must be >= 0.1 in hv_predictive")
         if config["autoscalers"]["hv_predictive"]["transition_time_budget"] < 0:
             raise ValueError("Transition time budget must be >= 0 in hv_predictive")
-        if config["autoscalers"]["hv_predictive"]["allocation"] not in ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
-            raise ValueError("Valid allocations in hv_predictive are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
+        # Check allocation and transition algorithms
+        AscalConfig._get_algoritm(config["autoscalers"]["hv_predictive"]["algorithm"]) 
         
     @staticmethod
     def _validate_h_reactive_hv_reactive(config):
@@ -428,21 +432,22 @@ class AscalConfig:
         :raises ValueError: When a validation fails.
         """
         mandatory = ["h_time_period", "h_replica_scale_down_stabilization_time",
-                     "h_node_scale_down_stabilization_time", 
-                     "h_node_utilization_threshold", "desired_cpu_utilization",
-                     "hv_time_period", "hv_transition_time_budget"] 
-        optional = ["hv_allocation", "hv_hot_node_scale_up", "hv_hot_container_scale"]
-        if "hv_allocation" not in config["autoscalers"]["h_reactive_hv_reactive"]:
-            config["autoscalers"]["h_reactive_hv_reactive"]["hv_allocation"] = "fcma"
+                     "h_node_scale_down_stabilization_time", "h_node_utilization_threshold", 
+                     "desired_cpu_utilization", "hv_time_period"] 
+        optional = ["hv_algorithm", "hv_hot_node_scale_up", "hv_hot_container_scale", "hv_transition_time_budget"]
+        if "hv_algorithm" not in config["autoscalers"]["h_reactive_hv_reactive"]:
+            config["autoscalers"]["h_reactive_hv_reactive"]["hv_algorithm"] = "fcma"
         if "hv_hot_node_scale_up" not in config["autoscalers"]["h_reactive_hv_reactive"]:
             config["autoscalers"]["h_reactive_hv_reactive"]["hv_hot_node_scale_up"] = False
         if "hv_hot_container_scale" not in config["autoscalers"]["h_reactive_hv_reactive"]:
             config["autoscalers"]["h_reactive_hv_reactive"]["hv_hot_container_scale"] = False
+        if "hv_transition_time_budget" not in config["autoscalers"]["h_reactive_hv_reactive"]:
+            config["autoscalers"]["h_reactive_hv_reactive"]["hv_transition_time_budget"] = 0
         if set(mandatory + optional) != set(list(config["autoscalers"]["h_reactive_hv_reactive"].keys()) + optional):
             raise ValueError(f"Invalid property in h_reactive_hv_reactive need to be removed")
         AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_reactive"], mandatory,
-                                  [int, int, int, float, float, int, int])
-        AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_reactive"], optional, [str, bool, bool])
+                                  [int, int, int, float, float, int])
+        AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_reactive"], optional, [str, bool, bool, int])
         h_time_period = config["autoscalers"]["h_reactive_hv_reactive"]["h_time_period"]
         hv_time_period = config["autoscalers"]["h_reactive_hv_reactive"]["hv_time_period"]
         if h_time_period <= 0:
@@ -460,10 +465,8 @@ class AscalConfig:
             raise ValueError("Node scale-down stabilization time must be >= 0 in h_reactive_hv_reactive")
         if config["autoscalers"]["h_reactive_hv_reactive"]["hv_transition_time_budget"] < 0:
             raise ValueError("Transition time budget must be >= 0 in h_reactive_hv_reactive")
-        if config["autoscalers"]["h_reactive_hv_reactive"]["hv_allocation"] not in\
-              ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
-            raise ValueError("Valid allocations in h_reactive_hv_reactive are "
-                             "'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
+        # Check allocation and transition algorithms
+        AscalConfig._get_algoritm(config["autoscalers"]["h_reactive_hv_reactive"]["hv_algorithm"]) 
     
     @staticmethod
     def _validate_h_reactive_hv_predictive(config):
@@ -475,20 +478,22 @@ class AscalConfig:
         mandatory = ["h_time_period", "h_replica_scale_down_stabilization_time",
                      "h_node_scale_down_stabilization_time", 
                      "h_node_utilization_threshold", "h_desired_cpu_utilization",
-                     "hv_prediction_window", "hv_prediction_percentile", "hv_transition_time_budget"] 
-        optional = ["hv_allocation", "hv_hot_node_scale_up", "hv_hot_container_scale"]
-        if "hv_allocation" not in config["autoscalers"]["h_reactive_hv_predictive"]:
-            config["autoscalers"]["h_reactive_hv_predictive"]["hv_allocation"] = "fcma"
+                     "hv_prediction_window", "hv_prediction_percentile"] 
+        optional = ["hv_algorithm", "hv_hot_node_scale_up", "hv_hot_container_scale", "hv_transition_time_budget"]
+        if "hv_algorithm" not in config["autoscalers"]["h_reactive_hv_predictive"]:
+            config["autoscalers"]["h_reactive_hv_predictive"]["hv_algorithm"] = "fcma"
         if "hv_hot_node_scale_up" not in config["autoscalers"]["h_reactive_hv_predictive"]:
             config["autoscalers"]["h_reactive_hv_predictive"]["hv_hot_node_scale_up"] = False
         if "hv_hot_container_scale" not in config["autoscalers"]["h_reactive_hv_predictive"]:
             config["autoscalers"]["h_reactive_hv_predictive"]["hv_hot_container_scale"] = False
+        if "hv_transition_time_budget" not in config["autoscalers"]["h_reactive_hv_predictive"]:
+            config["autoscalers"]["h_reactive_hv_predictive"]["hv_transition_time_budget"] = 0
         if set(mandatory + optional) != \
             set(list(config["autoscalers"]["h_reactive_hv_predictive"].keys()) + optional):
             raise ValueError(f"Invalid property in h_reactive_hv_predictive need to be removed")
         AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_predictive"], mandatory,
-                                  [int, int, int, float, float, int, int, int])
-        AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_predictive"], optional, [str, bool, bool])
+                                  [int, int, int, float, float, int, int])
+        AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_predictive"], optional, [str, bool, bool, int])
         h_time_period = config["autoscalers"]["h_reactive_hv_predictive"]["h_time_period"]
         hv_prediction_window = config["autoscalers"]["h_reactive_hv_predictive"]["hv_prediction_window"]
         hv_prediction_percentile = config["autoscalers"]["h_reactive_hv_predictive"]["hv_prediction_percentile"]
@@ -508,10 +513,8 @@ class AscalConfig:
             raise ValueError("Node scale-down stabilization time must be >= 0 in h_reactive_hv_predictive")
         if config["autoscalers"]["h_reactive_hv_predictive"]["hv_transition_time_budget"] < 0:
             raise ValueError("Transition time budget must be >= 0 in h_reactive_hv_predictive")
-        if config["autoscalers"]["h_reactive_hv_predictive"]["hv_allocation"] not in\
-              ["fcma", "fcma1", "fcma2", "fcma3", "mncf"]:
-            raise ValueError("Valid allocations in h_reactive_hv_predictive are "
-                             "'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
+        # Check allocation and transition algorithms
+        AscalConfig._get_algoritm(config["autoscalers"]["h_reactive_hv_predictive"]["hv_algorithm"]) 
 
     @staticmethod
     def _validate_autoscalers(config):

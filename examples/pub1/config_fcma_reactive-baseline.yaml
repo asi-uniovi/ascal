@@ -1,12 +1,12 @@
 # All available autoscalers
 autoscalers:
-  hv_predictive: # Horizontal/vertical+predictive autoscaling
-    prediction_window: 300 # Prediction window in seconds
-    prediction_percentile: 95 # Percentile for application's load in the prediction window
-    algorithm: fcma  # Allocation algorithm
-  
+  hv_reactive: # Horizontal/vertical+reactive autoscaling
+    time_period: 150 # Time period to evaluate autoscaling
+    desired_cpu_utilization: 0.7  # Desired CPU utilization
+    algorithm: fcma, baseline # Allocation and transition algorithms
+
 # Select autoscaler
-autoscaler: hv_predictive
+autoscaler: hv_reactive
 
 # Times in seconds for node/container creation/removal
 timing_args:
@@ -23,7 +23,7 @@ timing_args:
 apps:
   $A_0$:
     load:
-      file: triangle1.csv # Integer load samples in req/s
+      file: trapezoid1.csv # Integer load samples in req/s
       time_interval: 60 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
       load_offset: 0 # Integer value to be added to every load sample
@@ -36,7 +36,7 @@ apps:
       aggs: [1, 2, 4]
   $A_1$:
     load:
-      file: triangle2.csv # Integer load samples in req/s
+      file: trapezoid2.csv # Integer load samples in req/s
       time_interval: 60 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
       load_offset: 0 # Integer value to be added to every load sample
@@ -51,4 +51,4 @@ apps:
 # Simulation time in seconds.
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
-simulation_time: 3600 # 1 hour
+simulation_time: 86400 # 24 hours

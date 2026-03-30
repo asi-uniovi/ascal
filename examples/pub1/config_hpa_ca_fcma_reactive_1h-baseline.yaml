@@ -1,12 +1,16 @@
 # All available autoscalers
 autoscalers:
-  hv_predictive: # Horizontal/vertical+predictive autoscaling
-    prediction_window: 300 # Prediction window in seconds
-    prediction_percentile: 95 # Percentile for application's load in the prediction window
-    algorithm: fcma  # Allocation algorithm
-  
+  h_reactive_hv_reactive:
+    desired_cpu_utilization: 0.7  # Desired CPU utilization for both, the horizontal and vertical autoscaler
+    h_time_period: 60 # Time period to evaluate autoscaling for the horizontal autoscaler
+    h_node_utilization_threshold: 0.5 # Below this utilization, node removal is tried by the horizontal autoscaler
+    h_replica_scale_down_stabilization_time: 300 # Minimum time from a previous replica scale-up to a replica scale-down
+    h_node_scale_down_stabilization_time: 600 # Minimum time from a previous node scale-up to a node scale-down
+    hv_time_period: 600 # Time period to evaluate autoscaling for the horizontal/vertical autoscaler
+    hv_algorithm: fcma, baseline # Allocation and transition algorithms for the horizontal/vertical autoscaler
+
 # Select autoscaler
-autoscaler: hv_predictive
+autoscaler: h_reactive_hv_reactive
 
 # Times in seconds for node/container creation/removal
 timing_args:

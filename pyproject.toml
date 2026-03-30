@@ -13,11 +13,9 @@ readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
     "fcma",
-    "ipympl>=0.9.7",
     "matplotlib>=3.10.3",
     "pyyaml>=6.0.2",
     "scipy>=1.16.0",
-    "numpy>=1.26.4",
 ]
 requires-python = ">=3.12"
 
@@ -31,4 +29,9 @@ packages = ["examples"]
 dev = [
     "pandas>=2.3.1",
     "pytest-cov>=6.2.1",
+]
+examples = [
+    "fastparquet>=2026.3.0",
+    "ipykernel>=7.2.0",
+    "ipympl>=0.9.7",
 ]
