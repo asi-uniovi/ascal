@@ -1,0 +1,18 @@
+problem_file,processing_time(s),cost($),speedup,cost_divider
+../examples/pub1/config_fcma_predictive_1h-baseline.yaml, 0.62, 0.85, -, -
+../examples/pub1/config_fcma_reactive_1h.yaml, 1.18, 1.04, -, -
+../examples/pub1/config_hpa_ca_fcma_reactive_1h.yaml, 0.69, 1.04, -, -
+../examples/pub1/config_hpa_ca_fcma_reactive_1h-baseline.yaml, 0.69, 1.04, -, -
+../examples/pub1/config_fcma_predictive.yaml, 20.42, 16.42, -, -
+../examples/pub1/config_hpa_ca_fcma_reactive-baseline.yaml, 14.86, 23.38, -, -
+../examples/pub1/config_fcma_reactive_1h-baseline.yaml, 0.90, 1.22, -, -
+../examples/pub1/config_hpa_ca.yaml, 9.98, 27.73, -, -
+../examples/pub1/config_hpa_ca_fcma_predictive_1h.yaml, 0.74, 0.94, -, -
+../examples/pub1/config_hpa_ca_fcma_predictive.yaml, 18.30, 21.11, -, -
+../examples/pub1/config_fcma_predictive_1h.yaml, 1.04, 0.80, -, -
+../examples/pub1/config_hpa_ca_1h.yaml, 0.47, 1.28, -, -
+../examples/pub1/config_fcma_predictive-baseline.yaml, 13.52, 17.78, -, -
+../examples/pub1/config_hpa_ca_fcma_reactive.yaml, 14.74, 23.38, -, -
+../examples/pub1/config_fcma_reactive-baseline.yaml, 21.54, 26.72, -, -
+../examples/pub1/config_fcma_reactive.yaml, 26.44, 23.56, -, -
+TOTAL, 146.13, 188.28, -, -
