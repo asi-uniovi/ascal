@@ -645,7 +645,7 @@
   c5.xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
-2500:
+2400:
   c5.18xlarge-0:
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 34
   c5.24xlarge-0:
@@ -659,7 +659,7 @@
   c5.xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
-2506:
+2406:
   c5.18xlarge-0:
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 34
@@ -671,13 +671,21 @@
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 40
   c5.xlarge-0:
     None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
-2580:
+2460:
   c5.18xlarge-0:
-    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 33
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 34
   c5.24xlarge-0:
     app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 6
+    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 34
+  c5.24xlarge-1:
+    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 40
+2520:
+  c5.18xlarge-0:
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 34
+  c5.24xlarge-0:
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 6
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 34
   c5.24xlarge-1:
@@ -685,30 +693,18 @@
 2640:
   c5.18xlarge-0:
     None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 32
+    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 33
   c5.24xlarge-0:
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 6
-    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 33
-  c5.24xlarge-1:
-    app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 40
-2700:
-  c5.18xlarge-0:
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 32
-  c5.24xlarge-0:
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 6
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 33
   c5.24xlarge-1:
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 40
 2760:
   c5.18xlarge-0:
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 32
   c5.24xlarge-0:
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 1
     app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 6
     app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 32
