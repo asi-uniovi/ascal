@@ -126,7 +126,7 @@ class AscalConfig:
         AscalConfig._validate_apps(config)
 
     @staticmethod
-    def _get_check_aggs(data, apps: list[App], aggs) -> dict[App, list[int]]:
+    def _get_aggs(data, apps: list[App], aggs) -> dict[App, list[int]]:
         """
         Get the aggregation levels for the applications using the horizontal autoscaler.
         :param data: Data read from the YAML file.
@@ -185,8 +185,10 @@ class AscalConfig:
             allocation_str, transition_str = algorithm_str.split(", ")
         else:
             allocation_str = algorithm_str
-            transition_str = "rbt"
-        if allocation_str == 'fcma' or allocation_str == 'fcma1':
+            transition_str = 'rbt' # Default transition algorithm
+        if allocation_str == 'fcma':
+            allocation = AllocationSolver.FCMA
+        elif allocation_str == 'fcma1':
             allocation = AllocationSolver.FCMA1
         elif allocation_str == 'fcma2':
             allocation = AllocationSolver.FCMA2
@@ -198,10 +200,16 @@ class AscalConfig:
             raise ValueError("Valid allocation algorithms are 'fcma', 'fcma1', 'fcma2', 'fcma3' or 'mncf'")
         if transition_str == 'rbt':
             transition = TransitionAlgorithm.RBT
+        elif transition_str == 'rbt1':
+            transition = TransitionAlgorithm.RBT1
+        elif transition_str == 'rbt2':
+            transition = TransitionAlgorithm.RBT2
+        elif transition_str == 'rbt3':
+            transition = TransitionAlgorithm.RBT3
         elif transition_str == 'baseline':
             transition = TransitionAlgorithm.BASELINE
         else:
-            raise ValueError("Valid transition algorithms are 'rbt' and 'baseline'")
+            raise ValueError("Valid transition algorithms are 'rbt', 'rbt1', 'rbt2', 'rbt3' and 'baseline'")
         return allocation, transition
 
     @staticmethod
@@ -220,7 +228,7 @@ class AscalConfig:
                 data['autoscalers']['h_reactive']['node_utilization_threshold'],
                 data['autoscalers']['h_reactive']['replica_scale_down_stabilization_time'],
                 data['autoscalers']['h_reactive']['node_scale_down_stabilization_time'],
-                AscalConfig._get_check_aggs(data, config.apps, aggs=data["autoscalers"]['h_reactive']["aggs"]),
+                AscalConfig._get_aggs(data, config.apps, aggs=data["autoscalers"]['h_reactive']["aggs"]),
                 timing_args
             )
         elif data['autoscaler'] == 'hv_reactive':

@@ -23,13 +23,15 @@ class AllocationSolver(Enum):
     FCMA1 = 1         # FCMA algorithm with speed level 1
     FCMA2 = 2         # FCMA algorithm with speed level 2
     FCMA3 = 3         # FCMA algorithm with speed level 3
-    FCMA4 = 4         # FCMA algorithm with speed level 4
-    FCMA =  FCMA1     # FCMA algorithm with speed level 1
-    MNCF = 5          # Minimum Node Cost Fit allocation
+    FCMA  = FCMA1     # Default FCMA algorithm
+    MNCF  = 4         # Minimum Node Cost Fit allocation
 
 class TransitionAlgorithm(Enum):
-    BASELINE = 1      # Baseline transition algorithm
-    RBT      = 2      # Remove-allocate-copy based transition algorithm
+    RBT1 = 1          # Recycling-based Transition algorithm 1
+    RBT2 = 2          # Recycling-based Transition algorithm 2
+    RBT3 = 3          # Recycling-based Transition algorithm 3
+    RBT  = RBT3       # Default RBT algorithm
+    BASELINE = 4      # Baseline transition algorithm
 
 @dataclass(frozen=True)
 class AutoscalerStatistics:

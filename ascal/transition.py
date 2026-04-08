@@ -27,9 +27,20 @@ identified by a command flag "sync_on_nodes_creation"/"sync_on_nodes_upgrade" se
 any individual node removal is suspended until its containers have been removed. Similarly, any individual
 container allocation is suspended until the destination node has enough computational resources.
 
+Four transition algorithms are implemented:
+- Baseline transition. It performs the transition in 4 steps: 1) create all the nodes in the final allocation, 
+2) allocate all the containers in these created nodes, 3) remove all the containers in the initial allocation, 
+and 4) remove all the nodes in the initial allocation.
+- RBT3. It is the simplest variant based on the recycling. It does not perform remove-alocate-copy steps while new 
+nodes are created or recycled nodes are upgraded.
+- RBT2. The same as RBT2 but it performs remove-allocate-copy steps while new nodes are created or recycled nodes are
+ upgraded. 
+ - RBT1. It improves RBT2 breaking the containers to copy into smaller ones.
+
 Limitations of the current implementation:
-- A single familily of instance classes is supported.
-- All containers of a given application are configured with the same amount of memory.
+- All the containers of a given application are configured with the same amount of memory when they run on nodes 
+of the same instance class family.
+- All the nodes belong to instance classes of teh same family.
 """
 
 from math import ceil, floor
@@ -780,7 +791,15 @@ class TransitionRBT(Transition):
             cc = replace(cc, label="")
         if cc not in node.replicas:
             return 0
-        performance_surplus = self._app_perf_increment if relaxed_removal else self._app_perf_surplus
+        # The relaxed performance surplus is the sum of the application's performance surplus and the performance 
+        # increment from the same command. It is enabled when removing containers that have been allocated in the 
+        # same command. The command simplification method deletes both, the allocation and removal of the same 
+        # containers within the same command. 
+        relaxed_perf_surplus = {
+            app: self._app_perf_surplus[app] + self._app_perf_increment[app] 
+            for app in self._app_perf_surplus
+        }
+        performance_surplus = relaxed_perf_surplus if relaxed_removal else self._app_perf_surplus
         removed_replicas = min(
             node.replicas[cc], 
             replicas, 
@@ -927,39 +946,34 @@ class TransitionRBT(Transition):
         # List of containers that will be allocatable in the next execution of the remove-allocate-copy algorithm
         self._allocatable_cs_next_step = []
 
-    def _update_next_copy_state(self, allocatable_replicas:int, cc: ContainerClass, src_node: Vmt, 
-                               copied_obsolete_replicas: list[tuple[ContainerClass, int, Vmt]], 
-                               removed_obsolete_replicas: list[tuple[ContainerClass, int, Vmt]],
-                               available_obsolete_containers: dict[Vmt, dict[ContainerClass, int]], 
-                               available_node_free_resources: list[Vmt, tuple[float, float]]) \
-                                -> Command:
+    def _update_copy_state(self, allocatable_replicas:int, cc: ContainerClass, src_node: Vmt, 
+                           copied_obsolete_replicas: list[tuple[ContainerClass, int, Vmt]], 
+                           removed_obsolete_replicas: list[tuple[ContainerClass, int, Vmt]],
+                           available_obsolete_replicas: dict[Vmt, dict[ContainerClass, int]], 
+                           available_node_free_resources: list[Vmt, tuple[float, float]]) -> Command:
         """
-        Update the state for the copy of obsolete containers in the next remove-allocate-copy execution.
-        :param allocatable_replicas: Number of allocatable replicas of the new container.
-        :param cc: Container class for the new container.
-        :param src_node: Source node for the new_container.
-        :param copied_obsolete_replicas: List of obsolete replicas in the source node copied to allocate the new container.
-        :param removed_obsolete_replicas: List of obsolete replicas removed in the destination nodes  
-        to allocate copies of obsolete replicas from the source node.
-        :param available_obsolete_containers: Available obsolete containers after the allocation of the new container.
-        :param available_node_free_resources: Available free computational resources after the allocation of
-        the new container.
+        Update the state for the next copy of obsolete containers within the remove-allocate-copy algorithm.
+        The state is defined by: 
+        - Available obsolete replicas in all the nodes.
+        - Available free resources in all the nodes.
+        :param allocatable_replicas: Number of allocatable replicas after the last copy operation.
+        :param cc: Container class for the allocatable replicas after the last copy operation.
+        :param src_node: Source node that will allocate the replicas after the last copy operation.
+        :param copied_obsolete_replicas: List of obsolete replicas in the source node copied to allocate 
+        new replicas.
+        :param removed_obsolete_replicas: List of obsolete replicas removed in destination nodes to free up
+        computational resources for copies of obsolete replicas coming from source nodes.
+        :param available_obsolete_containers: Available obsolete containers after the copy 
+        and subsequent allocation in the source node.
+        :param available_node_free_resources: Available free computational resources after after the copy 
+        and subsequent allocation in the source node.
         :return: A command with the removal of copies of obsolete containers in the source node.
         """
         command = Command()
 
-        # The allocation of allocatable_replicas of the new container will reduce the available free cores and memory 
-        # of the source node, whereas the copied obsolete replicas will increase the availablefree cores and memory
-        free_src_cores, free_src_mem = available_node_free_resources[src_node]
-        for copied_cc, copied_replicas, _ in copied_obsolete_replicas:
-            free_src_cores += copied_replicas * copied_cc.cores
-            free_src_mem += copied_replicas * copied_cc.mem[0]
-        free_src_cores -= allocatable_replicas * cc.cores
-        free_src_mem -= allocatable_replicas * cc.mem[0]
-        available_node_free_resources[src_node] = (free_src_cores, free_src_mem)
-
-        # Removed obsolete replicas in destination nodes will increase free cores and memory 
-        # whereas the copied obsolete replicas will reduce free cores and memory
+        # Removed Obsolete replicas in the destination nodes will free up resources for copies of obsolete 
+        # replicas coming from source nodes, increasing the available free cores and memory in those nodes.
+        # The copied obsolete replicas will reduce free cores and memory in those nodes
         for removed_cc, removed_replicas, dest_node in removed_obsolete_replicas:
             free_dst_cores, free_dst_mem = available_node_free_resources[dest_node]
             free_dst_cores += removed_replicas * removed_cc.cores
@@ -971,29 +985,43 @@ class TransitionRBT(Transition):
             free_dst_mem -= copied_replicas * copied_cc.mem[0]
             available_node_free_resources[dest_node] = (free_dst_cores, free_dst_mem)
 
+        # Copied obsolete replicas in the source node will increase the available free cores 
+        # and memory in the source nodes after being removed. Next, they will be reduced after 
+        # the allocation of container replicas in the source node 
+        free_src_cores, free_src_mem = available_node_free_resources[src_node]
+        for copied_cc, copied_replicas, _ in copied_obsolete_replicas:
+            free_src_cores += copied_replicas * copied_cc.cores
+            free_src_mem += copied_replicas * copied_cc.mem[0]
+        free_src_cores -= allocatable_replicas * cc.cores
+        free_src_mem -= allocatable_replicas * cc.mem[0]
+        available_node_free_resources[src_node] = (free_src_cores, free_src_mem)
+
+        # The available obsolete replicas change after the copy. On one hand, the original replicas will be removed, 
+        # so they will not be available for future copies. On the other hand, the destination copies will be available 
+        # for future copies. 
         for copied_cc, copied_replicas, dest_node in copied_obsolete_replicas:
-            # Copied obsolete replicas can not be copied again
-            available_obsolete_containers[src_node][copied_cc] -= copied_replicas
-            if available_obsolete_containers[src_node][copied_cc] == 0:
-                del available_obsolete_containers[src_node][copied_cc]
+            available_obsolete_replicas[src_node][copied_cc] -= copied_replicas
+            if available_obsolete_replicas[src_node][copied_cc] == 0:
+                del available_obsolete_replicas[src_node][copied_cc]
             if copied_cc.label == "c": 
-                # If the source replicas are copies, they are removed without performance constraints
+                # If the original replicas are copies, they can be removed with relaxed performance constraints
                 self._remove_obsolete_replicas(copied_cc, copied_replicas, src_node, command, relaxed_removal=True)
-            # The copied replicas are available for future copies 
+            # Label the copied replicas
             labelled_copied_cc = replace(copied_cc, label="c")
-            if dest_node not in available_obsolete_containers:
-                available_obsolete_containers[dest_node] = {labelled_copied_cc: copied_replicas}
+            # The copied replicas are available for future copies 
+            if dest_node not in available_obsolete_replicas:
+                available_obsolete_replicas[dest_node] = {labelled_copied_cc: copied_replicas}
             else:
-                if labelled_copied_cc not in available_obsolete_containers[dest_node]:
-                    available_obsolete_containers[dest_node][labelled_copied_cc] = copied_replicas
+                if labelled_copied_cc not in available_obsolete_replicas[dest_node]:
+                    available_obsolete_replicas[dest_node][labelled_copied_cc] = copied_replicas
                 else:
-                    available_obsolete_containers[dest_node][labelled_copied_cc] += copied_replicas
+                    available_obsolete_replicas[dest_node][labelled_copied_cc] += copied_replicas
 
         # Removed obsolete replicas in the destination nodes will not be longer available
-        for removed_cc, removed_replicas, node in removed_obsolete_replicas:
-            available_obsolete_containers[node][removed_cc] -= removed_replicas
-            if available_obsolete_containers[node][removed_cc] == 0:
-                del available_obsolete_containers[node][removed_cc]
+        for removed_cc, removed_replicas, dest_node in removed_obsolete_replicas:
+            available_obsolete_replicas[dest_node][removed_cc] -= removed_replicas
+            if available_obsolete_replicas[dest_node][removed_cc] == 0:
+                del available_obsolete_replicas[dest_node][removed_cc]
 
         return command
     
@@ -1003,18 +1031,19 @@ class TransitionRBT(Transition):
                                   dest_nodes: list[Vmt]) -> tuple[int, Command]:
         """
         Copy obsolete replicas from a source node to destination nodes, removing obsolete containers from
-        the destination nodes if necessary. This operation sets up the allocation of new containers for the next
-        remove-allocate-copy execution.
-        The copy process depends of previous copies in the same call that modify the available obsolete
-        containers and free computational resources.
-        :param node_cc_replicas: Source node, container class and replicas for the new containers to allocate 
-        in the next call to the remove-allocate-copy algorithm.
+        the destination nodes if necessary. This operation sets up the allocation of new containers at the
+        beginning of the next remove-allocate-copy execution.
+        The copy process depends of previous copies in the same call of this method that modify the available 
+        obsolete containers and free computational resources.
+        :param node_cc_replicas: Source node, container class and replicas for the new containers to allocate. 
+        at the beginning of the next call to the remove-allocate-copy algorithm.
         :param available_obsolete_containers: Elegible obsolete containers in all the nodes. They are updated
         when at least a new container replica will be allocatable in the next remove-allocate-copy execution.
         :param available_node_free_resources: Free computational resources in the node. They are updated when
         at least a new container replica will be allocatable in the next remove-allocate-copy execution.
         :param dest_nodes: Elegible destination nodes to allocate copies of obsolete containers.
-        :return: A tuple with the number of allocatable new containers and a command with the operations.
+        :return: A tuple with the number of allocatable new containers and a command with the removals and 
+        allocations of containers.
         """
         # Source node, container class and number of replicas to allocate
         src_node, cc, replicas_to_allocate = node_cc_replicas
@@ -1032,35 +1061,31 @@ class TransitionRBT(Transition):
 
         # The state must be recovered when we fail to allocate at least one replica, so create backups.
         # It should be noted that the state is changed by the execution of the remove-allocate algorithm
-        modified_dest_nodes = []
+        modified_dest_nodes = [] # List of modified nodes to recover their state when the copy fails
         dest_nodes_backup = {
             node: (node.free_cores, node.free_mem, defaultdict(lambda: 0, node.replicas))
             for node in dest_nodes
-        }
+        } # Backup of all the destination nodes, including free resources and allocated containers
         zero_perf = RequestsPerTime("0 req/s")
         app_perf_surplus_backup = defaultdict(lambda: zero_perf, self._app_perf_surplus)
         app_perf_increment_backup = defaultdict(lambda: zero_perf, self._app_perf_increment)
         obsolete_containers_backup = {
             node: {cc: replicas for cc, replicas in cc_replicas.items()}
             for node, cc_replicas in self._recycling.obsolete_containers.items()
-        }
-
-        # Next, allocate obsolete container copies in destination nodes
+        } # backup of obselete containers in all the nodes
 
         command = Command()
 
-        # In case of success, these obsolete replicas will be no longer elegible. Available obsolete containers
-        # and free computational resources in nodes are updated accordingly        
+        # In case of success, these obsolete replicas in the source node will be no longer elegible in next copies
         copied_obsolete_replicas = []
 
-        # In case of success, these obsolete replicas will be removed from destination nodes. Available obsolete
-        # containers and free computational resources in nodes are updated accordingly
+        # In case of success, these obsolete replicas will be removed from destination nodes and will no longer 
+        # elegible in next copies
         removed_obsolete_replicas = []
 
+        # Copy enough obsolete replicas to free up computational resources in the source node to allocate the new replicas
         for removable_cc, available_replicas in available_src_node_obsolete_containers.items():
-            # Required obsolete containers to free up enough computational resurces to allocate
-            # replicas_to_allocate replicas in the node, considering rounding errors and the maximum
-            # number of available replicas
+            # Calculate the number of obselete replicas of the container to remove from the source node
             required_obsolete_replicas = max(
                 ((required_cores - free_src_cores) / removable_cc.cores).magnitude,
                 ((required_mem - free_src_mem) / removable_cc.mem[0]).magnitude
@@ -1068,17 +1093,18 @@ class TransitionRBT(Transition):
             required_obsolete_replicas = int(ceil(required_obsolete_replicas - TransitionRBT._DELTA))
             replicas_to_remove = min(required_obsolete_replicas, available_replicas)
 
-            # If no more replicas are required to free up enough computational resources
+            # Go out if no more replicas are required to free up enough computational resources
             if replicas_to_remove <= 0:
                 break
 
-            # Try copying required_obsolete_replicas to other nodes
+            # Try copying the obsolete replicas from the soruce node to destination nodes
             for dest_node in dest_nodes:
                 if dest_node == src_node:
                     # Cannot copy obsolete containers to the same node
                     continue
                 obsolete_replicas, removed_replicas = self._remove_allocate(removable_cc, replicas_to_remove,
                                                                             dest_node, command, obsolete=True)
+                # if some some obsolete replicas have been copied, update for the next copy of obsolete containers
                 if obsolete_replicas > 0:
                     copied_obsolete_replicas.append((removable_cc, obsolete_replicas, dest_node))
                     removed_obsolete_replicas.extend(removed_replicas)
@@ -1087,10 +1113,11 @@ class TransitionRBT(Transition):
                     required_mem -= obsolete_replicas * removable_cc.mem[0]
                     replicas_to_remove -= obsolete_replicas
                     if replicas_to_remove == 0:
-                        # We have copied all the required obsolete replicas to free up enough resources
+                        # Go out if we have copied all the required obsolete replicas to free up enough resources
                         break
 
-        # Calculate the number of replicas that would be allocatable in the next remove-allocate-copy step
+        # Calculate the number of replicas that will be allocatable in the source node at the beginning the next 
+        # remove-allocate-copy execution
         free_cores = free_src_cores + replicas_to_allocate * cc.cores - required_cores
         free_mem = free_src_mem + replicas_to_allocate * cc.mem[0] - required_mem
         allocatable_replicas = min(
@@ -1098,6 +1125,8 @@ class TransitionRBT(Transition):
             int((free_cores.magnitude + TransitionRBT._DELTA) / cc.cores.magnitude),
             int((free_mem.magnitude + TransitionRBT._DELTA) / cc.mem[0].magnitude),
         )
+
+        # If no replicas of the new container will be allocatable
         if allocatable_replicas == 0:
             # Recover from backups
             for mod_node in modified_dest_nodes:
@@ -1105,13 +1134,18 @@ class TransitionRBT(Transition):
             self._app_perf_surplus = app_perf_surplus_backup
             self._app_perf_increment = app_perf_increment_backup
             self._recycling.obsolete_containers = obsolete_containers_backup
+ 
+        # If some replicas of the new container will be allocatable
         else:
             # The allocation is preserved and the state is updated for the next new containers to allocate
-            command2 = self._update_next_copy_state(allocatable_replicas, cc, src_node,
-                                                    copied_obsolete_replicas, removed_obsolete_replicas,
-                                                    available_obsolete_containers, available_node_free_resources)            
+            command2 = self._update_copy_state(allocatable_replicas, cc, src_node,
+                                               copied_obsolete_replicas, removed_obsolete_replicas,
+                                               available_obsolete_containers, available_node_free_resources)            
             # Extend the comand with the removal of copies of obsolete containers in the source node
             command.extend(command2)
+
+        if allocatable_replicas == 0:
+            command = Command() # Return an empty command if no replicas will be allocatable
 
         return allocatable_replicas, command
 
@@ -1121,6 +1155,15 @@ class TransitionRBT(Transition):
         obsolete containers from the same node if it were necessary.
         :param command: A command with container allocations and removals.
         """
+        # Allocate new container replicas prepared in a previous copy phase of the algorithm. They must be allocatable
+        for src_node, cc, allocatable_replicas in self._allocatable_cs_next_step:
+            # Allocate using free computational resources on the same node and removing obsolete
+            # containers from the same node if it were necessary
+            allocated_replicas, _ = self._remove_allocate(cc, allocatable_replicas, src_node, command)
+            assert allocated_replicas == allocatable_replicas, "Containers must be allocatable"
+        self._allocatable_cs_next_step.clear()
+
+        # Allocate the rest of unallocated new container replicas
         unalloc_node_cs = self._unalloc_node_cs[:]
         for src_node, cc, replicas_to_allocate in unalloc_node_cs:
             node_cc_replicas_index = self._unalloc_node_cs.index((src_node, cc, replicas_to_allocate))
@@ -1137,80 +1180,75 @@ class TransitionRBT(Transition):
         containers, and copying obsolete containers to other nodes, in preparation for the next transition step.
         :param copy_nodes: A list of nodes where obsolete containers can be copied. All the nodes in the
         current allocation are used when this parameter is not set.
-        :return: A command with node removals, containers removal and containers allocation.
+        :return: One command with container removals, containers allocations and node removals.
         """
-
-        # Check that obsolete containers have not the copy label 'c'. It can be commented in production
-        assert self._debug_check_label_obsolete_containers(), "Obsolete containers are not properly labelled"
+        # Check that obsolete containers have not the copy label, 'c'. It can be commented in production
+        assert self._debug_check_copy_label_obsolete_containers(), "Obsolete containers are not properly labelled"
         
         command = Command()
 
-        # Remove the last obsolete containers of applications with all its new containers allocated
+        # Remove the last obsolete containers of applications with all its new containers allocated.
+        # The corresponding computational resources can be freed up for the allocation of new containers
         self._remove_last_obsolete_containers(command)
-
-        # Allocate container replicas prepared in a previous copy phase of the algorithm. They must be allocatable
-        for src_node, cc, allocatable_replicas in self._allocatable_cs_next_step:
-            # Allocate using free computational resources on the same node and removing obsolete
-            # containers from the same node if it were necessary
-            allocated_replicas, _ = self._remove_allocate(cc, allocatable_replicas, src_node, command)
-            assert allocated_replicas == allocatable_replicas, "Containers must be allocatable"
-        self._allocatable_cs_next_step.clear()
 
         # Allocate using free computational resources in the same node and removing obsolete
         # containers from the same node if it were necessary
         self._allocate_with_free_obsolete(command)
 
+        # If all the new containers were allocated, it is time to remove the obsolete nodes
+        # Nodes are not actually removed from the allocation until the end of the transition, 
+        # since they may be useful during the transition. They appear as removed onlyin the command
         if len(self._unalloc_node_cs) == 0:
             # Check if obsolete nodes can be removed and update the command
             self._remove_obsolete_nodes(command)
-            # Remove common allocations and removals. One container can be allocated and removed in the same command
-            # when an obsolete container is copied from node 1 to node 2, later from node 2 to node 3, and so on
             command.simplification()  
-
             return command
-
-        # Nodes are sorted by decreasing freeable capacity, leaving empty nodes at the end, sorted by
-        # increasing price
-        if copy_nodes is None:
-            copy_nodes = self._current_alloc
-        copy_nodes = self._get_free_capacity_nodes(copy_nodes)
-
-        # Next, try copying obsolete containers from the node to other nodes (destination nodes),
+        
+        # Set up the allocation of new container replicas for the next remove-allocate-copy step.
+        # Try copying obsolete containers from the node to other nodes (destination nodes),
         # yielding enough application's performance surplus to allocate the replicas of unallocated
         # containers in the next transition step
 
-        # Nodes elegible to allocate copies of obsolete containers        
-        elegible_nodes = copy_nodes[:] 
+        # Get nodes with free or freeable capacity, leaving empty nodes at the end, sorted by
+        # increasing price. Thus, empty nodes will be used as a last option to copy obsolete containers.
+        # copy_nodes include all the nodes when it is None (RBT1 and RBT2) and only the temporal nodes with RBT3
+        if copy_nodes is None:
+            copy_nodes = self._current_alloc
+        elegible_nodes = self._get_free_capacity_nodes(copy_nodes)
 
-        # Available obsolete containers for copy in each node
+        # Available obsolete containers for copy in the node for the next transition step
         available_obsolete_containers = {
             node: {cc: replicas for cc, replicas in cc_replicas.items()}
             for node, cc_replicas in self._recycling.obsolete_containers.items()
         }
 
-        # Available free computational resources in the node in the next transtion step 
+        # Available free computational resources for copy in the node for the next transition step 
         available_node_free_resources = {
             node: (node.free_cores, node.free_mem) for node in self._current_alloc
         }
 
+        # Copy of obsolete containers from source nodes to elegible destination nodes, starting with the nodes
+        # with larger unallocated containers 
         for unalloc_node_cc in self._unalloc_node_cs[:]:
             src_node, cc, replicas_to_allocate = unalloc_node_cc
 
             # If the node has obsolete containers
             if src_node in available_obsolete_containers:
-                # Copy obsolete containers from the source node to elegible nodes, setting up the allocation
-                # of allocatable_replicas in the next remove-allocate-copy. This process updates the
+                # Copy obsolete containers from the source node to elegible nodes. This process updates the
                 # available obsolete containers and the available free computational resources for the next copy. 
                 # It returns the number of allocatable replicas in the source node at the next transition step and 
-                # a command with the allocation of obsolete containers in elegible nodes 
+                # one command with the removal of obsolete containers in the source node and the allocation of copies
+                # of obsolete containers in elegible nodes 
                 allocatable_replicas, command2 = \
                     self._copy_obsolete_containers(unalloc_node_cc, available_obsolete_containers, 
                                                    available_node_free_resources, elegible_nodes)
+                command.extend(command2)
+                
                 if allocatable_replicas > 0:
-                    # Remove the node from the elegible nodes, since it will allocate new containers in the next step
+                    # Remove the node from the elegible nodes
                     if src_node in elegible_nodes:
                         elegible_nodes.remove(src_node)
-                    if self._time_limit > 0:
+                    if not self._shortest_rbt:
                         # Complete the list of containers allocatable in the next transisition step and remove them
                         # from the list of unallocated containers
                         self._allocatable_cs_next_step.append((src_node, cc, allocatable_replicas))
@@ -1220,10 +1258,7 @@ class TransitionRBT(Transition):
                             self._unalloc_node_cs[index] = (src_node, cc, replicas_to_allocate)
                         else:
                             self._unalloc_node_cs.pop(index)
-                    command.extend(command2)
 
-        # Remove common allocations and removals. One container can be allocated and removed in the same command
-        # when an obsolete container is copied from node 1 to node 2, later from node 2 to node 3, and so on
         command.simplification()  
 
         # Check if obsolete nodes can be removed and update the command
@@ -1233,7 +1268,7 @@ class TransitionRBT(Transition):
 
     def _get_allocation(self, app_performance: dict[App, RequestsPerTime]) -> list[Vm]:
         """
-        Get an allocation to fulfill application performances.
+        Get an allocation to fulfill application performances using FCMA with speed level 3.
         :param app_performance: Application performances.
         :return: An allocation.
         """
@@ -1254,7 +1289,8 @@ class TransitionRBT(Transition):
 
     def _append_command(self, command: Command, append_null_command=False):
         """
-        Append a command to the list of commands and updates application's performance surplus.
+        Append a command to the list of commands and update application's performance surplus from the 
+        performance incrementscoming from command's container allocations.
         :param command: The command to append.
         :append_null_command: Null commands are not appended if this option is not set.
         """
@@ -1263,6 +1299,8 @@ class TransitionRBT(Transition):
             self._app_perf_increment[app] = 0
         if not command.is_null() or append_null_command:
             self._commands.append(command)
+        # The first command that allocates containers in upgraded nodes is set with the synchronization on 
+        # node upgrade
         allocation_in_upgraded_nodes = any(
             node1 in self._recycling.upgraded_node_pairs and node1.ic == self._recycling.upgraded_node_pairs[node1].ic
             for node1, _, _  in command.allocate_containers
@@ -1273,76 +1311,96 @@ class TransitionRBT(Transition):
 
     def _post_process_commands(self):
         """
-        Perform post-processing on the comand list:
-        - For each obsolete node, remove all except its last remove operation. Note that obsolete nodes are not
-        actually removed from the allocation.
+        Perform the following post-processing on the comand list:
+        - Delete a node removal if the node is used in a later command for container allocations.
+        Note that obsolete nodes are not actually removed from the allocation, since they can be used
+        as temporary nodes in later commands.
+        - For each obsolete node, ignore all except its first remove operation, optimizing the cost. 
         - Remove empty commands.
-        - Replace Vmt nodes by Vm nodes.
         - Remove obsolete nodes from the current allocation.
+        - Replace Vmt nodes by Vm nodes in the commands.
         """
         # Node removal commands are generated when all the containers of an obsolete node are removed.
         # However, the nodes could be useful in future to help in the transition of recycled nodes, so
-        # they could be used after a removal command. A node removal command is removed when there is
-        # a later allocation in the node.
+        # they could be used after a removal command. A node removal command is invalid when there is
+        # a later allocation in the node, so the removal must be deleted
         null_command = Command() 
-        node_removal_command = defaultdict(lambda: null_command) # Start with no removals for any node
-        nodes_removed_once = set()
+        node_removal_command = defaultdict(lambda: null_command) # Start with no removals for all nodes
         for command in self._commands:
             for node, _, _ in command.allocate_containers:
+                # If the containers are allocated in a node included in a previous removal
                 if not node_removal_command[node].is_null():
+                    # The node removal in the previous comand is invalid, so delete it
                     removal_command = node_removal_command[node]
                     removal_command.remove_nodes.remove(node)
-                    removal_command = null_command
             for node_to_remove in command.remove_nodes:
-                nodes_removed_once.add(node_to_remove)
+                # When a node is removed in several commands, only the first removal is preserved
                 if node_removal_command[node_to_remove].is_null():
-                    # First removal command for the node or the previous removal command has been removed
+                    # This is the first removal command for the node (or a previous removal command was deleted)
                     node_removal_command[node_to_remove] = command
-
-        # Check the removals
-        for node in nodes_removed_once:
-            assert node in node_removal_command, "Node removal command not found"
-            assert not node_removal_command[node].is_null(), "Node removal command is null"
+                else:
+                    # A previous node removal command exists, so remove the node from the current command
+                    command.remove_nodes.remove(node_to_remove)
 
         # Remove empty commands
         for command in self._commands[:]:
             if command.is_null():
                 self._commands.remove(command)
 
-        # Remove the nodes from the current allocation
+        # Remove nodes from the current allocation. Now, nodes are actually removed
         for node, command in node_removal_command.items():
             if not command.is_null():
-                # The node is removed in the last removal command
+                # The node is removed in the first removal command
                 self._current_alloc.remove(node)
 
         # Replace Vmt nodes by nodes Vm nodes in the commands
         for command in self._commands:
             command.vmt_to_vm()
 
-    def _allocation_loop(self, max_time: int) -> int:
+    def _remove_allocate_copy_loop(self, max_time: int) -> int:
         """
-        Repeat a remove-allocate-copy operation adding the commands to the command list.
-        The method returns when total time required to perform execute the commands is higher than or equal to
-        a maximum time limit or no more allocation are possible.
-        :param max_time:  Maximum time.
+        Repeat remove-allocate-copy operations adding the commands to the command list.
+        The method returns when the last remove-allocation operation can not advance, or the total time required 
+        to execute the commands (excluding node removals) is higher than or equal to maximum time limit. In that
+        later case, the last remove-allocation operation is not performed.
+        :param max_time: Maximum time to peform remove-allocate-copy operations.
         :return: The time required to execute the added commands.
         """
         elapsed_time = 0
         while elapsed_time < max_time:
+            # Maximum time for a remove-allocate-copy operation, excludingnode removals
+            command_max_container_time = self._timing_args.container_removal_time + \
+                self._timing_args.container_creation_time
+            # Backup the current allocation if the container operations may extend the time limit
+            if elapsed_time + command_max_container_time > max_time:
+                self._current_alloc_backup = [
+                    (node.free_cores, node.free_mem, {cc:replicas for cc, replicas in node.replicas.items()}) 
+                    for node in self._current_alloc
+                ]
             command = self._remove_allocate_copy()
-            self._append_command(command)
-            elapsed_time += command.get_container_command_time(self._timing_args)
-            if elapsed_time >= max_time or len(command.allocate_containers) == 0:
+            container_command_time = command.get_container_command_time(self._timing_args)
+            elapsed_time += container_command_time
+            if elapsed_time > max_time:
+                # Recover the allocation when the time limit is exceeded.
+                # It should be noted that the command is not added to the command list, 
+                # so its operations are not performed and the current allocation is not modified.
+                for node in self._current_alloc:
+                    node.free_cores, node.free_mem, node.replicas = self._current_alloc_backup[node]
+                break
+            else:
+                self._append_command(command)
+            if container_command_time == 0:
                 break
         return elapsed_time
 
     def _complete_allocation_in_temporary_nodes(self, create_nodes_command: Command,
-                                               allocate_new_nodes_command: Command):
+                                                allocate_in_new_nodes_command: Command):
         """
         Complete the allocation using temporary nodes.
         :param create_nodes_command: Command where temporary nodes creations are appended.
         :param allocate_new_nodes_command: Command where container allocations in temporary nodes are appended.
         """
+
         # Add a dummy node with enough capacity to allocate any number of containers
         dummy_node = Vmt(Vm(self._current_alloc[0].ic, ignore_ic_index=True))
         dummy_node.free_cores *= 10E12
@@ -1350,7 +1408,14 @@ class TransitionRBT(Transition):
         self._current_alloc.append(dummy_node)
 
         # Calculate application's performance provided by temporary nodes to allocate the
-        # remaining containers
+        # remaining containers. The following approaches are valid in the calculation of the temporary nodes:
+        # - Execute the remove_allocate method allowing negative values for application's performance surplus. 
+        # Next, they are compensated by container replicas in temporary nodes.
+        # - Add a dummy node to the system with unlimited computational capacity, so all the remaining containers 
+        # can be allocated executing the remove_allocate_copy method. Next, the allocations in the dummy node 
+        # are compensated with container replicas in temporary nodes.
+        # The second approach has been followed, since it does not require to modify the remove_allocate method 
+        # to allow negative performance surplus values.
         copy_nodes = None if self._time_limit > 0 else [dummy_node]
         command = self._remove_allocate_copy(copy_nodes)
         zero_rps = RequestsPerTime("0 rps")
@@ -1358,11 +1423,10 @@ class TransitionRBT(Transition):
         for node, cc, replicas in command.allocate_containers:
             if node == dummy_node:
                 # The allocations in the dummy node will be performed in a previous command, so
-                # the performance surplus can be inmediately updated. It is required when
-                # time_limit == to avoid and additional command. It is related to the
-                # self._allocate_with_free_obsolete(command) call at the end of this method
+                # a performance increment translates into a performance surplus increment
                 self._app_perf_increment[cc.app] -= replicas * cc.perf
                 self._app_perf_surplus[cc.app] += replicas * cc.perf
+                # Update the application performance provided by temporary nodes
                 tmp_app_perf[cc.app] += cc.perf * replicas
 
         # Get an allocation for application's performance on temporary nodes
@@ -1371,32 +1435,37 @@ class TransitionRBT(Transition):
             # Change the id of temporary nodes to negative values to be easily identified
             tmp_nodes[tmp_node_index].id = -(tmp_node_index + 1)
             tmp_nodes[tmp_node_index].vm.id = -(tmp_node_index + 1)
+
+        # The temporary nodes are added to the command with the creation of new nodes
         create_nodes_command.create_nodes.extend(tmp_nodes)
+
+        # Move allocations from the dummy node to the temporary nodes
         containers_in_tmp_nodes = [
             (node, cc, replicas)
             for node in tmp_nodes for cc, replicas in node.replicas.items()
         ]
-
-        # Move allocations in the command from the dummy node to the temporary nodes
+        allocate_in_new_nodes_command.allocate_containers.extend(containers_in_tmp_nodes)
         command.allocate_containers = [
             (node, cc, replicas)
             for node, cc, replicas in command.allocate_containers[:]
             if node != dummy_node
         ]
-        allocate_new_nodes_command.allocate_containers.extend(containers_in_tmp_nodes)
 
         # Remove obsolete containers and nodes from the recycling object
         if dummy_node in self._recycling.obsolete_containers:
             del self._recycling.obsolete_containers[dummy_node]
-        for tmp_node in tmp_nodes:
-            self._recycling.obsolete_containers[tmp_node] = dict(tmp_node.replicas)
-            self._recycling.obsolete_nodes.append(tmp_node)
 
-        # Replace the dummy node with temporary nodes
+        # Temporary nodes and their containers are obsolete 
+        for tmp_node in tmp_nodes:
+            self._recycling.obsolete_nodes.append(tmp_node)
+            self._recycling.obsolete_containers[tmp_node] = dict(tmp_node.replicas)
+
+        # Replace the dummy node with temporary nodes in the current allocation
         self._current_alloc.remove(dummy_node)
         self._current_alloc.extend(tmp_nodes)
 
-        # Some replicas can be allocated after the copies to temporary nodes
+        # Some replicas can be allocated once temporary nodes are added, since some computational
+        # resources may remain free in these nodes after the allocation of containers_in_tmp_nodes
         if self._time_limit == 0:
             self._allocate_with_free_obsolete(command)
 
@@ -1411,10 +1480,9 @@ class TransitionRBT(Transition):
         """
         self._commands = []
 
-        # Now it is time to transition from the initial allocation to the final allocation, so
-        # start with the initial allocation. All the nodes are changed to the Vmt format.
+        # Start with the initial allocation to transition from the initial allocation to the final allocation.
         # Transition is performed on a copy of initial_alloc nodes in Vmt format. Transition modifies
-        # Vmt format nodes, while preserving their initial state, stored in initial_alloc.
+        # Vmt nodes, while preserving their initial state in Vm format, stored in initial_alloc.
         self._current_alloc = [Vmt(node) for node in initial_alloc]
         final_alloc_vmt = [Vmt(node) for node in final_alloc]
         vm_to_vmt = dict(zip(initial_alloc, self._current_alloc)) | \
@@ -1449,33 +1517,6 @@ class TransitionRBT(Transition):
 
         return True
 
-    def _debug_check_label_obsolete_containers(self) -> bool:            
-        """ Check if at least one obsolete replica in self._recycling.obsolete_containers has label 'c'
-        :return: True if no obsolete replicas have label 'c'.
-        """
-        for node in self._recycling.obsolete_containers:
-            for cc in list(self._recycling.obsolete_containers[node].keys()):
-                if cc.label == "c":
-                    return False
-        return True
-
-    def _debug_perf_surplus_balance(self) -> dict[Vmt, RequestsPerTime]:
-
-        """
-        Get the performance balance. The performance balance must be constant during the transition.
-        This function is used for debugging purposes, which can be called in the debugger command line.
-        """
-        balance = dict(self._app_perf_surplus)
-        for app, perf in self._app_perf_increment.items():
-            balance[app] += perf
-        for _, cc, replicas in self._unalloc_node_cs + self._allocatable_cs_next_step + \
-                                  self._unallocated_containers_in_new_nodes:
-            balance[cc.app] += cc.perf * replicas
-        for _, cc_replicas in self._recycling.obsolete_containers.items():
-            for cc, replicas in cc_replicas.items():
-                balance[cc.app] -= cc.perf * replicas
-        return balance
-    
     def calculate_sync(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
         """
         Calculate a synchronous transition from the initial allocation to the final allocation, while fulfilling the
@@ -1496,28 +1537,31 @@ class TransitionRBT(Transition):
         create_upgrade_nodes_command = Command(create_nodes=self._recycling.new_nodes, upgrade_nodes=upgrade_node_info)
         self._append_command(create_upgrade_nodes_command, append_null_command=True)
 
-        # Allocation loop until node upgrading completes
+        # Allocation loop until node upgrading completes. Node upgrading time is less time-consuming than 
+        # node creation time, so it completes before node creation. The elapsed time can not be higher than
+        # the hot node scale up time
         elapsed_time = 0
         if self._time_limit > 0:
-            elapsed_time = self._allocation_loop(self._timing_args.hot_node_scale_up_time)
+            max_time = self._timing_args.hot_node_scale_up_time
+            elapsed_time = self._remove_allocate_copy_loop(max_time)
 
-        # Update the elapsed time and current allocation after completing the node upgrading
-        elapsed_time = max(elapsed_time, self._timing_args.hot_node_scale_up_time)
+        # Update the current allocation after completing the node upgrading
         for initial_node, final_node in self._recycling.upgraded_node_pairs.items():
             initial_node.upgrade(final_node)
 
-        # Allocation loop until node creation completes
-        if self._time_limit > 0:
-            max_time = self._timing_args.node_creation_time - self._timing_args.hot_node_scale_up_time
-            elapsed_time += self._allocation_loop(max_time)
+        # Allocation loop until node creation completes.  Allocation loop until node creation completes. 
+        # Upgraded nodes can be used in the allocation of new containers meanwhile
+        if self._time_limit > 0 and elapsed_time < self._timing_args.node_creation_time:
+            max_time = self._timing_args.node_creation_time - elapsed_time
+            elapsed_time += self._remove_allocate_copy_loop(max_time)
 
         # Update the elapsed time and current allocation after completing the node creation
-        elapsed_time = max(elapsed_time, self._timing_args.node_creation_time)
+        elapsed_time = self._timing_args.node_creation_time
         self._current_alloc.extend(self._recycling.new_nodes)
 
         # Allocate new containers in new nodes. The corresponding command may be empty if there
         # are no new nodes in the final allocation. This command can be extended later to include
-        # containers in temporary nodes.
+        # containers in temporary nodes
         allocate_in_new_nodes_command = Command(allocate_containers=self._unallocated_containers_in_new_nodes[:])
         allocate_in_new_nodes_command.sync_on_nodes_creation = True
         for _, cc, replicas in self._unallocated_containers_in_new_nodes:
@@ -1527,9 +1571,9 @@ class TransitionRBT(Transition):
         self._unallocated_containers_in_new_nodes.clear()
         self._append_command(allocate_in_new_nodes_command, append_null_command=True)
 
-        # Allocation loop until the time limit. It does not execute with time limit = 0
+        # Allocation loop until the time limit is reached
         if elapsed_time < self._time_limit:
-            self._allocation_loop(self._time_limit - elapsed_time)
+            self._remove_allocate_copy_loop(self._time_limit - elapsed_time)
 
         # If there are still unallocated containers in recycled nodes
         if len(self._allocatable_cs_next_step) > 0 or len(self._unalloc_node_cs) > 0:
@@ -1562,26 +1606,17 @@ class TransitionRBT(Transition):
 
     def get_worst_case_transition_time(self) -> int:
         """
-        Get the worst-case transition time.
+        Get the worst-case transition time, including node removals
         :return: The worst-case transition time.
         """
-        # - If time_limit == 0: wait for node creation + allocate containers in new/tmp nodes +
-        #   remove_allocate + remove obsolete containers/nodes.
-        # - If time_limit > 0: wait for max(NCT , ceil(limit/CRCA) * CRCA) + allocate containers in
-        #   new/tmp nodes + remove_allocate + remove obsolete containers/nodes, where NCT is the
-        # node creation time and CRCA is the time to remove containers plus allocating containers.
-        # In the worst-case, node removals occur at the end of transition.
-
-        if self._time_limit == 0:
-            return self._timing_args.node_creation_time + self._timing_args.container_creation_time + \
-                   (self._timing_args.container_removal_time + self._timing_args.container_creation_time) + \
-                   self._timing_args.container_removal_time + self._timing_args.node_removal_time
-
+        worst_case_time = self._timing_args.node_creation_time + self._timing_args.container_creation_time + \
+            (self._timing_args.container_removal_time + self._timing_args.container_creation_time) + \
+             self._timing_args.container_removal_time + self._timing_args.node_removal_time 
         if self._time_limit > 0:
-            crca = self._timing_args.container_removal_time + self._timing_args.container_creation_time
-            return max(self._timing_args.node_creation_time, ceil(self._time_limit / crca) * crca) +\
-                   self._timing_args.container_creation_time + crca + self._timing_args.container_removal_time +\
-                   self._timing_args.node_removal_time
+            # One extra remove-allocate-copy step when it enables the transition without temporary nodes
+            worst_case_time += self._timing_args.container_removal_time + self._timing_args.container_creation_time +\
+                self._timing_args.node_removal_time
+        return worst_case_time 
 
     def get_recycling_levels(self) -> tuple[float, float]:
         """
@@ -1597,4 +1632,31 @@ class TransitionRBT(Transition):
         """
         return self._recycling_vm.recycled_node_pairs
 
+    def _debug_check_copy_label_obsolete_containers(self) -> bool:            
+        """ 
+        Check if at least one obsolete replica has the copy label, 'c'.
+        :return: True if no obsolete replicas have label 'c'.
+        """
+        for node in self._recycling.obsolete_containers:
+            for cc in list(self._recycling.obsolete_containers[node].keys()):
+                if cc.label == "c":
+                    return False
+        return True
 
+    def _debug_perf_surplus_balance(self) -> dict[Vmt, RequestsPerTime]:
+
+        """
+        Get the performance balance. The performance balance must be constant during the transition.
+        This function is used for debugging purposes, which can be called in the debugger command line.
+        """
+        balance = dict(self._app_perf_surplus)
+        for app, perf in self._app_perf_increment.items():
+            balance[app] += perf
+        for _, cc, replicas in self._unalloc_node_cs + self._allocatable_cs_next_step + \
+                                  self._unallocated_containers_in_new_nodes:
+            balance[cc.app] += cc.perf * replicas
+        for _, cc_replicas in self._recycling.obsolete_containers.items():
+            for cc, replicas in cc_replicas.items():
+                balance[cc.app] -= cc.perf * replicas
+        return balance
+    
