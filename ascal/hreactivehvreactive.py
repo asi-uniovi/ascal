@@ -7,10 +7,10 @@ from time import time as current_time
 from fcma import App, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
-from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
+from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
 from ascal.hreactive import HReactiveAutoscaler
 from ascal.recycling import Recycling
-from ascal.transition import TransitionBaseline, TransitionRBT
+from ascal.transition import TransitionAlgorithm, TransitionBaseline, TransitionRBT
 
 
 class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
@@ -23,9 +23,9 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
                  h_replica_scale_down_stabilization_time: int = 300,
                  h_node_scale_down_stabilization_time: int = 600, 
                  timing_args: TimedOps.TimingArgs = None,
-                 hv_algorithm: AllocationSolver = AllocationSolver.FCMA,
+                 hv_algorithm: tuple[AllocationSolver, TransitionAlgorithm] = \
+                    (AllocationSolver.FCMA, TransitionAlgorithm.RBT),
                  hv_time_period: int = 300,
-                 hv_transition_time_budget: int = 0, 
                  hot_node_scale_up: bool = False,
                  hot_container_scale: bool = False):
         """
@@ -38,9 +38,8 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         :param h_node_scale_down_stabilization_time: Minimum time from a previous node scale-up
         to a node scale-down.
         :param timing_args: Timings for creation/removal of nodes and containers.
-        :param hv_algorithm: Allocation algorithm.
+        :param hv_algorithm: Allocation/transition algorithm.
         :param hv_time_period: Time period for H/V autoscaling.
-        :param hv_transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
         :param hot_node_scale_up: If True, hot vertical scale-up of nodes is used.
         :param hot_container_scale: If True, hot vertical scaling of containers is used.
         """
@@ -54,7 +53,6 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         self._aggs = None # H autoscaler works with all the aggregation levels
         self._allocation_solver, self._transition_algorithm = hv_algorithm
         self.transition = None
-        self.transition_time_budget = hv_transition_time_budget
         self.hot_node_scale_up = hot_node_scale_up
         self._new_allocation = None
         self._hv_timedops = TimedOps(self.timing_args)
@@ -99,7 +97,8 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             if self._transition_algorithm == TransitionAlgorithm.BASELINE:
                 self.transition = TransitionBaseline(self.timing_args, self.system)
             else:
-                self.transition = TransitionRBT(self.timing_args, self.system, time_limit=self.transition_time_budget,
+                self.transition = TransitionRBT(self.timing_args, self.system, 
+                                                transition_algorithm=self._transition_algorithm,
                                                 hot_node_scale_up=self.hot_node_scale_up)
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,

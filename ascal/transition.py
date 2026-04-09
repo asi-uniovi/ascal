@@ -43,6 +43,7 @@ of the same instance class family.
 - All the nodes belong to instance classes of teh same family.
 """
 
+from enum import Enum
 from math import ceil, floor
 from json import loads
 from collections import defaultdict
@@ -58,6 +59,14 @@ from ascal.helper import (
     get_vmt_allocation_signature,
     get_app_perf_surplus
 )
+
+
+class TransitionAlgorithm(Enum):
+    RBT1 = 1          # Recycling-based Transition algorithm 1
+    RBT2 = 2          # Recycling-based Transition algorithm 2
+    RBT3 = 3          # Recycling-based Transition algorithm 3
+    RBT  = RBT3       # Default RBT algorithm
+    BASELINE = 4      # Baseline transition algorithm
 
 
 @dataclass
@@ -626,7 +635,8 @@ class TransitionRBT(Transition):
     transition time. 
     - time_limit > 0. Complete version that focus on reducing the transition cost.
     """
-    def __init__(self, timing_args: TimedOps.TimingArgs, system: System, time_limit: int = None,
+    def __init__(self, timing_args: TimedOps.TimingArgs, system: System, 
+                 transition_algorithm: TransitionAlgorithm.RBT,
                  hot_node_scale_up: bool = False, hot_replicas_scale: bool = False):
         """
         Creates an object for transition between two allocations.
@@ -648,14 +658,13 @@ class TransitionRBT(Transition):
         self._app_perf_increment: defaultdict[App, RequestsPerTime]  = None
         self._allocatable_cs_next_step: list[tuple[Vm, ContainerClass, int]] = None
         self._unallocated_containers_in_new_nodes: list[tuple[Vm, ContainerClass, int]] = None
-        self._time_limit = time_limit if time_limit is not None else self._timing_args.node_creation_time
         self._hot_node_scale_up = hot_node_scale_up
         self._hot_replicas_scale = hot_replicas_scale
         self._commands: list[Command] = None
         self._sync_on_next_alloc_upgraded_nodes = True
         # Lowest transition time when RBT when time limit is set to 0. 
-        # Otherwise, it focuses on reducing the transition cost.           
-        self._shortest_rbt = time_limit == 0 
+        # Otherwise, it focuses on reducing the transition cost           
+        self._rbt3 = transition_algorithm == TransitionAlgorithm.RBT3 
 
     def _remove_allocate(self, cc: ContainerClass, replicas: int, node: Vmt, command: Command, 
                          obsolete: bool=False) -> tuple[int, list[tuple[ContainerClass, int, Vmt]]]:
@@ -1248,7 +1257,7 @@ class TransitionRBT(Transition):
                     # Remove the node from the elegible nodes
                     if src_node in elegible_nodes:
                         elegible_nodes.remove(src_node)
-                    if not self._shortest_rbt:
+                    if not self._rbt3:
                         # Complete the list of containers allocatable in the next transisition step and remove them
                         # from the list of unallocated containers
                         self._allocatable_cs_next_step.append((src_node, cc, allocatable_replicas))
@@ -1415,8 +1424,8 @@ class TransitionRBT(Transition):
         # can be allocated executing the remove_allocate_copy method. Next, the allocations in the dummy node 
         # are compensated with container replicas in temporary nodes.
         # The second approach has been followed, since it does not require to modify the remove_allocate method 
-        # to allow negative performance surplus values.
-        copy_nodes = None if self._time_limit > 0 else [dummy_node]
+        # to allow negative performance surplus values
+        copy_nodes = None if not self._rbt3 else [dummy_node]
         command = self._remove_allocate_copy(copy_nodes)
         zero_rps = RequestsPerTime("0 rps")
         tmp_app_perf = {app: zero_rps for app in self._app_perf_surplus}
@@ -1466,7 +1475,7 @@ class TransitionRBT(Transition):
 
         # Some replicas can be allocated once temporary nodes are added, since some computational
         # resources may remain free in these nodes after the allocation of containers_in_tmp_nodes
-        if self._time_limit == 0:
+        if self._rbt3:
             self._allocate_with_free_obsolete(command)
 
         self._append_command(command)
@@ -1537,11 +1546,11 @@ class TransitionRBT(Transition):
         create_upgrade_nodes_command = Command(create_nodes=self._recycling.new_nodes, upgrade_nodes=upgrade_node_info)
         self._append_command(create_upgrade_nodes_command, append_null_command=True)
 
-        # Allocation loop until node upgrading completes. Node upgrading time is less time-consuming than 
-        # node creation time, so it completes before node creation. The elapsed time can not be higher than
-        # the hot node scale up time
+        # Allocation loop until node upgrading completes for all the RBT variants, except for RBT3. 
+        # Node upgrading time is less time-consuming than node creation time, so it completes before node creation.
+        # The elapsed time can not be higher than the hot node scale up time
         elapsed_time = 0
-        if self._time_limit > 0:
+        if not self._rbt3:
             max_time = self._timing_args.hot_node_scale_up_time
             elapsed_time = self._remove_allocate_copy_loop(max_time)
 
@@ -1549,9 +1558,9 @@ class TransitionRBT(Transition):
         for initial_node, final_node in self._recycling.upgraded_node_pairs.items():
             initial_node.upgrade(final_node)
 
-        # Allocation loop until node creation completes.  Allocation loop until node creation completes. 
+        # Allocation loop until node creation completes for all the RBT variants, except for RBT3.
         # Upgraded nodes can be used in the allocation of new containers meanwhile
-        if self._time_limit > 0 and elapsed_time < self._timing_args.node_creation_time:
+        if not self._rbt3 and elapsed_time < self._timing_args.node_creation_time:
             max_time = self._timing_args.node_creation_time - elapsed_time
             elapsed_time += self._remove_allocate_copy_loop(max_time)
 
@@ -1571,13 +1580,11 @@ class TransitionRBT(Transition):
         self._unallocated_containers_in_new_nodes.clear()
         self._append_command(allocate_in_new_nodes_command, append_null_command=True)
 
-        # Allocation loop until the time limit is reached
-        if elapsed_time < self._time_limit:
-            self._remove_allocate_copy_loop(self._time_limit - elapsed_time)
+        # All the transition operations are common to all the RBT variants from now on
 
         # If there are still unallocated containers in recycled nodes
         if len(self._allocatable_cs_next_step) > 0 or len(self._unalloc_node_cs) > 0:
-            if len(self._unalloc_node_cs) == 0 and self._time_limit > 0:
+            if len(self._unalloc_node_cs) == 0 and not self._rbt3:
                 # Extend a little the transition time instead of creating temporary nodes
                 self._append_command(self._remove_allocate_copy())
             # If new nodes are not enough to complete the transition of recycled nodes, temporary nodes are required
@@ -1586,7 +1593,7 @@ class TransitionRBT(Transition):
 
         # Two remove-allocate-copy steps may be necessary to complete the transition. The first
         # command to remove obsolete containers and next allocate the remaining new containers in recycled nodes.
-        # The second command to remove containers from the nodes and next the nodes
+        # The second command to remove containers from the nodes and next the obsoletenodes
         first_command = self._remove_allocate_copy()
         if not first_command.is_null():
             self._append_command(first_command)
@@ -1599,7 +1606,7 @@ class TransitionRBT(Transition):
 
         # Check whether the commands implement a valid transition between the initial and the final allocations
         # Four commands must be enough for the shortest RBT version
-        assert not self._shortest_rbt or len(self._commands) <= 4, "Too many commands"
+        assert not self._rbt3 or len(self._commands) <= 4, "Too many commands"
         assert self.check_transition(initial_alloc, final_alloc, self._commands), "Invalid transition"
 
         return self._commands, self.get_transition_time(self._commands, self._timing_args)
@@ -1612,7 +1619,7 @@ class TransitionRBT(Transition):
         worst_case_time = self._timing_args.node_creation_time + self._timing_args.container_creation_time + \
             (self._timing_args.container_removal_time + self._timing_args.container_creation_time) + \
              self._timing_args.container_removal_time + self._timing_args.node_removal_time 
-        if self._time_limit > 0:
+        if not self._rbt3:
             # One extra remove-allocate-copy step when it enables the transition without temporary nodes
             worst_case_time += self._timing_args.container_removal_time + self._timing_args.container_creation_time +\
                 self._timing_args.node_removal_time

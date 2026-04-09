@@ -5,9 +5,9 @@ Implement the horizontal/vertical predictive autoscaler
 from time import time as current_time
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
-from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
+from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
 from ascal.recycling import Recycling
-from ascal.transition import TransitionBaseline, TransitionRBT
+from ascal.transition import TransitionAlgorithm, TransitionBaseline, TransitionRBT
 from ascal.helper import get_min_max_load
 
 
@@ -18,16 +18,15 @@ class HVPredictiveAutoscaler(Autoscaler):
 
     def __init__(self, prediction_window: int = 3600, prediction_percentile: int = 95,
                  timing_args: TimedOps.TimingArgs = None,
-                 algorithm: AllocationSolver = AllocationSolver.FCMA,
-                 transition_time_budget: int = 0, hot_node_scale_up: bool = False,
-                 hot_container_scale: bool = False):
+                 algorithm: tuple[AllocationSolver, TransitionAlgorithm] = \
+                    (AllocationSolver.FCMA, TransitionAlgorithm.RBT),
+                 hot_node_scale_up: bool = False, hot_container_scale: bool = False):
         """
         Constructor for the horizontal/vertical reactive autoscaler.
         :param prediction_percentile: Load prediction percentile.
         :param prediction_window: Prediction window in seconds.
         :param timing_args: Timings for creation/removal of nodes and containers.
-        :param algorithm: Allocation algorithm.
-        :param transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
+        :param algorithm: Allocation/transition algorithm.
         :param hot_node_scale_up: Set to enable hot node scaling-up.
         :param hot_container_scale: Set to enable hot scaling up and down of container computational parameters.
         """
@@ -37,7 +36,6 @@ class HVPredictiveAutoscaler(Autoscaler):
         self._allocation_solver, self._transition_algorithm = algorithm
         self.predicted_workloads = None
         self.transition = None
-        self.transition_time_budget = transition_time_budget
         self.hot_node_scale_up = hot_node_scale_up
         self.new_allocation = None
         self._timedops = TimedOps(self.timing_args)
@@ -60,7 +58,8 @@ class HVPredictiveAutoscaler(Autoscaler):
         if self._transition_algorithm == TransitionAlgorithm.BASELINE:
             self.transition = TransitionBaseline(self.timing_args, self.system)
         else:
-            self.transition = TransitionRBT(self.timing_args, self.system, time_limit=self.transition_time_budget // 2,
+            self.transition = TransitionRBT(self.timing_args, self.system, 
+                                            transition_algorithm=self._transition_algorithm,
                                             hot_node_scale_up=self.hot_node_scale_up)
         # Calculate a new allocation
         self.new_allocation = self._solve_allocation(self._app_load, self._allocation_solver)
@@ -88,10 +87,10 @@ class HVPredictiveAutoscaler(Autoscaler):
         if self.time == 0:
             return self._initialize_allocation(current_time())
         
-        if self._transition_algorithm == TransitionAlgorithm.RBT:
-            return self.run_rbt()
-        else:
+        if self._transition_algorithm == TransitionAlgorithm.BASELINE:
             return self.run_baseline()
+        else:
+            return self.run_rbt()
 
     def run_baseline(self) -> tuple[bool, bool, float]:
         """

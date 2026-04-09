@@ -6,10 +6,10 @@ from time import time as current_time
 from fcma import App, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
-from ascal.autoscalers import AllocationSolver, TransitionAlgorithm, Autoscaler, AutoscalerStatistics
+from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
 from ascal.hreactive import HReactiveAutoscaler
 from ascal.recycling import Recycling
-from ascal.transition import TransitionRBT
+from ascal.transition import TransitionAlgorithm, TransitionRBT
 from ascal.helper import get_min_max_load
 
 
@@ -23,9 +23,9 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
                  h_replica_scale_down_stabilization_time: int = 300,
                  h_node_scale_down_stabilization_time: int = 600, 
                  timing_args: TimedOps.TimingArgs = None,
-                 hv_algorithm: AllocationSolver = AllocationSolver.FCMA,
+                 hv_algorithm: tuple[AllocationSolver, TransitionAlgorithm] = \
+                    (AllocationSolver.FCMA, TransitionAlgorithm.RBT),
                  hv_prediction_window: int = 600, hv_prediction_percentile: float = 0.95,
-                 hv_transition_time_budget: int = 0, 
                  hot_node_scale_up: bool = False,
                  hot_container_scale: bool = False):
         """
@@ -38,10 +38,9 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         :param h_node_scale_down_stabilization_time: Minimum time from a previous node scale-up
         to a node scale-down.
         :param timing_args: Timings for creation/removal of nodes and containers.
-        :param hv_algorithm: Allocation algorithm.
+        :param hv_algorithm: Allocation/transition algorithm.
         :param hv_prediction_window: Prediction window for the H/V autoscaler.
         :àram hv_prediction_percentile: Prediction percentile for the H/V autoscaler.
-        :param hv_transition_time_budget: Approximate transition time budget. The actual transition time can be higher.
         :param hot_node_scale_up: If True, hot vertical scale-up of nodes is used.
         :param hot_container_scale: If True, hot vertical scaling of containers is used.
         """
@@ -54,7 +53,6 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         self.predicted_workloads = None
         self._allocation_solver, self._transition_algorithm = hv_algorithm
         self.transition = None
-        self.transition_time_budget = hv_transition_time_budget
         self.hot_node_scale_up = hot_node_scale_up
         self.hot_container_scale = hot_container_scale
         self._hv_timedops = TimedOps(self.timing_args)
@@ -103,11 +101,13 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             # Initialize the HV application load in the last period
             self._hv_app_loads = {app: [] for app in app_workloads}
             # Initialize the transition
-            if self._transition_algorithm == TransitionAlgorithm.RBT:
-                self.transition = TransitionRBT(self.timing_args, self.system, time_limit=self.transition_time_budget,
-                                                hot_node_scale_up=self.hot_node_scale_up)
-            else:
+            if self._transition_algorithm == TransitionAlgorithm.BASELINE:
                 ValueError("'baseline' transition is not valid for the horizontal/vertical predictive autoscaler")
+            else:
+                self.transition = TransitionRBT(self.timing_args, self.system, 
+                                                transition_algorithm=self._transition_algorithm,
+                                                hot_node_scale_up=self.hot_node_scale_up)
+                
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
                                               Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
