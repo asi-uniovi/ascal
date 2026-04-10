@@ -2,8 +2,8 @@ autoscalers:
   hv_predictive: # Horizontal/vertical+predictive autoscaling
     prediction_window: 240 # Prediction window in seconds
     prediction_percentile: 95 # Percentile for application's load in the prediction window
-    transition_time_budget: 200 # Approximate time budget for the transition (0 for simple transaction)
-
+    algorithm: fcma, rbt1 # Allocation/transition algorithm
+    
 # Select autoscaler
 autoscaler: hv_predictive
 

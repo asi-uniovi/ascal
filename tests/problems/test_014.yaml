@@ -7,7 +7,7 @@ autoscalers:
     h_node_scale_down_stabilization_time: 600 # Minimum time from a previous node scale-up to a node scale-down
     hv_prediction_window: 600 # Prediction window for the horizontal/vertical autoscaler
     hv_prediction_percentile: 95 # Percentile for application's load in the prediction window for the H/V autoscaler
-    hv_transition_time_budget: 100 # Approximate time budget for the transition (0 for simple transaction)
+    hv_algorithm: fcma, rbt1 # Allocation/transition algorithm
 
 # Select autoscaler
 autoscaler: h_reactive_hv_predictive

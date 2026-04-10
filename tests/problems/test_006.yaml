@@ -3,7 +3,6 @@ autoscalers:
   hv_reactive: # Horizontal/vertical+reactive autoscaling
     time_period: 60 # Time period to evaluate autoscaling
     desired_cpu_utilization: 0.7  # Desired CPU utilization
-    transition_time_budget: 0 # Approximate time budget for the transition (0 for simple transaction)
 
 # Select autoscaler
 autoscaler: hv_reactive

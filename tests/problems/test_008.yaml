@@ -7,7 +7,6 @@ autoscalers:
     h_replica_scale_down_stabilization_time: 300 # Minimum time from a previous replica scale-up to a replica scale-down
     h_node_scale_down_stabilization_time: 600 # Minimum time from a previous node scale-up to a node scale-down
     hv_time_period: 600 # Time period to evaluate autoscaling for the horizontal/vertical autoscaler
-    hv_transition_time_budget: 0 # Approximate time budget for the transition (0 for simple transaction)
 
 # Select autoscaler
 autoscaler: h_reactive_hv_reactive

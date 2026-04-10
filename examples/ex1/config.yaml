@@ -1,38 +1,11 @@
-# Configuration file with two applications
-
-# All available autoscalers
 autoscalers:
-  h_reactive: # Horizontal+reactive autoscaling
-    time_period: 60 # Time period to evaluate autoscaling
-    desired_cpu_utilization: 0.7  # Desired CPU utilization
-    node_utilization_threshold: 0.5 # Below this utilization, node removal is tried
-    replica_scale_down_stabilization_time: 300 # Minimum time from a previous replica scale-up to a replica scale-down
-    node_scale_down_stabilization_time: 600 # Minimum time from a previous node scale-up to a node scale-down
-    aggs: 2 # Aggregation level for applications. Equivalent to {app0: 2, app1: 2}
   hv_reactive: # Horizontal/vertical+reactive autoscaling
     time_period: 150 # Time period to evaluate autoscaling
     desired_cpu_utilization: 0.7  # Desired CPU utilization
-  hv_predictive: # Horizontal/vertical+predictive autoscaling
-    prediction_window: 300 # Prediction window in seconds
-    prediction_percentile: 95 # Percentile for application's load in the prediction window
-  h_reactive_hv_reactive:
-    desired_cpu_utilization: 0.7  # Desired CPU utilization for both, the horizontal and vertical autoscaler
-    h_time_period: 60 # Time period to evaluate autoscaling for the horizontal autoscaler
-    h_node_utilization_threshold: 0.5 # Below this utilization, node removal is tried by the horizontal autoscaler
-    h_replica_scale_down_stabilization_time: 300 # Minimum time from a previous replica scale-up to a replica scale-down
-    h_node_scale_down_stabilization_time: 600 # Minimum time from a previous node scale-up to a node scale-down
-    hv_time_period: 600 # Time period to evaluate autoscaling for the horizontal/vertical autoscaler
-  h_reactive_hv_predictive:
-    h_desired_cpu_utilization: 0.7  # Desired CPU utilization for the horizontal autoscaler
-    h_time_period: 60 # Time period to evaluate autoscaling for the horizontal autoscaler
-    h_node_utilization_threshold: 0.5 # Below this utilization, node removal is tried by the horizontal autoscaler
-    h_replica_scale_down_stabilization_time: 300 # Minimum time from a previous replica scale-up to a replica scale-down
-    h_node_scale_down_stabilization_time: 600 # Minimum time from a previous node scale-up to a node scale-down
-    hv_prediction_window: 600 # Prediction window for the horizontal/vertical autoscaler
-    hv_prediction_percentile: 95 # Percentile for application's load in the prediction window for the H/V autoscaler
+    algorithm: fcma, rbt1 # Allocation/transition algorithm
 
 # Select autoscaler
-autoscaler: hv_predictive
+autoscaler: hv_reactive
 
 # Times in seconds for node/container creation/removal
 timing_args:
@@ -49,11 +22,11 @@ timing_args:
 apps:
   app0:
     load:
-      file: ../../traces/triangle_rand.csv # Integer load samples in req/s
+      file: ../../traces/trace-app0-24h-rand-10.csv # Integer load samples in req/s
       time_interval: 1 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
-      load_offset: 10 # Integer value to be added to every load sample
-      load_mult: 4 # Multiplier for the load samples (multiplies also the load offset)
+      load_offset: 0 # Integer value to be added to every load sample
+      load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
       cpu: 260 mcores
@@ -62,19 +35,58 @@ apps:
       aggs: [1, 2, 4]
   app1:
     load:
-      file: ../../traces/triangle_rand.csv # Integer load samples in req/s
+      file: ../../traces/trace-app1-24h-rand-10.csv # Integer load samples in req/s
       time_interval: 1 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
-      load_offset: 50 # Integer value to be added to every load sample
-      load_mult: 3 # Multiplier for the load samples (multiplies also the load offset)
-      time_offset: 100 # Advance this number of samples and complete with the last value
+      load_offset: 0 # Integer value to be added to every load sample
+      load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
+      time_offset: 0 # Advance this number of samples and complete with the last value
     container:
       cpu: 300 mcores
       mem: 0.500 GiB
+      perf: 1 req/s
+      aggs: [1, 2, 4]
+  app2:
+    load:
+      file: ../../traces/trace-app2-24h-rand-10.csv # Integer load samples in req/s
+      time_interval: 1 # Integer time in seconds between two consecutive samples
+      repeat: 1 # The whole set of samples in the file is repeated this number of times
+      load_offset: 0 # Integer value to be added to every load sample
+      load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
+      time_offset: 0 # Advance this number of samples and complete with the last value
+    container:
+      cpu: 400 mcores
+      mem: 0.580 GiB
+      perf: 1 req/s
+      aggs: [1, 2, 4]
+  app3:
+    load:
+      file: ../../traces/trace-app3-24h-rand-10.csv # Integer load samples in req/s
+      time_interval: 1 # Integer time in seconds between two consecutive samples
+      repeat: 1 # The whole set of samples in the file is repeated this number of times
+      load_offset: 0 # Integer value to be added to every load sample
+      load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
+      time_offset: 0 # Advance this number of samples and complete with the last value
+    container:
+      cpu: 350 mcores
+      mem: 0.540 GiB
+      perf: 1 req/s
+      aggs: [1, 2, 4]
+  app4:
+    load:
+      file: ../../traces/trace-app4-24h-rand-10.csv # Integer load samples in req/s
+      time_interval: 1 # Integer time in seconds between two consecutive samples
+      repeat: 1 # The whole set of samples in the file is repeated this number of times
+      load_offset: 0 # Integer value to be added to every load sample
+      load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
+      time_offset: 0 # Advance this number of samples and complete with the last value
+    container:
+      cpu: 650 mcores
+      mem: 0.540 GiB
       perf: 1 req/s
       aggs: [1, 2, 4]
 
 # Simulation time in seconds.
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
-simulation_time: 3600
+simulation_time: 86350
