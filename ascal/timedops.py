@@ -58,7 +58,8 @@ class TimedOps:
         hot_node_scale_up_time: int = 0 # Time to hot scale-up a node
         container_creation_time: int = 0 # Time required to create a container
         container_removal_time: int = 0 # Time required to remove a container
-        hot_container_scale_time: int = 0 # Time to hot scale-up/down a container
+        hot_container_scale_up_time: int = 0 # Time to hot scale-up a container
+        hot_container_scale_down_time: int = 0 # Time to hot scale-down a container
 
     def __init__(self, time_args: TimingArgs):
         """

@@ -166,7 +166,7 @@ def get_vmt_allocation_signature(alloc: list[Vmt]) -> Counter:
     for node in alloc:
         serializable_node = {
             'ic': node.ic.name,
-            'replicas': {str(c): rep for c, rep in node.replicas.items()}
+            'replicas': {str(cc): rep for cc, rep in node.replicas.items()}
         }
         serializable_alloc.append(serializable_node)
     return Counter([dumps(node, sort_keys=True) for node in serializable_alloc])

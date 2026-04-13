@@ -20,26 +20,29 @@ Nevertheless, an asynchronous transition can be derived from a synchronous trans
 
 - Move container allocations in created/upgraded nodes to the first command, i.e, to the node creation/upgrade 
 command. Although these container allocations and node creations/upgrades are triggered at the same time, 
-allocations are suspended until completing the node creations/upgrades. Note these containers can be easily 
-identified by a command flag "sync_on_nodes_creation"/"sync_on_nodes_upgrade" set.
+allocations are suspended until completing the node creations/upgrades. These containers can be easily 
+identified by a set command flag "sync_on_nodes_creation"/"sync_on_nodes_upgrade".
 
 - Container removals, node removals and container allocations in a command are triggered with the command. However,
 any individual node removal is suspended until its containers have been removed. Similarly, any individual
 container allocation is suspended until the destination node has enough computational resources.
 
-Four transition algorithms are implemented:
-- Baseline transition. It performs the transition in 4 steps: 1) create all the nodes in the final allocation, 
-2) allocate all the containers in these created nodes, 3) remove all the containers in the initial allocation, 
-and 4) remove all the nodes in the initial allocation.
-- RBT2. It is the simplest variant based on the recycling. It does not perform remove-alocate-copy steps while new 
-nodes are created or recycled nodes are upgraded.
-- RBT1. The same as RBT2 but it performs remove-allocate-copy steps while new nodes are created or recycled nodes are
- upgraded. 
+Three transition algorithms are implemented:
+- Baseline transition. It performs the transition in 4 steps: 
+    1) Create all the nodes in the final allocation. 
+    2) Allocate all the containers in these created nodes, 
+    3) Remove all the containers in the initial allocation 
+    4) Remove all the nodes in the initial allocation.
+- RBT2. It is the simplest variant based on recycling. It does not perform remove-alocate-copy steps while new 
+nodes are created, or recycled nodes are upgraded.
+- RBT1. The same as RBT2, but it performs remove-allocate-copy steps while new nodes are created, or recycled 
+nodes are upgraded. 
 
 Limitations of the current implementation:
-- All the containers of a given application are configured with the same amount of memory when they run on nodes 
-of the same instance class family.
-- All the nodes belong to instance classes of teh same family.
+- All the nodes belong to instance classes of the same family.
+- All the containers of a given application are configured with the same amount of memory. Nevertheless, CPU 
+and performance parameters can be different for different container classes of the same application.
+
 """
 
 from enum import Enum
@@ -61,6 +64,9 @@ from ascal.helper import (
 
 
 class TransitionAlgorithm(Enum):
+    """
+    Different algorithms for calculating the transition between two allocations.
+    """
     RBT1 = 1          # Recycling-based Transition algorithm 1
     RBT2 = 2          # Recycling-based Transition algorithm 2
     RBT  = RBT2       # Default RBT algorithm
@@ -75,42 +81,36 @@ class Command:
     """
     allocate_containers: list[tuple[Vm|Vmt, ContainerClass, int]] = field(default_factory=list)
     remove_containers: list[tuple[Vm|Vmt, ContainerClass, int]] = field(default_factory=list)
-    scale_up_containers: list[tuple[Vm|Vmt, ContainerClass, int, int]] = field(default_factory=list)
-    scale_down_containers: list[tuple[Vm|Vmt, ContainerClass, int, int]] = field(default_factory=list)
+    scale_containers: list[tuple[Vm|Vmt, ContainerClass, int, float]] = field(default_factory=list)
     remove_nodes: list[Vm|Vmt] = field(default_factory=list)
     # Only the first command can create/upgrade nodes
     create_nodes: list[Vm|Vmt] = field(default_factory=list)
     upgrade_nodes: list[tuple[Vm|Vmt, InstanceClass]] = field(default_factory=list)
-    # Some commands must delay command execution until completing node creations/upgrades in the first command    
+    # Some commands must delay execution until completing the node creations/upgrades in the first command    
     sync_on_nodes_creation: bool = False
     sync_on_nodes_upgrade: bool = False
 
     def extend(self, command: 'Command'):
         """
-        Extend with a new command, appending all the container and node operations.
-        :param command: Command to extend.
+        Extend the command operations with a new command, appending all the container and node operations.
+        :param command: Command with the extensions.
         """
         self.allocate_containers.extend(command.allocate_containers)
         self.remove_containers.extend(command.remove_containers)
-        self.scale_up_containers.extend(command.scale_up_containers)
-        self.scale_down_containers.extend(command.scale_down_containers)
+        self.scale_containers.extend(command.scale_containers)
         self.create_nodes.extend(command.create_nodes)
         self.remove_nodes.extend(command.remove_nodes)
         self.upgrade_nodes.extend(command.upgrade_nodes)
 
     def vmt_to_vm(self):
         """
-        Replaces the Vmt nodes in the command by Vm nodes.
+        Replace Vmt formatted nodes in the command by Vm nodes.
         """
         self.allocate_containers = [(node.vm, cc, replicas) for node, cc, replicas in self.allocate_containers]
         self.remove_containers = [(node.vm, cc, replicas) for node, cc, replicas in self.remove_containers]
-        self.scale_up_containers = [
-            (node.vm, cc, multiplier, replicas) 
-            for node, cc, multiplier, replicas in self.scale_up_containers
-        ]
-        self.scale_down_containers = [
-            (node.vm, cc, divider, replicas) 
-            for node, cc, divider, replicas in self.scale_down_containers
+        self.scale_containers = [
+            (node.vm, cc, replicas, multiplier) 
+            for node, cc, replicas, multiplier in self.scale_containers
         ]
         self.create_nodes = [node.vm for node in self.create_nodes]
         self.remove_nodes = [node.vm for node in self.remove_nodes]
@@ -122,8 +122,8 @@ class Command:
         :return: True when the command is null.
         """
         return (len(self.allocate_containers) == 0 and len(self.remove_containers) == 0 and
-                len(self.scale_up_containers) == 0 and len(self.scale_down_containers) == 0 and
-                len(self.create_nodes) == 0 and len(self.remove_nodes) == 0 and len(self.upgrade_nodes) == 0)
+                len(self.scale_containers) == 0 and len(self.create_nodes) == 0 and 
+                len(self.remove_nodes) == 0 and len(self.upgrade_nodes) == 0)
 
     def get_container_command_time(self, timing_args: TimedOps.TimingArgs) -> int:
         """
@@ -133,22 +133,34 @@ class Command:
         :param timing_args: Times for creation/removal of nodes/containers.
         :return: The time to complete the command.
         """
+        # Check if the are scale-up and scale-down container operations in the command
+        container_scale_up = False
+        container_scale_down = False
+        for _, _, _, multiplier in self.scale_containers:
+            if multiplier > 1:
+                container_scale_up = True
+            if multiplier < 1:
+                container_scale_down = True
         container_command_time = 0
+
+        # Sum up the time required to perform container operations
         if len(self.remove_containers) > 0:
             container_command_time += timing_args.container_removal_time
-        elif len(self.scale_down_containers) > 0:
-            container_command_time += timing_args.hot_container_scale_time
+        elif container_scale_down:
+            container_command_time += timing_args.hot_container_scale_down_time
         if len(self.allocate_containers) > 0:
             container_command_time += timing_args.container_creation_time
-        elif len(self.scale_up_containers) > 0:
-            container_command_time += timing_args.hot_container_scale_time
+        elif container_scale_up:
+            container_command_time += timing_args.hot_container_scale_up_time
         return container_command_time
     
     def simplification(self):
         """
         Labels in container classes are removed, and after that, performs the following simplifications:
-        - Summing up replicas of the same container class in the same node.
-        - Removing allocations and removals of the same containers.
+        - Translate container creations/removals into container scale-ups/scale-downs when there are
+        containers with the same id and hot scale of containers is enabled.
+        - Sum up replicas of the same container class in the same node.
+        - Remove allocations and removals of the same containers.
         """
         # Remove labels in container classes
         self.allocate_containers = [
@@ -160,13 +172,15 @@ class Command:
             for node, cc, replicas in self.remove_containers
         ]
 
-        # Sum up replicas of the same container class in the same node and remove common allocations and removals
+        # Sum up replicas of the same container class in the same node. The same for removals
         allocs = defaultdict(int)
         for node, cc, replicas in self.allocate_containers:
             allocs[(node, cc)] += replicas
         removes = defaultdict(int)
         for node, cc, replicas in self.remove_containers:
-            removes[(node, cc)] += replicas       
+            removes[(node, cc)] += replicas
+
+        # Remove common allocations and removals       
         for node, cc in allocs:
             if (node, cc) in removes:
                 common_replicas = min(allocs[(node, cc)], removes[(node, cc)])
@@ -202,26 +216,21 @@ class Command:
                 new_command.remove_containers.append((node_pairs[node], cc, replicas))
             else:
                 new_command.remove_containers.append((node, cc, replicas))
-        for node, cc, multiplier, replicas in self.scale_up_containers:
+        for node, cc, replicas, multiplier in self.scale_containers:
             if node in node_pairs:
-                new_command.scale_up_containers.append((node_pairs[node], cc, multiplier, replicas))
+                new_command.scale_containers.append((node_pairs[node], cc, replicas, multiplier))
             else:
-                new_command.scale_up_containers.append((node, cc, multiplier, replicas))
-        for node, cc, divider, replicas in self.scale_down_containers:
-            if node in node_pairs:
-                new_command.scale_down_containers.append((node_pairs[node], cc, divider, replicas))
-            else:
-                new_command.scale_down_containers.append((node, cc, divider, replicas))
+                new_command.scale_up_containers.append((node, cc, replicas, multiplier))
         for node in self.create_nodes:
             if node in node_pairs:
                 new_command.create_nodes.append(node_pairs[node])
             else:
                 new_command.create_nodes.append(node)
-        for node1, node2 in self.upgrade_nodes:
+        for node1, new_ic in self.upgrade_nodes:
             if node1 in node_pairs:
-                new_command.upgrade_nodes.append((node_pairs[node1], node2))
+                new_command.upgrade_nodes.append((node_pairs[node1], new_ic))
             else:
-                new_command.upgrade_nodes.append((node1, node2))
+                new_command.upgrade_nodes.append((node1, new_ic))
         for node in self.remove_nodes:
             if node in node_pairs:
                 new_command.remove_nodes.append(node_pairs[node])
@@ -254,10 +263,10 @@ class Transition(ABC):
         return self._recycling.node_recycling_level, self._recycling.container_recycling_level
 
     @abstractmethod
-    def get_recycled_node_pairs(self):
+    def get_recycled_node_pairs(self) -> dict[Vm, Vm]|None:
         """
         Get the recycled node pairs.
-        :return: Recycled node pairs.
+        :return: Recycled node pairs or None if the transition algorithm does not use recycling.
         """
         pass
 
@@ -279,7 +288,7 @@ class Transition(ABC):
 
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
-        :return: A list of commands and the worst-case time to perform the transition.
+        :return: A tuple with thelist of commands and the worst-case time to perform the transition.
         """
         sync_commands, worst_case_time = self.calculate_sync(initial_alloc, final_alloc)[:]
         for command in sync_commands[:]:
@@ -290,7 +299,6 @@ class Transition(ABC):
                 command.sync_on_nodes_upgrade = False
                 if command.is_null():
                     sync_commands.remove(command)
-                break
         return sync_commands, worst_case_time
 
     def check_transition(self, initial_alloc: Allocation, final_alloc: Allocation, commands: list[Command]) -> bool:
@@ -300,7 +308,7 @@ class Transition(ABC):
         :param final_alloc: Final allocation.
         :param commands: List of commands to transition.
         :return: True if commands perform the required transition.
-        :raises  ValueError: If some command is invalid.
+        :raises ValueError: If some command is invalid.
         """
         min_perf, _ = get_min_max_perf(initial_alloc, final_alloc)
         initial_alloc_vmt = [Vmt(node) for node in initial_alloc]
@@ -337,8 +345,11 @@ class Transition(ABC):
                     raise ValueError(f'{op_str} -> Invalid container removal. Too many mem')
                 
             # Container scaled-down commands
-            for node, cc, divider, replicas in command.scale_down_containers:
-                op_str = f'Command #{command_index}. Scale down containers ({node}, {cc}, {divider}, {replicas})'
+            for node, cc, replicas, multiplier in command.scale_containers:
+                if multiplier >= 1: # It is not a container scale-down
+                    continue
+                divider = 1.0/multiplier
+                op_str = f'Command #{command_index}. Scale down containers ({node}, {cc}, {replicas}, {multiplier})'
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
@@ -360,7 +371,7 @@ class Transition(ABC):
                 node_vmt.free_cores += cc.cores * replicas * (divider - 1) / divider
                 if (node_vmt.free_cores - node_vmt.ic.cores).magnitude > Transition._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container scale down. Too many cores')
-                # Memory is no checked as it is not changed in scale down operations
+                # Memory is no checked as it does not change in scale down operations
 
             # Add node commands
             for node in command.create_nodes:
@@ -371,7 +382,7 @@ class Transition(ABC):
                     raise ValueError(f'{op_str} -> Duplicated node')
                 initial_alloc_vmt.append(node_vmt.clear())
 
-            # Add container commands
+            # Allocate container commands
             for node, cc, replicas in command.allocate_containers:
                 op_str = f'Command #{command_index}. Allocate containers ({node}, {cc}, {replicas})'
                 if (node, cc) in obsolete_cc_replicas:
@@ -389,8 +400,10 @@ class Transition(ABC):
                     raise ValueError(f'{op_str} -> Invalid container removal. Not enough memory is available')
             
             # Container scaled-up commands
-            for node, cc, multiplier, replicas in command.scale_up_containers:
-                op_str = f'Command #{command_index}. Scale up containers ({node}, {cc}, {multiplier}, {replicas})'
+            for node, cc, replicas, multiplier in command.scale_containers:
+                if multiplier <= 1: # It is not a container scale-up
+                    continue
+                op_str = f'Command #{command_index}. Scale up containers ({node}, {cc}, {replicas}, {multiplier})'
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
@@ -407,12 +420,10 @@ class Transition(ABC):
                 )
                 node_vmt.replicas[scaled_up_cc] += replicas
                 app_perf_increment[cc.app] += cc.perf * replicas * (multiplier - 1)
-                if app_perf_increment[cc.app].magnitude < -Transition._DELTA:
-                    raise ValueError(f'{op_str} -> Invalid container scale up. app surplus < 0')
                 node_vmt.free_cores -= cc.cores * replicas * (multiplier - 1)
                 if node_vmt.free_cores.magnitude < -Transition._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container scale up. Not enough cores are available')
-                # Memory is no checked as it is not changed in scale up operations 
+                # Memory is no checked as it is does not change in scale-up operations 
 
             # Remove node commands
             for node in command.remove_nodes:
@@ -421,7 +432,7 @@ class Transition(ABC):
                 if node_vmt not in initial_alloc_vmt:
                     raise ValueError(f'{op_str} -> Invalid node')
                 for _ in node_vmt.replicas:
-                        raise ValueError(f'{op_str} -> Node allocates containers')
+                    raise ValueError(f'{op_str} -> Node allocates containers')
                 initial_alloc_vmt.remove(node_vmt)
 
             # Upgrade node commands
@@ -463,15 +474,24 @@ class Transition(ABC):
     def get_transition_time(commands: list[Command], timing_args: TimedOps.TimingArgs) -> int:
         """
         Get the transition time from a list of commands. Node upgrade times are assumed to be lower 
-        than node creation times, and container scale up/down times are assumed to be lower than 
-        container creation/removal times.
+        than or equal to node creation times, and container scale up/down times are assumed to be lower 
+        than or equal to container creation/removal times.
         :param commands: A list of commands.
-        :param timing_args: Creation/removal times of nodes and containers.
+        :param timing_args: Creation/removal/scale times of nodes and containers.
         :return: The transition time.
         """
+
         transition_time = 0
-        last_node_removal_time = -1
+        last_node_removal_time = -1 
         for command in commands:
+            # Check if the are scale-up and scale-down container operations in the command
+            container_scale_up = False
+            container_scale_down = False
+            for _, _, _, multiplier in command.scale_containers:
+                if multiplier > 1:
+                    container_scale_up = True
+                if multiplier < 1:
+                    container_scale_down = True
             if len(command.create_nodes) > 0:
                 assert commands.index(command) == 0, "Nodes must be created in the first command"
             if len(command.upgrade_nodes) > 0:
@@ -488,8 +508,8 @@ class Transition(ABC):
                 transition_time = max(transition_time, timing_args.hot_node_scale_up_time)
             # Add the maximum time required to perform container removals or container scale-downs
             incremental_time = 0
-            if len(command.scale_down_containers) > 0:
-                incremental_time = timing_args.hot_container_scale_time
+            if container_scale_down:
+                incremental_time = timing_args.hot_container_scale_down_time
             if len(command.remove_containers) > 0:
                 incremental_time = timing_args.container_removal_time
             transition_time += incremental_time
@@ -498,8 +518,8 @@ class Transition(ABC):
                 last_node_removal_time = transition_time + timing_args.node_removal_time
             # Add the maximum time required to perform container creations or container scale-ups
             incremental_time = 0
-            if len(command.scale_up_containers) > 0:
-                incremental_time = timing_args.hot_container_scale_time
+            if container_scale_up:
+                incremental_time = timing_args.hot_container_scale_up_time
             if len(command.allocate_containers) > 0:
                 incremental_time = timing_args.container_creation_time
             transition_time += incremental_time
@@ -535,7 +555,7 @@ class TransitionBaseline(Transition):
     def get_creation_in_transition_time(self) -> int:
         """
         Get the total time required to create nodes and next allocate containers in the transition.
-        :return: The creation total time.
+        :return: The node+container creation time.
         """
         return self._timing_args.node_creation_time + self._timing_args.container_creation_time
     
@@ -546,7 +566,7 @@ class TransitionBaseline(Transition):
         """
         return Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING
 
-    def get_recycled_node_pairs(self):
+    def get_recycled_node_pairs(self) -> None:
         """
         Get the recycled node pairs.
         :return: Recycled node pairs.
@@ -555,12 +575,12 @@ class TransitionBaseline(Transition):
         return None
 
     @staticmethod
-    def _check_node_equality(node1: Vm, node2: Vm) -> bool:
+    def compare_vm_nodes(node1: Vm, node2: Vm) -> bool:
         """
-        Check if two nodes are equal, i.e., they have the same instance class and the same allocated containers.
+        Check if two Vm nodes come from the same instance class and allocate the same containers.
         :param node1: Node 1.
         :param node2: Node 2.
-        :return: True if the nodes are equal.
+        :return: True if the nodes come from the same instance class and allocate the same containers.
         """
         if node1.ic != node2.ic or len(node1.cgs) != len(node2.cgs):
             return False
@@ -576,7 +596,8 @@ class TransitionBaseline(Transition):
 
     def calculate_sync(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
         """
-        Calculate a synchronous transition from the initial allocation to the final allocation. It is a baseline algorithm.
+        Calculate a synchronous transition from the initial allocation to the final allocation for
+        the baseline algorithm.
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
         :return: A list of commands and the time to perform the transition.
@@ -585,10 +606,10 @@ class TransitionBaseline(Transition):
         initial_nodes = initial_alloc[:]
         final_nodes = final_alloc[:]
 
-        # A transition is necessary whan some node or allocated containers change
+        # A transition is necessary when some nodes or allocated containers change
         for initial_node in initial_nodes[:]:
             for final_node in final_nodes:
-                if TransitionBaseline._check_node_equality(initial_node, final_node):
+                if TransitionBaseline.compare_vm_nodes(initial_node, final_node):
                     initial_nodes.remove(initial_node)
                     final_nodes.remove(final_node)
                     break
@@ -628,10 +649,7 @@ class TransitionBaseline(Transition):
 class TransitionRBT(Transition):
     """
     Class to implement the recycling based transition algorithm. There are
-    two variants: 
-    - time_limit = 0. Simplified version of the algorithm that focus on reducing the
-    transition time. 
-    - time_limit > 0. Complete version that focus on reducing the transition cost.
+    two variants: RBT1 and RBT2.
     """
     def __init__(self, timing_args: TimedOps.TimingArgs, system: System, 
                  transition_algorithm: TransitionAlgorithm.RBT,
@@ -639,9 +657,8 @@ class TransitionRBT(Transition):
         """
         Creates an object for transition between two allocations.
         :param timing_args: Creation/removal/scaling times for containers and nodes.
-        :param system: Applications's performance on different container classes and available node types.
-        :param time_limit: Maximum time to carry out transitions. By default, this is set to the node creation time. 
-        It is a best-effort limit.
+        :param system: Applications's performance on different container classes and available instance classes.
+        :param transition_algorithm: The specific RBT variant to use (RBT1 or RBT2).
         :param hot_node_scale_up: Set to enable hot node scaling-up.
         :param hot_replicas_scale: Set to enable hot scaling of container computational parameters.
         """
@@ -681,7 +698,7 @@ class TransitionRBT(Transition):
         if cc.label != "":
             cc = replace(cc, label="")
 
-        # List of removed replicas (container class, number of replicas, node)
+        # List of tuples with removed replicas (container class, number of replicas, node)
         removed_replicas = []
 
         # Required computational resources to allocate the replicas
@@ -704,10 +721,6 @@ class TransitionRBT(Transition):
                 )
                 if required_replicas == 0:
                     break
-
-                """
-                To be improved. It assumes a single family of instance classes. 
-                """
 
                 # Get the number of replicas of the obsolete container that could be removed
                 obsolete_replicas_count = self._get_obsolete_removable_replicas(obsolete_cc, node, required_replicas,
@@ -845,7 +858,7 @@ class TransitionRBT(Transition):
     def _get_free_capacity_nodes(self, nodes: list[Vm] = None) -> list[Vmt]:
         """
         Get nodes with free or freeable capacity. 
-        :param nodes: Nodes to sort or all the nodes in the allocation when this parameter is no set.
+        :param nodes: Elegible nodes or all the nodes in the allocation when this parameter is no set.
         :return: A list of nodes with free or freeable capacity. Nodes that do not allocate containers are returned at 
         the end of the list sorted by increasing price.
         """
@@ -1324,6 +1337,8 @@ class TransitionRBT(Transition):
         - For each obsolete node, ignore all except its first remove operation, optimizing the cost. 
         - Remove empty commands.
         - Remove obsolete nodes from the current allocation.
+        - Check the labels of allocated and removed containers to transform these operations into
+        container scales when required.
         - Replace Vmt nodes by Vm nodes in the commands.
         """
         # Node removal commands are generated when all the containers of an obsolete node are removed.
@@ -1629,7 +1644,7 @@ class TransitionRBT(Transition):
         """
         return self._recycling.node_recycling_level, self._recycling.container_recycling_level
 
-    def get_recycled_node_pairs(self):
+    def get_recycled_node_pairs(self) -> dict[Vm, Vm]:
         """
         Get the recycled node pairs.
         :return: Recycled node pairs.

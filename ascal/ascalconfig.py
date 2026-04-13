@@ -535,34 +535,34 @@ class AscalConfig:
         :param config: Configuration.
         :raises ValueError: When a validation fails.
         """
-        mandatory = ["node_time_to_billing", "node_creation_time", "node_removal_time",
-                     "container_creation_time", "container_removal_time"]
-        optional = ["hot_node_scale_up_time", "hot_container_scale_time"]
+        mandatory = ["node_creation_time", "node_removal_time", "container_creation_time", "container_removal_time"]
+        optional = ["node_time_to_billing", "hot_node_scale_up_time", "hot_container_scale_up_time", 
+                    "hot_container_scale_down_time"]
+        if "node_time_to_billing" not in config["timing_args"]:
+            config["timing_args"]["node_time_to_billing"] = 0
+        if config["timing_args"]["node_time_to_billing"] > config["timing_args"]["node_creation_time"]:
+            raise ValueError("Node time to billing can not be higher than node creation time")
         if "hot_node_scale_up_time" not in config["timing_args"]:
             config["timing_args"]["hot_node_scale_up_time"] = config["timing_args"]["node_creation_time"]
         if config["timing_args"]["hot_node_scale_up_time"] > config["timing_args"]["node_creation_time"]:
             raise ValueError("Hot node scale-up time can not be higher than node creation time")
-        if "hot_container_scale_time" not in config["timing_args"]:
-            config["timing_args"]["hot_container_scale_time"] = 1
-        if config["timing_args"]["hot_container_scale_time"] > config["timing_args"]["container_creation_time"]:
-            raise ValueError("Hot container scale time can not be higher than container creation time") 
-        if config["timing_args"]["hot_container_scale_time"] > config["timing_args"]["container_removal_time"]:
-            raise ValueError("Hot container scale time can not be higher than container removal time") 
+        if "hot_container_scale_up_time" not in config["timing_args"]:
+            config["timing_args"]["hot_container_scale_up_time"] = config["timing_args"]["container_creation_time"]
+        if config["timing_args"]["hot_container_scale_up_time"] > config["timing_args"]["container_creation_time"]:
+            raise ValueError("Hot container scale-up time can not be higher than container creation time") 
+        if "hot_container_scale_down_time" not in config["timing_args"]:
+            config["timing_args"]["hot_container_scale_down_time"] = config["timing_args"]["container_removal_time"]
+        if config["timing_args"]["hot_container_scale_down_time"] > config["timing_args"]["container_removal_time"]:
+            raise ValueError("Hot container scale-down time can not be higher than container removal time") 
         if set(mandatory + optional) != set(list(config["timing_args"].keys()) + optional):
-            raise ValueError(f"Invalid property in 'timing_args need to be removed")
+            raise ValueError(f"Invalid property in 'timing_args' need to be removed")
         AscalConfig._check_fields(config["timing_args"], mandatory + optional,
-              [int, int, int, int, int, int, int])
-        if config["timing_args"]["node_time_to_billing"] < 0:
-            raise ValueError("Node time to billing must be possitive")
-        check_non_negative = mandatory + optional
-        check_non_negative.remove("node_time_to_billing")
-        for key in check_non_negative:
+              [int, int, int, int, int, int, int, int])
+        check_possitive = mandatory + optional
+        check_possitive.remove("node_time_to_billing")
+        for key in check_possitive:
             if config["timing_args"][key] <= 0:
                 raise ValueError(f"Timing argument {key} must be possitive")
-
-        # Node creation time can not be lower than hot node scale-up time
-        if config["timing_args"]["node_creation_time"] < config["timing_args"]["hot_node_scale_up_time"]:
-            raise ValueError("Node creation time can not be lower than hot node scale-up time")
 
     @staticmethod
     def _validate_apps(config):

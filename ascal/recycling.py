@@ -84,7 +84,8 @@ class Recycling:
             return 0
 
         # Recycling between a node and its scale-up version has a penalty
-        penalty_factor = UP_SCALE_PENALTY_FACTOR if initial_node.ic != final_node.ic else 1.0
+        node_scale_up_penalty = 0.5 * (initial_node.ic.cores / final_node.ic.cores + \
+                                initial_node.ic.mem / final_node.ic.mem).magnitude
 
         recycling_level = 0
         ic_cores = (initial_node.ic.cores - initial_node.free_cores).magnitude
@@ -92,7 +93,7 @@ class Recycling:
         for cg1 in initial_node.cgs:
             for cg2 in final_node.cgs:
                 if cg1.cc == cg2.cc:
-                    recycling_level += (0.5 * penalty_factor * min(cg1.replicas, cg2.replicas) *
+                    recycling_level += (0.5 * node_scale_up_penalty * min(cg1.replicas, cg2.replicas) *
                                         (cg1.cc.cores.magnitude / ic_cores + cg1.cc.mem[0].magnitude / ic_mem))
                     break
         return recycling_level
