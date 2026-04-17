@@ -37,6 +37,7 @@ class HVPredictiveAutoscaler(Autoscaler):
         self.predicted_workloads = None
         self.transition = None
         self.hot_node_scale_up = hot_node_scale_up
+        self.hot_container_scale = hot_container_scale
         self.new_allocation = None
         self._timedops = TimedOps(self.timing_args)
         self._app_load = None
@@ -60,7 +61,8 @@ class HVPredictiveAutoscaler(Autoscaler):
         else:
             self.transition = TransitionRBT(self.timing_args, self.system, 
                                             transition_algorithm=self._transition_algorithm,
-                                            hot_node_scale_up=self.hot_node_scale_up)
+                                            hot_node_scale_up=self.hot_node_scale_up,
+                                            hot_container_scale=self.hot_container_scale)
         # Calculate a new allocation
         self.new_allocation = self._solve_allocation(self._app_load, self._allocation_solver)
         self.allocation = self.new_allocation

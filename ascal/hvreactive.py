@@ -66,7 +66,7 @@ class HVReactiveAutoscaler(Autoscaler):
                 self.transition = TransitionRBT(self.timing_args, self.system, 
                                                 transition_algorithm=self._transition_algorithm,
                                                 hot_node_scale_up=self.hot_node_scale_up,
-                                                hot_replicas_scale=self.hot_replicas_scale)
+                                                hot_container_scale=self.hot_replicas_scale)
             # Calculate the first allocation
             self._new_allocation = self._solve_allocation(incremented_workloads, self._allocation_solver)
             self._app_loads = {}  # Application workloads in a time period

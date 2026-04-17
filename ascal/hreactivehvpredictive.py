@@ -106,7 +106,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             else:
                 self.transition = TransitionRBT(self.timing_args, self.system, 
                                                 transition_algorithm=self._transition_algorithm,
-                                                hot_node_scale_up=self.hot_node_scale_up)
+                                                hot_node_scale_up=self.hot_node_scale_up,
+                                                hot_container_scale=self.hot_container_scale)
                 
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,

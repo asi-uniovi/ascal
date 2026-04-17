@@ -54,6 +54,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         self._allocation_solver, self._transition_algorithm = hv_algorithm
         self.transition = None
         self.hot_node_scale_up = hot_node_scale_up
+        self.hot_container_scale = hot_container_scale
         self._new_allocation = None
         self._hv_timedops = TimedOps(self.timing_args)
         self._next_hv_autoscaling_time = self.hv_time_period
@@ -99,7 +100,8 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             else:
                 self.transition = TransitionRBT(self.timing_args, self.system, 
                                                 transition_algorithm=self._transition_algorithm,
-                                                hot_node_scale_up=self.hot_node_scale_up)
+                                                hot_node_scale_up=self.hot_node_scale_up,
+                                                hot_container_scale=self.hot_container_scale)
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
                                               Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)

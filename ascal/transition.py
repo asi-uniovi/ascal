@@ -90,6 +90,36 @@ class Command:
     sync_on_nodes_creation: bool = False
     sync_on_nodes_upgrade: bool = False
 
+    def __str__(self) -> str:
+        """
+        String representation of the command
+        """
+        alloc_c_str = 'allocate->[' + \
+            ', '.join(f'({str(v)}, {str(c)}): {r}' for v, c, r in self.allocate_containers) + ']'
+        if len(self.allocate_containers) == 0:
+            alloc_c_str = ''
+        remove_c_str = 'remove->[' + \
+            ', '.join(f'({str(v)}, {str(c)}): {r}' for v, c, r in self.remove_containers) + ']'
+        if len(self.remove_containers) == 0:
+            remove_c_str = ''
+        scale_c_str = 'scale->[' + \
+            str([f'({str(v)}, {str(c)}, {m:1.2f}): {r}' for v, c, r, m in self.scale_containers]) + ']'
+        if len(self.scale_containers) == 0:
+            scale_c_str = ''
+        create_n_str = 'create->[' + ', '.join([str(v) for v in self.create_nodes]) + ']'
+        if len(self.create_nodes) == 0:
+            create_n_str = ''
+        remove_n_str = 'remove->[' + str([str(v) for v in self.remove_nodes]) + ']'
+        if len(self.remove_nodes) == 0:
+            remove_n_str = ''
+        upgrade_n_str = 'upgrade->[' + str([f'({str(v)}), {str(i)})' for v, i in self.upgrade_nodes]) + ']'
+        if len(self.upgrade_nodes) == 0:
+            upgrade_n_str = ''
+        sync_n_c = 'sync_on_n_creation' if self.sync_on_nodes_creation else ''         
+        sync_n_u = 'sync_on_n_upgrade' if self.sync_on_nodes_upgrade else ''
+        items = [alloc_c_str, remove_c_str, scale_c_str, create_n_str, remove_n_str, upgrade_n_str, sync_n_c, sync_n_u]
+        return ' || '.join(s for s in items if s)
+    
     def extend(self, command: 'Command'):
         """
         Extend the command operations with a new command, appending all the container and node operations.
@@ -459,7 +489,7 @@ class Transition(ABC):
             only_in_initial_alloc = initial_alloc_signature - final_alloc_signature
             only_in_final_alloc = final_alloc_signature - initial_alloc_signature
             if len(only_in_initial_alloc) > 0:
-                print("* Only in initial allocation:")
+                print("* Only after transitioning the initial allocation:")
                 for item in only_in_initial_alloc.elements():
                     print(f'- {loads(item)}')
             if len(only_in_final_alloc) > 0:
@@ -653,7 +683,7 @@ class TransitionRBT(Transition):
     """
     def __init__(self, timing_args: TimedOps.TimingArgs, system: System, 
                  transition_algorithm: TransitionAlgorithm.RBT,
-                 hot_node_scale_up: bool = False, hot_replicas_scale: bool = False):
+                 hot_node_scale_up: bool = False, hot_container_scale: bool = False):
         """
         Creates an object for transition between two allocations.
         :param timing_args: Creation/removal/scaling times for containers and nodes.
@@ -674,7 +704,7 @@ class TransitionRBT(Transition):
         self._allocatable_cs_next_step: list[tuple[Vm, ContainerClass, int]] = None
         self._unallocated_containers_in_new_nodes: list[tuple[Vm, ContainerClass, int]] = None
         self._hot_node_scale_up = hot_node_scale_up
-        self._hot_replicas_scale = hot_replicas_scale
+        self._hot_replicas_scale = hot_container_scale
         self._commands: list[Command] = None
         self._sync_on_next_alloc_upgraded_nodes = True
         self._rbt1 = transition_algorithm == TransitionAlgorithm.RBT1 
@@ -1511,7 +1541,9 @@ class TransitionRBT(Transition):
 
         # Calculate recycled node pairs, new nodes, nodes to remove, recycled containers, new containers
         # and containers to remove when transitioning from the initial allocation to the final allocation
-        self._recycling_vm = Recycling(initial_alloc, final_alloc, self._hot_node_scale_up)
+        self._recycling_vm = Recycling(initial_alloc, final_alloc, 
+                                       self._hot_node_scale_up, self._hot_replicas_scale)
+        
         self._recycling = RecyclingVmt(self._recycling_vm, vm_to_vmt)
 
         # Check whether the initial allocation is identical to the final allocation
@@ -1550,7 +1582,7 @@ class TransitionRBT(Transition):
         # Initialize the transition and check if a transition is necessary
         if not self._transition_init(initial_alloc, final_alloc):
             return [], 0
-
+                
         # Node creation and node upgrade operations are the most time-consuming. Therefore, they are the first
         # operations to be performed. This command may be empty and extended later to include the creation of
         # temporary nodes
@@ -1605,7 +1637,7 @@ class TransitionRBT(Transition):
 
         # Two remove-allocate-copy steps may be necessary to complete the transition. The first
         # command to remove obsolete containers and next allocate the remaining new containers in recycled nodes.
-        # The second command to remove containers from the nodes and next the obsoletenodes
+        # The second command to remove containers from the nodes and next the obsolete nodes
         first_command = self._remove_allocate_copy()
         if not first_command.is_null():
             self._append_command(first_command)
