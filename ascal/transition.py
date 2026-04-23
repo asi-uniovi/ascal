@@ -1751,10 +1751,6 @@ class TransitionRBT(Transition):
         self._unallocated_containers_in_new_nodes.clear()
         self._append_command(allocate_in_new_nodes_command, append_null_command=True)
 
-        # Remove the last obsolete containers of applications with all its new containers allocated.
-        # The corresponding computational resources can be freed up for the allocation of new containers
-        self._remove_last_obsolete_containers(allocate_in_new_nodes_command)
-
         # If there are still unallocated containers in recycled nodes
         if len(self._allocatable_cs_next_step) > 0 or len(self._unalloc_node_cs) > 0:
             # Temporary nodes are added if it were necessary
