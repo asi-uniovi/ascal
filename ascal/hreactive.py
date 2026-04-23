@@ -214,12 +214,12 @@ class HReactiveAutoscaler(Autoscaler):
             replicas = cg.replicas
             for node in no_ready_nodes:
                 cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude + Autoscaler._DELTA)
-                mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude + Autoscaler._DELTA)
+                mem_allocatable_replicas = int(node.free_mem.magnitude / cc.memv.magnitude + Autoscaler._DELTA)
                 allocatable_replicas = min(cpu_allocatable_replicas, mem_allocatable_replicas, replicas)
                 replicas -= allocatable_replicas
                 cg.replicas -= allocatable_replicas
                 node.free_cores -= allocatable_replicas * cc.cores
-                node.free_mem -= allocatable_replicas * cc.mem[0]
+                node.free_mem -= allocatable_replicas * cc.memv
                 cgs_allocated.append((node, ContainerGroup(cc, allocatable_replicas)))
                 if cg.replicas == 0:
                     cgs_to_allocate.remove(cg)

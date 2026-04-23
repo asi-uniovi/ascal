@@ -4,15 +4,15 @@ A synchronous transition defines predefined times to start node/container creati
 fixed durations to perform these operations. A command starts when the previous command completes
 and the node creation/upgrade time has elapsed if the command flag 
 "sync_on_nodes_creation"/"sync_on_nodes_upgrade" is set. 
-A command completes after finishing all its container removals and allocations, 
-so the time required to execute a command is the sum of one container removal time and one container creation time.
-Note that node creations and removals execute in background.
+A command completes after finishing all its container removals, allocations and scales. 
+Node creations and removals execute in background.
 Within a command operations are executed following these restrictions:
 
         - Node creations and upgrades. Start inmediately with the command. Only the first command can include them.
-        - Container removals. Start inmediately with the command.
+        - Container removals and container scale-downs. Start inmediately with the command.
         - Node removals. Start after completing all the container removals in the command.
-        - Container allocations. Start after completing all the container removals in the command.
+        - Container allocations and container scale-ups. Start after completing all the container removals in the 
+          command.
 
 While useful for theoretical analysis, synchronous transitions are too restrictive in practice,
 as creation and removal times are not fixed, and assuming their worst-case durations can be overly pessimistic.
@@ -23,9 +23,10 @@ command. Although these container allocations and node creations/upgrades are tr
 allocations are suspended until completing the node creations/upgrades. These containers can be easily 
 identified by a set command flag "sync_on_nodes_creation"/"sync_on_nodes_upgrade".
 
-- Container removals, node removals and container allocations in a command are triggered with the command. However,
-any individual node removal is suspended until its containers have been removed. Similarly, any individual
-container allocation is suspended until the destination node has enough computational resources.
+- Container removals, container scale-downs, node removals and container allocations in a command are triggered 
+with the command. However, any individual node removal is suspended until its containers have been removed. 
+Similarly, any individual container allocation or scale-up is suspended until the destination node has enough 
+computational resources.
 
 Three transition algorithms are implemented:
 - Baseline transition. It performs the transition in 4 steps: 
@@ -206,26 +207,26 @@ class Command:
         allocs = defaultdict(int)
         for node, cc, replicas in self.allocate_containers:
             allocs[(node, cc)] += replicas
-        removes = defaultdict(int)
+        removals = defaultdict(int)
         for node, cc, replicas in self.remove_containers:
-            removes[(node, cc)] += replicas
+            removals[(node, cc)] += replicas
 
         # Remove common allocations and removals       
         for node, cc in allocs:
-            if (node, cc) in removes:
-                common_replicas = min(allocs[(node, cc)], removes[(node, cc)])
+            if (node, cc) in removals:
+                common_replicas = min(allocs[(node, cc)], removals[(node, cc)])
                 allocs[(node, cc)] -= common_replicas
-                removes[(node, cc)] -= common_replicas
+                removals[(node, cc)] -= common_replicas
         self.allocate_containers = [
             (node, cc, allocs[(node, cc)]) 
             for (node, cc) in allocs 
             if allocs[(node, cc)] > 0
         ]
         self.remove_containers = [
-            (node, cc, removes[(node, cc)]) 
-            for (node, cc) in removes 
-            if removes[(node, cc)] > 0
-        ] 
+            (node, cc, removals[(node, cc)]) 
+            for (node, cc) in removals 
+            if removals[(node, cc)] > 0
+        ]
 
     def replace_nodes(self, node_pairs: dict[Vm, Vm]) -> 'Command':
         """
@@ -370,38 +371,48 @@ class Transition(ABC):
                 node_vmt.free_cores += cc.cores * replicas
                 if (node_vmt.free_cores - node_vmt.ic.cores).magnitude > TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. Too many cores')
-                node_vmt.free_mem += cc.mem[0] * replicas
+                node_vmt.free_mem += cc.memv * replicas
                 if (node_vmt.free_mem - node_vmt.ic.mem).magnitude > TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. Too many mem')
                 
-            # Container scaled-down commands
+            # Container scale-up and scale-down commands
             for node, cc, replicas, multiplier in command.scale_containers:
-                if multiplier >= 1: # It is not a container scale-down
-                    continue
-                divider = 1.0/multiplier
-                op_str = f'Command #{command_index}. Scale down containers ({node}, {cc}, {replicas}, {multiplier})'
+                op_str = f'Command #{command_index}. Scale containers ({node}, {cc}, {replicas}, {multiplier})'
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
                 if node_vmt.replicas[cc] < replicas:
-                    raise ValueError(f'{op_str} -> Invalid container scale down. Replicas to scale down > allocated replicas')
+                    raise ValueError(f'{op_str} -> Invalid container scale. Replicas to scale > allocated replicas')
+                # Remove scaled replicas
                 node_vmt.replicas[cc] -= replicas
                 if node_vmt.replicas[cc] == 0:
                     del node_vmt.replicas[cc]
-                scaled_down_cc = replace(
-                    cc, 
-                    cores=cc.cores / divider,
-                    perf=cc.perf / divider,
-                    agg_level=cc.agg_level / divider
-                )
-                node_vmt.replicas[scaled_down_cc] += replicas
-                app_perf_surplus[cc.app] -= cc.perf * replicas * (divider - 1) / divider
-                if app_perf_surplus[cc.app].magnitude < -Transition._DELTA:
-                    raise ValueError(f'{op_str} -> Invalid container scale down. app surplus < 0')
-                node_vmt.free_cores += cc.cores * replicas * (divider - 1) / divider
-                if (node_vmt.free_cores - node_vmt.ic.cores).magnitude > Transition._DELTA:
-                    raise ValueError(f'{op_str} -> Invalid container scale down. Too many cores')
-                # Memory is no checked as it does not change in scale down operations
+                # Add the replicas after the scaling. Note that other replicas of the same container class
+                # may be allocated
+                scaled_cc = cc * multiplier
+                close_cc_found = False # Dealing with floats may introduce runding errors
+                for other_cc in node_vmt.replicas:
+                    if scaled_cc.almost_equal(other_cc):
+                        node_vmt.replicas[other_cc] += replicas
+                        close_cc_found = True
+                        break
+                if not close_cc_found:
+                    node_vmt.replicas[scaled_cc] = replicas
+                # Update the node free cores
+                node_vmt.free_cores += cc.cores * replicas * (1 - multiplier)
+                if multiplier > 1:
+                    # The performance increment is delayed until the command termination
+                    app_perf_increment[cc.app] += cc.perf * replicas * (multiplier - 1)
+                    if node_vmt.free_cores.magnitude < -TransitionRBT._DELTA:
+                        raise ValueError(f'{op_str} -> Invalid container scale-up. Not enough cores are available')
+                else:
+                    # The performance surplus is inmediately reduced
+                    app_perf_surplus[cc.app] -= cc.perf * replicas * (1 - multiplier)
+                    if app_perf_surplus[cc.app].magnitude < -Transition._DELTA:
+                        raise ValueError(f'{op_str} -> Invalid container scale down. app surplus < 0')
+                    if (node_vmt.free_cores - node_vmt.ic.cores).magnitude > TransitionRBT._DELTA:
+                        raise ValueError(f'{op_str} -> Invalid container scale-down. Too many cores')
+                # Memory is no checked as it does not change in scale operations
 
             # Add node commands
             for node in command.create_nodes:
@@ -425,36 +436,10 @@ class Transition(ABC):
                 node_vmt.free_cores -= cc.cores * replicas
                 if node_vmt.free_cores.magnitude < -TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container addition. Not enough cores are available')
-                node_vmt.free_mem -= cc.mem[0] * replicas
+                node_vmt.free_mem -= cc.memv * replicas
                 if node_vmt.free_mem.magnitude < -TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. Not enough memory is available')
             
-            # Container scaled-up commands
-            for node, cc, replicas, multiplier in command.scale_containers:
-                if multiplier <= 1: # It is not a container scale-up
-                    continue
-                op_str = f'Command #{command_index}. Scale up containers ({node}, {cc}, {replicas}, {multiplier})'
-                if node not in vm_to_vmt:
-                    raise ValueError(f'{op_str} -> Invalid node: {node}')
-                node_vmt = vm_to_vmt[node]
-                if node_vmt.replicas[cc] < replicas:
-                    raise ValueError(f'{op_str} -> Invalid container scale up. Replicas to scale up > allocated replicas')
-                node_vmt.replicas[cc] -= replicas
-                if node_vmt.replicas[cc] == 0:
-                    del node_vmt.replicas[cc]
-                scaled_up_cc = replace(
-                    cc, 
-                    cores=cc.cores * multiplier,
-                    perf=cc.perf * multiplier,
-                    agg_level=cc.agg_level * multiplier
-                )
-                node_vmt.replicas[scaled_up_cc] += replicas
-                app_perf_increment[cc.app] += cc.perf * replicas * (multiplier - 1)
-                node_vmt.free_cores -= cc.cores * replicas * (multiplier - 1)
-                if node_vmt.free_cores.magnitude < -Transition._DELTA:
-                    raise ValueError(f'{op_str} -> Invalid container scale up. Not enough cores are available')
-                # Memory is no checked as it is does not change in scale-up operations 
-
             # Remove node commands
             for node in command.remove_nodes:
                 node_vmt = vm_to_vmt[node]
@@ -477,7 +462,7 @@ class Transition(ABC):
                                             final_node_ic.mem - initial_node_vmt.ic.mem
                 initial_node_vmt.ic = final_node_ic
 
-            # Update application's performance surplus
+            # Update application's performance surplus at the command termination
             for app in app_perf_increment:
                 app_perf_surplus[app] += app_perf_increment[app]
                 app_perf_increment[app] = RequestsPerTime("0 req/s")
@@ -681,6 +666,10 @@ class TransitionRBT(Transition):
     Class to implement the recycling based transition algorithm. There are
     two variants: RBT1 and RBT2.
     """
+
+    # A negative ID for unscalable containers
+    UNSCALABLE_CONTAINER_ID = -1
+
     def __init__(self, timing_args: TimedOps.TimingArgs, system: System, 
                  transition_algorithm: TransitionAlgorithm.RBT,
                  hot_node_scale_up: bool = False, hot_container_scale: bool = False):
@@ -692,17 +681,18 @@ class TransitionRBT(Transition):
         :param hot_node_scale_up: Set to enable hot node scaling-up.
         :param hot_replicas_scale: Set to enable hot scaling of container computational parameters.
         """
-        self._timing_args = timing_args
-        self._system = system
-        self._recycling = None
-        self._recycling_vm = None
-        self._current_alloc: list[Vmt] = None
-        self._unalloc_node_cs: list[tuple[Vmt, ContainerClass, int]]  = None
+        self._timing_args: TimedOps.TimingArgs = timing_args
+        self._system: System = system
+        self._recycling: RecyclingVmt = None
+        self._recycling_vm: Recycling = None
+        self._id_scalable_containers: dict[Vmt, dict[int, tuple[int, int]]] = {}
+        self._current_alloc: list[Vmt] = []
+        self._unalloc_node_cs: list[tuple[Vmt, ContainerClass, int]]  = []
         self._app_unalloc_perf: defaultdict[App, RequestsPerTime]  = None
         self._app_perf_surplus:  defaultdict[App, RequestsPerTime]  = None
         self._app_perf_increment: defaultdict[App, RequestsPerTime]  = None
-        self._allocatable_cs_next_step: list[tuple[Vm, ContainerClass, int]] = None
-        self._unallocated_containers_in_new_nodes: list[tuple[Vm, ContainerClass, int]] = None
+        self._allocatable_cs_next_step: list[tuple[Vm, ContainerClass, int]] = []
+        self._unallocated_containers_in_new_nodes: list[tuple[Vm, ContainerClass, int]] = []
         self._hot_node_scale_up = hot_node_scale_up
         self._hot_replicas_scale = hot_container_scale
         self._commands: list[Command] = None
@@ -733,7 +723,7 @@ class TransitionRBT(Transition):
 
         # Required computational resources to allocate the replicas
         required_cores = replicas * cc.cores
-        required_mem = replicas * cc.mem[0]
+        required_mem = replicas * cc.memv
 
         # Obsolete replicas in the node to be removed in order to allocate the replicas
         obsolete_replicas = []
@@ -747,7 +737,7 @@ class TransitionRBT(Transition):
                 # Number of required obsolete replicas of the container class to remove
                 required_replicas = max(
                     ceil((required_cores - node.free_cores) / obsolete_cc.cores),
-                    ceil((required_mem - node.free_mem) / obsolete_cc.mem[0])
+                    ceil((required_mem - node.free_mem) / obsolete_cc.memv)
                 )
                 if required_replicas == 0:
                     break
@@ -759,17 +749,17 @@ class TransitionRBT(Transition):
                     available_perf_surplus[obsolete_cc.app] -= obsolete_cc.perf * obsolete_replicas_count
                     obsolete_replicas.append((obsolete_cc, obsolete_replicas_count))
                     required_cores -= obsolete_replicas_count * obsolete_cc.cores
-                    required_mem -= obsolete_replicas_count * obsolete_cc.mem[0]
+                    required_mem -= obsolete_replicas_count * obsolete_cc.memv
 
         # Calculate the number of cores and memory obtained from the removal of obsolete containers in the node
         removed_cores = replicas * cc.cores - required_cores
-        removed_mem = replicas * cc.mem[0] - required_mem
+        removed_mem = replicas * cc.memv - required_mem
 
         # Calculate how many new container replicas could be allocated after the removals
         allocatable_replicas = min(
             replicas,
             int((node.free_cores.magnitude + removed_cores.magnitude + TransitionRBT._DELTA) / cc.cores.magnitude),
-            int((node.free_mem.magnitude + removed_mem.magnitude + TransitionRBT._DELTA) / cc.mem[0].magnitude)
+            int((node.free_mem.magnitude + removed_mem.magnitude + TransitionRBT._DELTA) / cc.memv.magnitude)
         )
 
         # Allocate the replicas. At this point, the removals and allocations are actually performed
@@ -795,12 +785,12 @@ class TransitionRBT(Transition):
         allocatable_replicas = min(
             replicas,
             int((node.free_cores.magnitude + TransitionRBT._DELTA) / cc.cores.magnitude),
-            int((node.free_mem.magnitude + TransitionRBT._DELTA) / cc.mem[0].magnitude)
+            int((node.free_mem.magnitude + TransitionRBT._DELTA) / cc.memv.magnitude)
         )
         if allocatable_replicas > 0:
             node.free_cores = node.free_cores - allocatable_replicas * cc.cores
             assert node.free_cores.magnitude > - TransitionRBT._DELTA, "Node free cores cannot not be negative"
-            node.free_mem = node.free_mem - allocatable_replicas * cc.mem[0]
+            node.free_mem = node.free_mem - allocatable_replicas * cc.memv
             assert node.free_mem.magnitude > - TransitionRBT._DELTA, "Node free memory cannot not be negative"
             node.replicas[cc] += allocatable_replicas
             command.allocate_containers.append((node, cc, allocatable_replicas))
@@ -859,7 +849,7 @@ class TransitionRBT(Transition):
             del node.replicas[cc]
         node.free_cores += cc.cores * removed_replicas
         assert (node.free_cores - node.ic.cores).magnitude < TransitionRBT._DELTA, "Invalid node free cores"
-        node.free_mem += cc.mem[0] * removed_replicas
+        node.free_mem += cc.memv * removed_replicas
         assert (node.free_mem - node.ic.mem).magnitude < TransitionRBT._DELTA, "Invalid node free mem"
         performance_surplus[cc.app] -= cc.perf * removed_replicas
         self._recycling.obsolete_containers[node][cc] -= removed_replicas
@@ -912,7 +902,7 @@ class TransitionRBT(Transition):
                     cc_perf_surplus = min(app_perf_surplus[app], cc.perf * replicas)
                     surplus_replicas = floor(cc_perf_surplus / cc.perf + Transition._DELTA)
                     free_cores += surplus_replicas * cc.cores
-                    free_mem += surplus_replicas * cc.mem[0]
+                    free_mem += surplus_replicas * cc.memv
                     app_perf_surplus[app] -= cc_perf_surplus
             if free_cores.magnitude > Transition._DELTA and free_mem.magnitude > Transition._DELTA:
                 allocated_nodes.append(node)
@@ -956,10 +946,10 @@ class TransitionRBT(Transition):
         total_new_cpu = 0
         total_new_mem = 0
         for n, cc_replicas in self._recycling.new_containers.items():
-            # We focus on new containers in recycled and upgradednodes
+            # We focus on new containers in recycled and upgraded nodes
             if n in self._recycling.recycled_node_pairs | self._recycling.upgraded_node_pairs:
                 total_new_cpu += sum(cc.cores.magnitude * replicas for cc, replicas in cc_replicas.items())
-                total_new_mem += sum(cc.mem[0].magnitude * replicas for cc, replicas in cc_replicas.items())
+                total_new_mem += sum(cc.memv.magnitude * replicas for cc, replicas in cc_replicas.items())
 
         # Build a list of unallocated containers (new containers) in recycled and upgraded nodes,
         # sorted by decreasing size
@@ -969,7 +959,7 @@ class TransitionRBT(Transition):
             if n in self._recycling.recycled_node_pairs | self._recycling.upgraded_node_pairs:
                 for cc, replicas in cc_replicas.items():
                     new_replicas = (n, cc, replicas)
-                    container_size = cc.cores.magnitude / total_new_cpu + cc.mem[0].magnitude / total_new_mem
+                    container_size = cc.cores.magnitude / total_new_cpu + cc.memv.magnitude / total_new_mem
                     container_sizes.append(container_size)
                     self._unalloc_node_cs.append(new_replicas)
         self._unalloc_node_cs = [
@@ -1025,12 +1015,12 @@ class TransitionRBT(Transition):
         for removed_cc, removed_replicas, dest_node in removed_obsolete_replicas:
             free_dst_cores, free_dst_mem = available_node_free_resources[dest_node]
             free_dst_cores += removed_replicas * removed_cc.cores
-            free_dst_mem += removed_replicas * removed_cc.mem[0]
+            free_dst_mem += removed_replicas * removed_cc.memv
             available_node_free_resources[dest_node] = (free_dst_cores, free_dst_mem)
         for copied_cc, copied_replicas, dest_node in copied_obsolete_replicas:
             free_dst_cores, free_dst_mem = available_node_free_resources[dest_node]
             free_dst_cores -= copied_replicas * copied_cc.cores
-            free_dst_mem -= copied_replicas * copied_cc.mem[0]
+            free_dst_mem -= copied_replicas * copied_cc.memv
             available_node_free_resources[dest_node] = (free_dst_cores, free_dst_mem)
 
         # Copied obsolete replicas in the source node will increase the available free cores 
@@ -1039,9 +1029,9 @@ class TransitionRBT(Transition):
         free_src_cores, free_src_mem = available_node_free_resources[src_node]
         for copied_cc, copied_replicas, _ in copied_obsolete_replicas:
             free_src_cores += copied_replicas * copied_cc.cores
-            free_src_mem += copied_replicas * copied_cc.mem[0]
+            free_src_mem += copied_replicas * copied_cc.memv
         free_src_cores -= allocatable_replicas * cc.cores
-        free_src_mem -= allocatable_replicas * cc.mem[0]
+        free_src_mem -= allocatable_replicas * cc.memv
         available_node_free_resources[src_node] = (free_src_cores, free_src_mem)
 
         # The available obsolete replicas change after the copy. On one hand, the original replicas will be removed, 
@@ -1105,7 +1095,7 @@ class TransitionRBT(Transition):
 
         # Required cores and memory to allocate all the replicas
         required_cores = replicas_to_allocate * cc.cores
-        required_mem = replicas_to_allocate * cc.mem[0]
+        required_mem = replicas_to_allocate * cc.memv
 
         # The state must be recovered when we fail to allocate at least one replica, so create backups.
         # It should be noted that the state is changed by the execution of the remove-allocate algorithm
@@ -1137,7 +1127,7 @@ class TransitionRBT(Transition):
             # Calculate the number of obselete replicas of the container to remove from the source node
             required_obsolete_replicas = max(
                 ((required_cores - free_src_cores) / removable_cc.cores).magnitude,
-                ((required_mem - free_src_mem) / removable_cc.mem[0]).magnitude
+                ((required_mem - free_src_mem) / removable_cc.memv).magnitude
             )
             required_obsolete_replicas = int(ceil(required_obsolete_replicas - TransitionRBT._DELTA))
             replicas_to_remove = min(required_obsolete_replicas, available_replicas)
@@ -1159,7 +1149,7 @@ class TransitionRBT(Transition):
                     removed_obsolete_replicas.extend(removed_replicas)
                     modified_dest_nodes.append(dest_node)
                     required_cores -= obsolete_replicas * removable_cc.cores
-                    required_mem -= obsolete_replicas * removable_cc.mem[0]
+                    required_mem -= obsolete_replicas * removable_cc.memv
                     replicas_to_remove -= obsolete_replicas
                     if replicas_to_remove == 0:
                         # Go out if we have copied all the required obsolete replicas to free up enough resources
@@ -1168,11 +1158,11 @@ class TransitionRBT(Transition):
         # Calculate the number of replicas that will be allocatable in the source node at the beginning the next 
         # remove-allocate-copy execution
         free_cores = free_src_cores + replicas_to_allocate * cc.cores - required_cores
-        free_mem = free_src_mem + replicas_to_allocate * cc.mem[0] - required_mem
+        free_mem = free_src_mem + replicas_to_allocate * cc.memv - required_mem
         allocatable_replicas = min(
             replicas_to_allocate,
             int((free_cores.magnitude + TransitionRBT._DELTA) / cc.cores.magnitude),
-            int((free_mem.magnitude + TransitionRBT._DELTA) / cc.mem[0].magnitude),
+            int((free_mem.magnitude + TransitionRBT._DELTA) / cc.memv.magnitude),
         )
 
         # If no replicas of the new container will be allocatable
@@ -1308,11 +1298,10 @@ class TransitionRBT(Transition):
                         else:
                             self._unalloc_node_cs.pop(index)
 
-        command.simplification()  
-
         # Check if obsolete nodes can be removed and update the command
         self._remove_obsolete_nodes(command)
 
+        command.simplification()  
         return command
 
     def _get_allocation(self, app_performance: dict[App, RequestsPerTime]) -> list[Vm]:
@@ -1339,7 +1328,8 @@ class TransitionRBT(Transition):
     def _append_command(self, command: Command, append_null_command=False):
         """
         Append a command to the list of commands and update application's performance surplus from the 
-        performance incrementscoming from command's container allocations.
+        performance incrementscoming from command's container allocations. In addition, it combines
+        the fragments to scale the containers.
         :param command: The command to append.
         :append_null_command: Null commands are not appended if this option is not set.
         """
@@ -1357,6 +1347,102 @@ class TransitionRBT(Transition):
         if self._sync_on_next_alloc_upgraded_nodes and allocation_in_upgraded_nodes:
             command.sync_on_nodes_upgrade = True
             self._sync_on_next_alloc_upgraded_nodes = False
+        
+        # Combine fragments to scale-up containers
+        for node, fcc, fr in command.allocate_containers[:]:
+            # If the container is a fragment
+            if fcc.id > 0:
+                scale_up_command = self.combine_replica_fragments(node, fcc.cc, fr, up_down=1)
+                for cc in dict(self._current_alloc[node].keys()):
+                    if cc.id == fcc.id:
+                        del self._current_alloc[node][cc]
+                command.scale_containers.append(scale_up_command.scale_containers)
+                command.allocate_containers.remove((node, fcc, fr))
+
+        # Combine fragments to scale-down containers
+        for node, fcc, fr in command.remove_containers[:]:
+            # If the container is a fragment
+            if fcc.id > 0:
+                scale_down_command = self.combine_replica_fragments(node, fcc, fr, up_down=-1)
+                command.scale_containers.extend(scale_down_command.scale_containers)
+                command.remove_containers.remove((node, fcc, fr))
+
+    def combine_replica_fragments(self, node: Vmt, fcc: ContainerClass, fr: int, up_down:int = 1) -> Command:
+        """
+        Combine fragments to scale replicas updating the dictionary with the replicas and current fragments 
+        in self._id_scalable_containers.
+        :param node: Node where the fragments are allocated or removed.
+        :param cc: Container class for the fragments.
+        :param fr: Number of fragments.
+        :param up_down: 1 for scale-up using the fragments and -1 for scale-down. 
+        :return: A Command with the scales.
+        """
+        # The number of replicas to scale is given in the horizontal axis whereas the number of fragments is
+        # given in the vertical axis. Bottom plots depict the replicas before adding new fragments and top
+        # plots after de addition (the situation for fragment removals would be the reverse). The quotient
+        # between the top and bottom plots would be another plot with container multipliers. Each plot includes
+        # replicas with the minimum number of fragments and replicas with the maximum (with one additional 
+        # fragment). Left and right plots depict two possible scenarios.
+        # The goal is to distribute the fragments equally among all replicas with multipliers as close to 1.0
+        # as possible. 
+        #
+        #    |                       |
+        #    |         _________     |           ______
+        #    | ________|             | __________|
+        #    |           _______     |       __________
+        #    | __________|           | ______|
+        #    |___________________    |____________________
+        #
+
+        # Check params
+        assert fcc.id > 0, "The fragments can not be combined"
+        assert up_down == 1 or up_down == -1, "Invalid combination of fragments"
+
+        command = Command()
+
+        # Replicas and fragments for the container before the combination with the new fragments
+        replicas, prev_fragments = self._id_scalable_containers[node][fcc.id]
+
+        # Minimum and maximum number of fragments per replica before the combination 
+        prev_min_fragments_per_replica = prev_fragments // replicas
+        prev_max_fragments_per_replica = prev_min_fragments_per_replica + 1
+        # Number of replicas with the maximum and the minimum number of replicas before the combination
+        prev_n_max_replicas = prev_fragments - prev_min_fragments_per_replica * replicas
+        prev_n_min_replicas = replicas - prev_n_max_replicas
+        # Container class for the replicas with minimum and maximum fragments before the combination
+        prev_min_cc = fcc * prev_min_fragments_per_replica
+        if prev_n_max_replicas > 0:
+            prev_max_cc = fcc * prev_max_fragments_per_replica
+        # Total number of fragments after the combination  
+        new_fragments = prev_fragments + fr * up_down
+        # Minimum and maximum number of fragments per replica after the combination 
+        new_min_fragments_per_replica = new_fragments // replicas
+        new_max_fragments_per_replica = new_min_fragments_per_replica + 1
+        # Number of replicas with the maximum and the minimum number of replicas after the combination
+        new_n_max_replicas = new_fragments - new_min_fragments_per_replica * replicas
+        new_n_min_replicas = replicas - new_n_max_replicas
+        # Multipliers for escales between the minimum and between the maximum container classes
+        min_multiplier = new_min_fragments_per_replica / prev_min_fragments_per_replica
+        max_multiplier = new_max_fragments_per_replica / prev_max_fragments_per_replica
+        # Number of replicas with scales between the minimums and between the maximums container classes
+        n_min_scaled_replicas = min(prev_n_min_replicas, new_n_min_replicas)
+        n_max_scaled_replicas = min(prev_n_max_replicas, new_n_max_replicas)
+        # Scales between the minimums and between the maximums
+        command.scale_containers.append((node, prev_min_cc, n_min_scaled_replicas, min_multiplier))
+        if prev_n_max_replicas > 0:
+            command.scale_containers.append((node, prev_max_cc, n_max_scaled_replicas, max_multiplier))
+        # Intermediate scales between minimum and maximum container classes (leftmost figure)
+        if prev_n_min_replicas > new_n_min_replicas:
+            medium_multiplier = new_max_fragments_per_replica / prev_min_fragments_per_replica
+            scaled_replicas = prev_n_min_replicas - new_n_min_replicas
+            command.scale_containers.append((node, prev_min_cc, scaled_replicas, medium_multiplier))
+        # Intermediate scales between minimum and maximum container classes (rightmost figure)
+        elif prev_n_min_replicas < new_n_min_replicas and prev_n_max_replicas > 0:
+            medium_multiplier = new_min_fragments_per_replica / prev_max_fragments_per_replica
+            scaled_replicas = new_n_min_replicas - prev_n_min_replicas
+            command.scale_containers.append((node, prev_max_cc, scaled_replicas, medium_multiplier))
+
+        return command
 
     def _post_process_commands(self):
         """
@@ -1451,7 +1537,6 @@ class TransitionRBT(Transition):
         :param create_nodes_command: Command where temporary nodes creations are appended.
         :param allocate_new_nodes_command: Command where container allocations in temporary nodes are appended.
         """
-
         # Add a dummy node with enough capacity to allocate any number of containers
         dummy_node = Vmt(Vm(self._current_alloc[0].ic, ignore_ic_index=True))
         dummy_node.free_cores *= 10E12
@@ -1522,6 +1607,44 @@ class TransitionRBT(Transition):
 
         self._append_command(command)
 
+    def fragment_scaled_containers(self):
+        """
+        Fragment containers to emulate container's scale-ups and scale-downs through allocations of new
+        containers (fragments) and removals of obsolete containers (fragments).
+        """
+        # Scaled-up containers are replaced by the initial container, as a recycled container, plus a set of
+        # container fragments, as new containers. Scaled-down containers are replaced by the initial container, 
+        # as a recycled container, plus a set of container fragments, as obsolete containers
+        new_id = 1
+        for node, cc1_cc2_replicas in dict(self._recycling.scaled_containers).items():
+            self._id_scalable_containers[node] = {}
+            for cc1_cc2, replicas in cc1_cc2_replicas.items():
+                cc1, cc2 = cc1_cc2
+                # One fragment corresponds to a minimum-size container
+                cc1_cc2_fragment = replace(cc1 * (1/cc1.agg_level), id=new_id)
+                if cc1.cores > cc2.cores:
+                    # Fragment the scaled replicas in the allocation
+                    node.replicas[cc1] -= replicas
+                    if node.replicas[cc1] == 0:
+                        del node.replicas[cc1]
+                    node.replicas[cc2] = replicas
+                    node.replicas[cc1_cc2_fragment] = replicas * (cc1.agg_level - cc2.agg_level) 
+                # Set the same possitive container ID for all the scaled containers. All the containers get 
+                # a negative container iD by default 
+                    cc1 = replace(cc1, id=new_id)
+                cc2 = replace(cc2, id=new_id)
+                if cc1.cores > cc2.cores:
+                    self._recycling.recycled_containers[node][cc2] = replicas
+                    self._recycling.obsolete_containers[node][cc1_cc2_fragment] = \
+                        replicas * (cc1.agg_level - cc2.agg_level)
+                else:
+                    self._recycling.recycled_containers[node][cc1] = replicas
+                    self._recycling.new_containers[node][cc1_cc2_fragment] = \
+                        replicas * (cc2.agg_level - cc1.agg_level)
+                # Set the number of replicas and the total number of fragments for each escalable container
+                self._id_scalable_containers[node][cc1.id] = (replicas, replicas*cc1.agg_level)                    
+                new_id += 1
+
     def _transition_init(self, initial_alloc: Allocation, final_alloc: Allocation) -> bool:
         """
         Initialize the trasition between two allocations.
@@ -1545,6 +1668,10 @@ class TransitionRBT(Transition):
                                        self._hot_node_scale_up, self._hot_replicas_scale)
         
         self._recycling = RecyclingVmt(self._recycling_vm, vm_to_vmt)
+
+        if len(self._recycling.scaled_containers) > 0:
+            # Frament scaled-up and scaled-down containers
+            self.fragment_scaled_containers()
 
         # Check whether the initial allocation is identical to the final allocation
         if get_vmt_allocation_signature(self._current_alloc) == get_vmt_allocation_signature(final_alloc_vmt):
@@ -1624,16 +1751,14 @@ class TransitionRBT(Transition):
         self._unallocated_containers_in_new_nodes.clear()
         self._append_command(allocate_in_new_nodes_command, append_null_command=True)
 
-        # All the transition operations are common to all the RBT variants from now on
+        # Remove the last obsolete containers of applications with all its new containers allocated.
+        # The corresponding computational resources can be freed up for the allocation of new containers
+        self._remove_last_obsolete_containers(allocate_in_new_nodes_command)
 
         # If there are still unallocated containers in recycled nodes
         if len(self._allocatable_cs_next_step) > 0 or len(self._unalloc_node_cs) > 0:
-            if len(self._unalloc_node_cs) == 0 and self._rbt1:
-                # Extend a little the transition time instead of creating temporary nodes
-                self._append_command(self._remove_allocate_copy())
-            # If new nodes are not enough to complete the transition of recycled nodes, temporary nodes are required
-            else:
-                self._complete_allocation_in_temporary_nodes(create_upgrade_nodes_command, allocate_in_new_nodes_command)
+            # Temporary nodes are added if it were necessary
+            self._complete_allocation_in_temporary_nodes(create_upgrade_nodes_command, allocate_in_new_nodes_command)
 
         # Two remove-allocate-copy steps may be necessary to complete the transition. The first
         # command to remove obsolete containers and next allocate the remaining new containers in recycled nodes.
@@ -1649,8 +1774,8 @@ class TransitionRBT(Transition):
         self._post_process_commands()
 
         # Check whether the commands implement a valid transition between the initial and the final allocations
-        # Four commands must be enough for the shortest RBT version
-        assert self._rbt1 or len(self._commands) <= 4, "Too many commands"
+        # Four commands must be enough for the RBT2 version
+        assert not self._rbt2 or len(self._commands) <= 4, "Too many commands"
         assert self.check_transition(initial_alloc, final_alloc, self._commands), "Invalid transition"
 
         return self._commands, self.get_transition_time(self._commands, self._timing_args)
@@ -1663,10 +1788,6 @@ class TransitionRBT(Transition):
         worst_case_time = self._timing_args.node_creation_time + self._timing_args.container_creation_time + \
             (self._timing_args.container_removal_time + self._timing_args.container_creation_time) + \
              self._timing_args.container_removal_time + self._timing_args.node_removal_time 
-        if self._rbt1:
-            # One extra remove-allocate-copy step when it enables the transition without temporary nodes
-            worst_case_time += self._timing_args.container_removal_time + self._timing_args.container_creation_time +\
-                self._timing_args.node_removal_time
         return worst_case_time 
 
     def get_recycling_levels(self) -> tuple[float, float]:

@@ -228,8 +228,9 @@ class Recycling:
                 for cc, replicas in initial_containers_app[app]:
                     container_pairs.append((cc, None, replicas))
             # Append pairs with new replicas
-            for cc, replicas in final_containers.items(): 
-                container_pairs.append((None, cc, replicas))
+            for app in final_containers_app:
+                 for cc, replicas in final_containers_app[app]:
+                     container_pairs.append((None, cc, replicas))
 
         return container_pairs
 
@@ -255,7 +256,7 @@ class Recycling:
         for cc1, cc2, replicas in container_pairs:
             if cc1 is not None and cc2 is not None:
                 cc1_cores = cc1.cores.magnitude
-                cc1_mem = cc1.mem[0].magnitude
+                cc1_mem = cc1.memv.magnitude
                 cc2_cores = cc2.cores.magnitude
                 container_scale_penalty = min(cc1_cores, cc2_cores) / cc1_cores 
                 recycling_level += (0.5 * node_scale_up_penalty * replicas * container_scale_penalty *
@@ -517,7 +518,6 @@ class Recycling:
             self.obsolete_containers[initial_node] = {}
             self.new_containers[initial_node] = {}
             self.recycled_containers[initial_node] = {} 
-            self.scaled_containers[initial_node] = []
 
         # Recycled and upgraded nodes can contain recycled containers, new containers, obsolete containers 
         # and scaled containers
@@ -531,9 +531,10 @@ class Recycling:
                 elif initial_cc == final_cc:
                     self.recycled_containers[initial_node][initial_cc] = replicas
                 else:
-                    self.scaled_containers[initial_node].append((initial_cc, final_cc, replicas))
-
-        return
+                    if node not in self.scaled_containers:
+                        self.scaled_containers[initial_node] = {(initial_cc, final_cc): replicas}
+                    else:    
+                        self.scaled_containers[initial_node][(initial_cc, final_cc)] = replicas
 
     def _calculate_recycling_levels(self, initial_alloc: Allocation):
         """
@@ -554,7 +555,7 @@ class Recycling:
             for cg in initial_node.cgs
         )
         initial_container_mem = sum(
-            cg.cc.mem[0] * cg.replicas
+            cg.cc.memv * cg.replicas
             for initial_node in initial_alloc
             for cg in initial_node.cgs
         )
@@ -572,7 +573,7 @@ class Recycling:
             for cc, replicas in cc_replicas.items()
         )
         recycled_container_mem = sum(
-            cc.mem[0] * replicas
+            cc.memv * replicas
             for _, cc_replicas in self.recycled_containers.items()
             for cc, replicas in cc_replicas.items()
         )
@@ -596,7 +597,7 @@ class Recycling:
         self.new_nodes: list[Vm] = []
         self.obsolete_containers: dict[Vm, dict[ContainerClass, int]] = {}
         self.recycled_containers: dict[Vm, dict[ContainerClass, int]] = {}
-        self.scaled_containers: dict[Vm, list[ContainerClass, ContainerClass, int]] = {} 
+        self.scaled_containers: dict[Vm, dict[tuple[ContainerClass, ContainerClass], int]] = {} 
         self.new_containers: dict[Vm, dict[ContainerClass, int]] = {}
         self.node_recycling_level: float = 0
         self.container_recycling_level: float = 0

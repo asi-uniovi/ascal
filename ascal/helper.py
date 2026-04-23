@@ -109,6 +109,10 @@ class RecyclingVmt:
             vm_to_vmt[vm]: cc_replicas
             for vm, cc_replicas in recycling.new_containers.items()
         }
+        self.scaled_containers: dict[Vmt, dict[ContainerClass, ContainerClass, int]] = {
+            vm_to_vmt[vm]: {(cc1_cc2[0], cc1_cc2[1]): replicas for cc1_cc2, replicas in cc1_cc2_replicas.items()}
+            for vm, cc1_cc2_replicas in recycling.scaled_containers.items()
+        }
         self.node_recycling_level: float = recycling.node_recycling_level
         self.container_recycling_level: float = recycling.container_recycling_level
 
@@ -211,9 +215,9 @@ def get_app_ccs(system: System, app_aggs: dict[App, list[int]] = None) -> dict[A
                 ic=None,
                 fm=icf,
                 cores=system[(app, icf)].cores * agg,
-                mem=system[(app, icf)].mem[0],
                 perf=system[(app, icf)].perf * agg,
                 agg_level=agg,
+                mem=system[(app, icf)].mem[aggs.index(agg)],
                 aggs=aggs
             )
             app_ccs[app].append(cc)
@@ -282,11 +286,11 @@ def get_required_nodes(ic_list: list[InstanceClass], cgs: list[ContainerGroup], 
             allocated_replicas = 0
             for node in required_nodes:
                 allocatable_replicas_cpu = int((node.free_cores / cg.cc.cores).magnitude + delta)
-                allocatable_replicas_mem = int((node.free_mem / cg.cc.mem[0]).magnitude + delta)
+                allocatable_replicas_mem = int((node.free_mem / cg.cc.memv).magnitude + delta)
                 allocated_replicas = min(cg.replicas, allocatable_replicas_cpu, allocatable_replicas_mem)
                 if allocated_replicas > 0:
                     node.free_cores -= allocated_replicas * cg.cc.cores
-                    node.free_mem -= allocated_replicas * cg.cc.mem[0]
+                    node.free_mem -= allocated_replicas * cg.cc.memv
                     node.cgs.append(ContainerGroup(cg.cc, allocated_replicas))
                     cg.replicas -= allocated_replicas
                     if cg.replicas == 0:
