@@ -198,8 +198,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             transition1_time = self.transition.get_transition_time(commands1, self.timing_args)
             transition2_time = self.transition.get_transition_time(commands2, self.timing_args)
 
-            self.log(f"Transition at {self._next_prediction_window_time - transition1_time}:"
-                     f"{transition1_time + transition2_time} seconds")
+            self.log(f"Transition at {self._next_prediction_window_time - transition1_time}, calculation: "
+                     f"{transition1_time + transition2_time:1.3f} seconds")
             self.log(f"Predicted loads for {self.prediction_percentile:.1f} % percentile:")
             for app, load in hv_new_app_load.items():
                 self.log(f"- {app.name} -> {load.to('req/s').magnitude:.2f} req/s")

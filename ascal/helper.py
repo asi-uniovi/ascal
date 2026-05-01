@@ -116,6 +116,18 @@ class RecyclingVmt:
         self.node_recycling_level: float = recycling.node_recycling_level
         self.container_recycling_level: float = recycling.container_recycling_level
 
+def similar_ccs(cc1: ContainerClass, cc2: ContainerClass)->bool:
+    """
+    Check if the similarity of two container classes. Two container classes are similar when the are associated
+    to the same instance class family and application, require the same computational resources and provide
+    the same performance. 
+    :param cc1: One container class.
+    :param cc2: Another container class.
+    :return: True if the container classes are similar.
+    """
+    return cc1.fm == cc2.fm and cc1.app == cc2.app and abs(cc1.cores - cc2.cores).magnitude < 0.000001 and \
+        abs(cc1.memv - cc2.memv).magnitude < 0.000001 and abs(cc1.perf - cc2.perf).magnitude < 0.000001
+            
 def get_min_max_perf(alloc1: Allocation, alloc2: Allocation) ->\
         tuple[dict[App, RequestsPerTime], dict[App, RequestsPerTime]]:
     """

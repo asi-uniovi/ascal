@@ -531,7 +531,7 @@ class Recycling:
                 elif initial_cc == final_cc:
                     self.recycled_containers[initial_node][initial_cc] = replicas
                 else:
-                    if node not in self.scaled_containers:
+                    if initial_node not in self.scaled_containers:
                         self.scaled_containers[initial_node] = {(initial_cc, final_cc): replicas}
                     else:    
                         self.scaled_containers[initial_node][(initial_cc, final_cc)] = replicas

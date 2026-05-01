@@ -227,6 +227,8 @@ class Autoscaler(ABC):
             timedops = self._timedops
         curr_time = start_time
         for command in commands:
+            scale_up_containers = [scale for scale in command.scale_containers if scale[3] > 1.0]
+            scale_down_containers = [scale for scale in command.scale_containers if scale[3] < 1.0]
             if command.sync_on_nodes_upgrade:
                 curr_time = max(curr_time, start_time + self.timing_args.hot_node_scale_up_time)
             if command.sync_on_nodes_creation:
@@ -239,14 +241,26 @@ class Autoscaler(ABC):
                     node.clear()
                     timedops.create_node(curr_time, node)
                     self.allocation.append(node)
+            elapsed_time = 0
+            if len(scale_down_containers) > 0:
+                for node, cc, replicas, multiplier in scale_down_containers:
+                    timedops.scale_container_replicas(curr_time, cc, multiplier, replicas, node)
+                elapsed_time = self.timing_args.hot_container_scale_down_time            
             if len(command.remove_containers) > 0:
                 for node, cc, replicas in command.remove_containers:
                     timedops.remove_container_replicas(curr_time, cc, replicas, node)
-                curr_time += self.timing_args.container_removal_time
+                elapsed_time = self.timing_args.container_removal_time
+            curr_time += elapsed_time
             if len(command.remove_nodes) > 0:
                 for node in command.remove_nodes:
                     timedops.remove_node(curr_time, node)
+            elapsed_time = 0
+            if len(scale_up_containers) > 0:
+                for node, cc, replicas, multiplier in scale_up_containers:
+                    timedops.scale_container_replicas(curr_time, cc, multiplier, replicas, node)
+                elapsed_time = self.timing_args.hot_container_scale_up_time            
             if len(command.allocate_containers) > 0:
                 for node, cc, replicas in command.allocate_containers:
                     timedops.allocate_container_replicas(curr_time, cc, replicas, node)
-                curr_time += self.timing_args.container_creation_time
+                elapsed_time = self.timing_args.container_creation_time
+            curr_time += elapsed_time

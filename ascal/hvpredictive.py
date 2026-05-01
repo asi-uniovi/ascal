@@ -135,7 +135,7 @@ class HVPredictiveAutoscaler(Autoscaler):
             commands, transition_time = self.transition.calculate_sync(self.allocation, self.new_allocation)
 
             transition_time = current_time() - transition_time_start
-            self.log(f"Transition: {transition_time} seconds")
+            self.log(f"Transition calculation: {transition_time:1.3f} seconds")
             self.log(f"- From {[str(node) for node in self.allocation]}")
             self.log(f"- To   {[str(node) for node in self.new_allocation]}")
             if len(commands) > 0:

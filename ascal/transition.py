@@ -60,7 +60,8 @@ from ascal.helper import (
     Vmt,
     RecyclingVmt,
     get_vmt_allocation_signature,
-    get_app_perf_surplus
+    get_app_perf_surplus,
+    similar_ccs
 )
 
 
@@ -141,7 +142,7 @@ class Command:
         self.remove_containers = [(node.vm, cc, replicas) for node, cc, replicas in self.remove_containers]
         self.scale_containers = [
             (node.vm, cc, replicas, multiplier) 
-            for node, cc, replicas, multiplier in self.scale_containers
+            for node, cc, replicas, multiplier in self.scale_containers[:]
         ]
         self.create_nodes = [node.vm for node in self.create_nodes]
         self.remove_nodes = [node.vm for node in self.remove_nodes]
@@ -392,7 +393,7 @@ class Transition(ABC):
                 scaled_cc = cc * multiplier
                 close_cc_found = False # Dealing with floats may introduce runding errors
                 for other_cc in node_vmt.replicas:
-                    if scaled_cc.almost_equal(other_cc):
+                    if similar_ccs(scaled_cc, other_cc):
                         node_vmt.replicas[other_cc] += replicas
                         close_cc_found = True
                         break
@@ -685,7 +686,7 @@ class TransitionRBT(Transition):
         self._system: System = system
         self._recycling: RecyclingVmt = None
         self._recycling_vm: Recycling = None
-        self._id_scalable_containers: dict[Vmt, dict[int, tuple[int, int]]] = {}
+        self._replicas_fragments: dict[Vmt, dict[int, tuple[int, int]]] = {}
         self._current_alloc: list[Vmt] = []
         self._unalloc_node_cs: list[tuple[Vmt, ContainerClass, int]]  = []
         self._app_unalloc_perf: defaultdict[App, RequestsPerTime]  = None
@@ -1330,7 +1331,8 @@ class TransitionRBT(Transition):
         Append a command to the list of commands and update application's performance surplus from the 
         performance incrementscoming from command's container allocations. In addition, it combines
         the fragments to scale the containers.
-        :param command: The command to append.
+        :param command: The command to append. If the command includes hot scaling of replicas, they
+        are sorted by increasing multipliers.
         :append_null_command: Null commands are not appended if this option is not set.
         """
         for app in self._app_perf_increment:
@@ -1350,24 +1352,32 @@ class TransitionRBT(Transition):
         
         # Combine fragments to scale-up containers
         for node, fcc, fr in command.allocate_containers[:]:
-            # If the container is a fragment
-            if fcc.id > 0:
-                scale_up_command = self.combine_replica_fragments(node, fcc.cc, fr, up_down=1)
-                for cc in dict(self._current_alloc[node].keys()):
-                    if cc.id == fcc.id:
-                        del self._current_alloc[node][cc]
-                command.scale_containers.append(scale_up_command.scale_containers)
+            # If the container is a fragment, check if it can be combined in the current node. 
+            # Fragments copied from another node can not be combined in the destination node
+            if fcc.id > 0 and node in self._replicas_fragments and fcc.id in self._replicas_fragments[node]:
+                scale_up_command = self.combine_fragments(node, fcc, fr, up_down=1)
+                command.scale_containers.extend(scale_up_command.scale_containers)
+                replicas = self._replicas_fragments[node][fcc.id][0]
+                new_fr = self._replicas_fragments[node][fcc.id][1] + fr 
+                self._replicas_fragments[node][fcc.id] = (replicas, new_fr)
                 command.allocate_containers.remove((node, fcc, fr))
 
         # Combine fragments to scale-down containers
         for node, fcc, fr in command.remove_containers[:]:
-            # If the container is a fragment
-            if fcc.id > 0:
-                scale_down_command = self.combine_replica_fragments(node, fcc, fr, up_down=-1)
+            # If the container is a fragment, check if it can be combined in the current node. 
+            # Fragments copied from another node can not be combined in the destinatination node
+            if fcc.id > 0 and node in self._replicas_fragments and fcc.id in self._replicas_fragments[node]:
+                scale_down_command = self.combine_fragments(node, fcc, fr, up_down=-1)
                 command.scale_containers.extend(scale_down_command.scale_containers)
+                replicas = self._replicas_fragments[node][fcc.id][0]
+                new_fr = self._replicas_fragments[node][fcc.id][1] - fr
+                self._replicas_fragments[node][fcc.id] = (replicas, new_fr)
                 command.remove_containers.remove((node, fcc, fr))
 
-    def combine_replica_fragments(self, node: Vmt, fcc: ContainerClass, fr: int, up_down:int = 1) -> Command:
+        # Sort scaled containers in the command by increasing multiplier
+        command.scale_containers.sort(key=lambda s: s[3])
+
+    def combine_fragments(self, node: Vmt, fcc: ContainerClass, fr: int, up_down:int = 1) -> Command:
         """
         Combine fragments to scale replicas updating the dictionary with the replicas and current fragments 
         in self._id_scalable_containers.
@@ -1379,7 +1389,7 @@ class TransitionRBT(Transition):
         """
         # The number of replicas to scale is given in the horizontal axis whereas the number of fragments is
         # given in the vertical axis. Bottom plots depict the replicas before adding new fragments and top
-        # plots after de addition (the situation for fragment removals would be the reverse). The quotient
+        # plots after the addition (the situation for fragment removals would be the reverse). The quotient
         # between the top and bottom plots would be another plot with container multipliers. Each plot includes
         # replicas with the minimum number of fragments and replicas with the maximum (with one additional 
         # fragment). Left and right plots depict two possible scenarios.
@@ -1400,8 +1410,8 @@ class TransitionRBT(Transition):
 
         command = Command()
 
-        # Replicas and fragments for the container before the combination with the new fragments
-        replicas, prev_fragments = self._id_scalable_containers[node][fcc.id]
+        # Replicas and fragments for the container before the combination
+        replicas, prev_fragments = self._replicas_fragments[node][fcc.id]
 
         # Minimum and maximum number of fragments per replica before the combination 
         prev_min_fragments_per_replica = prev_fragments // replicas
@@ -1614,35 +1624,46 @@ class TransitionRBT(Transition):
         """
         # Scaled-up containers are replaced by the initial container, as a recycled container, plus a set of
         # container fragments, as new containers. Scaled-down containers are replaced by the initial container, 
-        # as a recycled container, plus a set of container fragments, as obsolete containers
+        # as a recycled container, plus a set of container fragments, as obsolete containers.
+        # self._replicas_fragments is a dictionary to keep track of the number of replicas and fragments for 
+        # each escalable container during the transition. Dictionary keys are the nodes and the container IDs, 
+        # and values are tuples with the number of replicas to scale and the current number of fragments for 
+        # the node and container ID. The number of replicas will increase with allocation of new fragments for
+        # scaling-up and the removal of fragments for scaling-down.
+        # The number of replicas will increase with allocation of new fragments for scaling-up and the removal of
+        # fragments for scaling-down.
         new_id = 1
+        self._replicas_fragments = {}
         for node, cc1_cc2_replicas in dict(self._recycling.scaled_containers).items():
-            self._id_scalable_containers[node] = {}
+            # Replicas and fragments for the fragmented containers before the transition            
+            self._replicas_fragments[node] = {}
             for cc1_cc2, replicas in cc1_cc2_replicas.items():
                 cc1, cc2 = cc1_cc2
-                # One fragment corresponds to a minimum-size container
+                # Set the same possitive container ID for the fragments. All the containers get 
+                # a negative container ID by default. One fragment corresponds to a minimum-size container
                 cc1_cc2_fragment = replace(cc1 * (1/cc1.agg_level), id=new_id)
+                # Remove the replicas to scale, since they will be replaced later by new ones with the correct ID
+                node.replicas[cc1] -= replicas
+                if node.replicas[cc1] == 0:
+                    del node.replicas[cc1]
                 if cc1.cores > cc2.cores:
+                    cc2 = replace(cc2, id=new_id) # The same ID as the fragments
                     # Fragment the scaled replicas in the allocation
-                    node.replicas[cc1] -= replicas
-                    if node.replicas[cc1] == 0:
-                        del node.replicas[cc1]
                     node.replicas[cc2] = replicas
-                    node.replicas[cc1_cc2_fragment] = replicas * (cc1.agg_level - cc2.agg_level) 
-                # Set the same possitive container ID for all the scaled containers. All the containers get 
-                # a negative container iD by default 
-                    cc1 = replace(cc1, id=new_id)
-                cc2 = replace(cc2, id=new_id)
-                if cc1.cores > cc2.cores:
+                    nfragments = replicas * (cc1.agg_level - cc2.agg_level)
+                    node.replicas[cc1_cc2_fragment] += nfragments 
                     self._recycling.recycled_containers[node][cc2] = replicas
-                    self._recycling.obsolete_containers[node][cc1_cc2_fragment] = \
-                        replicas * (cc1.agg_level - cc2.agg_level)
+                    self._recycling.obsolete_containers[node][cc1_cc2_fragment] = nfragments
+                    # Set the number of replicas and the total number of fragments for each escalable container
+                    self._replicas_fragments[node][cc2.id] = (replicas, replicas*cc1.agg_level)                    
                 else:
+                    cc1 = replace(cc1, id=new_id)
+                    node.replicas[cc1] = replicas
+                    nfragments = replicas * (cc2.agg_level - cc1.agg_level)
                     self._recycling.recycled_containers[node][cc1] = replicas
-                    self._recycling.new_containers[node][cc1_cc2_fragment] = \
-                        replicas * (cc2.agg_level - cc1.agg_level)
-                # Set the number of replicas and the total number of fragments for each escalable container
-                self._id_scalable_containers[node][cc1.id] = (replicas, replicas*cc1.agg_level)                    
+                    self._recycling.new_containers[node][cc1_cc2_fragment] = nfragments
+                    # Set the number of replicas and the total number of fragments for each escalable container
+                    self._replicas_fragments[node][cc1.id] = (replicas, replicas*cc1.agg_level)                    
                 new_id += 1
 
     def _transition_init(self, initial_alloc: Allocation, final_alloc: Allocation) -> bool:

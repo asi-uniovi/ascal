@@ -87,7 +87,10 @@ class AscalConfig:
                                                           timing_args['node_creation_time']),
                                           timing_args['container_creation_time'],
                                           timing_args['container_removal_time'],
-                                          timing_args.get('hot_container_scale_time', 1))
+                                          timing_args.get('hot_container_scale_up_time',
+                                                          timing_args['container_creation_time']),
+                                          timing_args.get('hot_container_scale_down_time', 
+                                                          timing_args['container_removal_time']))
         # Set the autoscaler
         AscalConfig._set_autoscaler(config, data, timing_args)
 

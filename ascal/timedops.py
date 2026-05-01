@@ -1,16 +1,17 @@
 """
-It defines the TimedOps class to create/remove container and nodes using an event-driven architecture.
+It defines the TimedOps class to create/remove/scale container and nodes using an event-driven architecture.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Callable
 from fcma import ContainerGroup, ContainerClass, Vm, RequestsPerTime, InstanceClass
 from ascal.nodestates import NodeStates
+from ascal.helper import similar_ccs
 
 class TimedOps:
     """
-    This class manages the creation and removal of nodes and containers at predefined times,
+    This class manages the creation, removal and scale of nodes and containers at predefined times,
     taking into account the time required for these operations.
     """
 
@@ -29,11 +30,15 @@ class TimedOps:
         UPGRADE_NODE_END = 5
         START_REPLICAS_GRACE_PERIOD = 6
         REMOVE_CONTAINER_REPLICAS_END = 7
-        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 8 # After the end of container removal, since removal frees up resources
-        ALLOCATE_CONTAINER_REPLICAS_END = 9
-        REMOVE_CONTAINER_REPLICAS_BEGIN = 10 # After the end of allocation to meet with performance requeriments
-        REMOVE_NODE_BEGIN = 11 # After the end of container removal, since a node with containers can not be removed
-        REMOVE_NODE_END = 12
+        SCALE_DOWN_CONTAINER_REPLICAS_END = 8
+        ALLOCATE_CONTAINER_REPLICAS_BEGIN = 9 # After the end of container removal, since removal frees up resources
+        SCALE_UP_CONTAINER_REPLICAS_BEGIN = 10
+        ALLOCATE_CONTAINER_REPLICAS_END = 11
+        SCALE_UP_CONTAINER_REPLICAS_END = 12
+        REMOVE_CONTAINER_REPLICAS_BEGIN = 13 # After the end of allocation to meet with performance requeriments
+        SCALE_DOWN_CONTAINER_REPLICAS_BEGIN = 14
+        REMOVE_NODE_BEGIN = 15 # After the end of container removal, since a node with containers can not be removed
+        REMOVE_NODE_END = 16
 
     @dataclass
     class Event:
@@ -41,7 +46,7 @@ class TimedOps:
         Event for creating/removing nodes or containers.
         """
         type: 'TimedOps.EventTypes'
-        containers: tuple[ContainerClass, int, Vm, ContainerClass] | None = None # Information of containers
+        containers: tuple[int, Vm, ContainerClass, ContainerClass] | None = None # Information of containers
         node: Vm | tuple[Vm,Vm] | None = None # Node to create/remove, or a nodes pair to upgrade
         message: str = None # Message to log
         callback: Callable[..., None] | None = None # Function called when the event is fired
@@ -73,7 +78,7 @@ class TimedOps:
         self.new_nodes_ready = False # True if there are new nodes ready at the current time
         self.perf_changed = False # True if containers are removed or allocated at the current time
         self._last_dispatched_time = -1 # Current time. It is the time of the last dispatched event
-        self.log: Callable[[...], None] = lambda _: None # Method used to print a log message
+        self.log: Callable[..., None] = lambda _: None # Method used to print a log message
 
     def is_event_list_empty(self) -> bool:
         """
@@ -108,7 +113,9 @@ class TimedOps:
                                     (event_type == TimedOps.EventTypes.UPGRADE_NODE_END) or \
                                     self.node_billing_changed
         self.perf_changed = (event_type == TimedOps.EventTypes.ALLOCATE_CONTAINER_REPLICAS_END) or \
+                            (event_type == TimedOps.EventTypes.SCALE_UP_CONTAINER_REPLICAS_END) or \
                             (event_type == TimedOps.EventTypes.REMOVE_CONTAINER_REPLICAS_BEGIN) or \
+                            (event_type == TimedOps.EventTypes.SCALE_DOWN_CONTAINER_REPLICAS_BEGIN) or \
                             self.perf_changed
         self.new_nodes_ready = (event_type == TimedOps.EventTypes.CREATE_NODE_END) or \
                                self.new_nodes_ready
@@ -228,7 +235,7 @@ class TimedOps:
         # If allocation occurs just now
         if at_time == self._last_dispatched_time:
             cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude + TimedOps._DELTA)
-            mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude + TimedOps._DELTA)
+            mem_allocatable_replicas = int(node.free_mem.magnitude / cc.memv.magnitude + TimedOps._DELTA)
             allocatable_replicas = min(cpu_allocatable_replicas, mem_allocatable_replicas, replicas)
             if allocatable_replicas == 0:
                 return 0
@@ -256,12 +263,12 @@ class TimedOps:
         zero_perf_cc = ContainerClass(cc.app, cc.ic, cc.fm, cc.cores, cc.mem,
                                       RequestsPerTime("0 req/s"), cc.aggs, cc.agg_level)
         cpu_allocatable_replicas = int(node.free_cores.magnitude / cc.cores.magnitude + TimedOps._DELTA)
-        mem_allocatable_replicas = int(node.free_mem.magnitude / cc.mem[0].magnitude + TimedOps._DELTA)
+        mem_allocatable_replicas = int(node.free_mem.magnitude / cc.memv.magnitude + TimedOps._DELTA)
         allocatable_replicas = min(cpu_allocatable_replicas, mem_allocatable_replicas, replicas)
         assert allocatable_replicas == replicas, "Can not allocate the required replicas"
         node.cgs.append(ContainerGroup(zero_perf_cc, allocatable_replicas))
         node.free_cores -= allocatable_replicas * zero_perf_cc.cores
-        node.free_mem -= allocatable_replicas * zero_perf_cc.mem[0]
+        node.free_mem -= allocatable_replicas * zero_perf_cc.memv
 
         # Create the related event to complete the containers allocation
         event = TimedOps.Event(TimedOps.EventTypes.ALLOCATE_CONTAINER_REPLICAS_END,
@@ -292,7 +299,7 @@ class TimedOps:
         assert found_cg is True, "Error allocating container replicas"
         if NodeStates.get_state(node) == NodeStates.REMOVING:
             # The allocation is aborted before being completed
-            self.log(f'Aborting the allocation of {replicas} replicas of {cc.app} on node {node}')
+            self.log(f'Aborting the allocation of {replicas} replicas {cc} on node {node}')
             return
         # Find a container group with ready replicas for the same container class and increment the number of replicas
         found_cg = False
@@ -306,10 +313,10 @@ class TimedOps:
             node.cgs.append(ContainerGroup(cc, replicas))
         self.log(f'Completed the allocation of {replicas} replicas {cc} on node {node}')
 
-    def remove_container_replicas(self, at_time: int, cc: ContainerClass, replicas: int, node: Vm) -> int:
+    def remove_container_replicas(self, at_time: int, cc: ContainerClass, replicas: int, node: Vm) -> int|None:
         """
         Remove container replicas in a node. The replicas will become zero performance replicas with
-        None application until they are completly removed, once the removal time elapses.
+        None application until they are completely removed, once the removal time elapses.
         :param at_time: Container removal starts at this time.
         :param cc: Container class.
         :param replicas: The number of replicas to remove.
@@ -355,7 +362,7 @@ class TimedOps:
         cg_with_replicas = None
         for cg in node.cgs:
             # Replicas that are in the process of being created can not be removed
-            if (cc.app, cc.cores, cc.mem[0]) == (cg.cc.app, cg.cc.cores, cg.cc.mem[0]):
+            if (cc.app, cc.cores, cc.memv) == (cg.cc.app, cg.cc.cores, cg.cc.memv):
                 removable_replicas = min(cg.replicas, replicas)
                 cg_with_replicas = cg
                 break
@@ -388,9 +395,151 @@ class TimedOps:
 
         # Update free computational resources in the node
         node.free_cores += replicas * cc.cores
-        node.free_mem += replicas * cc.mem[0]
+        node.free_mem += replicas * cc.memv
         node.cgs.remove(ContainerGroup(zero_perf_cc, replicas))
         self.log(f'Completed the removal of {replicas} replicas {cc} from node {node}')
+
+    def scale_container_replicas(self, at_time: int, cc: ContainerClass, multiplier: float, replicas: int, node: Vm):
+        """
+        Scale replicas of a container class in a node. In case of scale-up, the performance does not change
+        until the container scale-up time elapses, but CPU and memory resources are reclaimed instantly.
+        In case of scale-down, the replicas performance is reduced instantly, but CPU and memory 
+        resources are released once the scale-down time elapses.
+        :param at_time: Container creation starts at this time.
+        :param cc: Initial container class.
+        :param multiplier: The container class multiplier (> 1.0 for scale-up and < 1.0 for scale-down).
+        :param replicas: The number of replicas to scale.
+        :param node: Node where replicas are scaled.
+        """
+        assert at_time >= self._last_dispatched_time, "Can not scale containers in the past"
+        if replicas == 0 or multiplier == 1.0:
+            return
+
+        # Different scale-up and scale-down event types for different priorities
+        eventType = TimedOps.EventTypes.SCALE_UP_CONTAINER_REPLICAS_BEGIN if multiplier > 1.0 else \
+                    TimedOps.EventTypes.SCALE_DOWN_CONTAINER_REPLICAS_BEGIN
+        event = TimedOps.Event(eventType, containers=(replicas, node, cc, cc * multiplier),
+                               callback=self._at_scale_container_replicas_begin)
+        self._add_event(at_time, event)
+
+    def _at_scale_container_replicas_begin(self, event: Event):
+        """
+        Start the scaling of container replicas when the event is fired.
+        :param event: Event that has just being fired.
+        """
+        replicas, node, initial_cc, final_cc = event.containers
+        multiplier = final_cc.cores.magnitude / initial_cc.cores.magnitude
+
+        assert NodeStates.get_state(node) in (NodeStates.READY, NodeStates.UPGRADING), \
+            "Can not scale containers on nodes that are not ready"
+
+        # Diff container group with zero performance
+        diff_cc = replace(initial_cc * abs(1.0 - multiplier), app=None, perf=RequestsPerTime("0 req/s"))
+
+        # Scale-down
+        if multiplier < 1.0:
+            # Find the container group with the initial container class and decrement the scaled-down replicas.
+            # Computational resources are reclaimed later
+            found_cg = None
+            for cg in node.cgs:
+                if cg.cc == initial_cc and cg.replicas >= replicas:
+                    found_cg = cg
+                    found_cg.replicas -= replicas
+                    if found_cg.replicas == 0:
+                        node.cgs.remove(found_cg)
+                    break
+            assert found_cg is not None, "Can not find the replicas to scale"
+            # Find a container group with the final container class and increment its number of replicas
+            found_cg = None
+            for cg in node.cgs:
+                if cg.cc == final_cc:
+                    found_cg = cg
+                    found_cg.replicas += replicas
+                    break
+            if not found_cg:
+                node.cgs.append(ContainerGroup(final_cc, replicas))
+
+        # Scale-up. Decrement the free computational resources of the node
+        else:
+            node.free_cores -= diff_cc.cores * replicas
+            node.free_mem -= diff_cc.memv * replicas  
+
+        # Scale-up and scale-down. Increment the number of replicas of the diff container class
+        found_cg = None
+        for cg in node.cgs:
+            if similar_ccs(cg.cc, diff_cc): # Compare ignoring rounding errors and performances
+                found_cg = cg
+                found_cg.replicas += replicas
+                break
+        if not found_cg:
+            node.cgs.append(ContainerGroup(diff_cc, replicas))
+
+        # Create the related event to complete the scale-up or scale-down
+        eventType = TimedOps.EventTypes.SCALE_UP_CONTAINER_REPLICAS_END if multiplier > 1.0 else \
+                    TimedOps.EventTypes.SCALE_DOWN_CONTAINER_REPLICAS_END
+
+        event = TimedOps.Event(eventType, containers=(replicas, node, initial_cc, final_cc),
+                               callback=self._at_scale_container_replicas_end)
+        if multiplier > 0:
+            self._add_event(self._last_dispatched_time + self.time_args.hot_container_scale_up_time, event)
+        else:
+            self._add_event(self._last_dispatched_time + self.time_args.hot_container_scale_down_time, event)
+        self.log(f'Scaling {replicas} replicas {str(initial_cc)} x {multiplier:1.2f} on node {node}')
+
+    def _at_scale_container_replicas_end(self, event: Event):
+        """
+        Complete the scaling of replicas when the event is fired.
+        :param event: Event that has just being fired.
+        """
+        replicas, node, initial_cc, final_cc = event.containers
+        multiplier = final_cc.cores.magnitude / initial_cc.cores.magnitude
+        diff_cc = replace(initial_cc * abs(1.0 - multiplier), app=None, perf=RequestsPerTime("0 req/s"))
+
+        # Scale-up and scale-down. Remove the diff replicas
+        found_cg = None
+        for cg in node.cgs[:]:
+            if similar_ccs(cg.cc, diff_cc) and cg.replicas >= replicas:
+                found_cg = cg
+                found_cg.replicas -= replicas
+                if found_cg.replicas == 0:
+                    node.cgs.remove(found_cg)
+                break
+        assert found_cg is not None, "Can not complete the scaling of replicas"
+
+        # Scale-down. Reclaim the computational resources
+        if multiplier < 1.0:
+            node.free_cores += diff_cc.cores * replicas
+            node.free_mem += diff_cc.memv * replicas
+
+        # Scale-up. Replace the initial replicas with the final replicas
+        else:
+            if NodeStates.get_state(node) == NodeStates.REMOVING:
+                # The scaling-up is aborted before being completed
+                self.log(f'Aborting the scaling-up of {replicas} replicas of {initial_cc}'
+                        f' x {multiplier:1.2f}  on node {node}')
+                return
+            # Find a container group with the initial replicas
+            found_cg = None
+            for cg in node.cgs:
+                if cg.cc == initial_cc and cg.replicas >= replicas:
+                    found_cg = cg
+                    found_cg.replicas -= replicas
+                    if found_cg.replicas == 0:
+                        node.cgs.remove(found_cg)
+                    break
+            assert found_cg is not None, "Can not complete the replicas scaling-up"
+            # Find a container group with the final replicas
+            found_cg = None
+            for cg in node.cgs:
+                if cg.cc == final_cc:
+                    found_cg = cg
+                    found_cg.replicas += replicas
+                    break
+            # If it is not found, create a new container group with the final replicas
+            if not found_cg:
+                node.cgs.append(ContainerGroup(final_cc, replicas))
+
+        self.log(f'Completed the scaling of {replicas} replicas {initial_cc} x {multiplier:1.2f} on node {node}')
 
     def create_node(self, at_time: int, node: Vm):
         """
