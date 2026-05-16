@@ -41,7 +41,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         :param hv_algorithm: Allocation/transition algorithm.
         :param hv_time_period: Time period for H/V autoscaling.
         :param hot_node_scale_up: If True, hot vertical scale-up of nodes is used.
-        :param hot_container_scale: If True, hot vertical scaling of containers is used.
+        :param hot_container_scale: Set to enable hot container scaling-up and scaling-down.
         """
         super().__init__(h_time_period, desired_cpu_utilization, h_node_utilization_threshold, 
                          h_replica_scale_down_stabilization_time,
@@ -57,6 +57,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         self.hot_container_scale = hot_container_scale
         self._new_allocation = None
         self._hv_timedops = TimedOps(self.timing_args)
+        self._hv_timedops.log = self.log
         self._next_hv_autoscaling_time = self.hv_time_period
 
     def enable_disable_near_h_operations(self):

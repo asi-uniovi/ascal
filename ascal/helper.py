@@ -24,6 +24,7 @@ class Vmt:
         self.free_mem = vm.free_mem
         self.free_cores = vm.free_cores
         self.replicas = defaultdict(lambda: 0, {cg.cc: cg.replicas for cg in vm.cgs})
+        self.fragments = defaultdict(lambda: (0, 0))
 
     def __str__(self) -> str:
         """

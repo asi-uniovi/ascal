@@ -459,10 +459,9 @@ class TimedOps:
             if not found_cg:
                 node.cgs.append(ContainerGroup(final_cc, replicas))
 
-        # Scale-up. Decrement the free computational resources of the node
+        # Scale-up. Decrement the free computational resources. Memory resource does not change on scaling-ups
         else:
             node.free_cores -= diff_cc.cores * replicas
-            node.free_mem -= diff_cc.memv * replicas  
 
         # Scale-up and scale-down. Increment the number of replicas of the diff container class
         found_cg = None
@@ -506,10 +505,9 @@ class TimedOps:
                 break
         assert found_cg is not None, "Can not complete the scaling of replicas"
 
-        # Scale-down. Reclaim the computational resources
+        # Scale-down. Reclaim the computational resources. Memory resource does not change on scaling-downs 
         if multiplier < 1.0:
             node.free_cores += diff_cc.cores * replicas
-            node.free_mem += diff_cc.memv * replicas
 
         # Scale-up. Replace the initial replicas with the final replicas
         else:

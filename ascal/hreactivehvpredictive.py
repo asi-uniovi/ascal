@@ -42,7 +42,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         :param hv_prediction_window: Prediction window for the H/V autoscaler.
         :àram hv_prediction_percentile: Prediction percentile for the H/V autoscaler.
         :param hot_node_scale_up: If True, hot vertical scale-up of nodes is used.
-        :param hot_container_scale: If True, hot vertical scaling of containers is used.
+        :param hot_container_scale: Set to enable hot container scaling-up and scaling-down.
         """
         super().__init__(h_time_period, h_desired_cpu_utilization, h_node_utilization_threshold, 
                          h_replica_scale_down_stabilization_time,
@@ -56,6 +56,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         self.hot_node_scale_up = hot_node_scale_up
         self.hot_container_scale = hot_container_scale
         self._hv_timedops = TimedOps(self.timing_args)
+        self._hv_timedops.log = self.log
         self._next_prediction_window_time = hv_prediction_window
         self._hv_app_loads = {} # Application workloads in a time period for the HV autoscaler
 

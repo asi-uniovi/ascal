@@ -258,7 +258,7 @@ class Recycling:
                 cc1_cores = cc1.cores.magnitude
                 cc1_mem = cc1.memv.magnitude
                 cc2_cores = cc2.cores.magnitude
-                container_scale_penalty = min(cc1_cores, cc2_cores) / cc1_cores 
+                container_scale_penalty = min(cc1_cores, cc2_cores) / max(cc1_cores, cc2_cores) 
                 recycling_level += (0.5 * node_scale_up_penalty * replicas * container_scale_penalty *
                                     (cc1_cores / ic_cores + cc1_mem / ic_mem))
         return recycling_level
@@ -531,6 +531,8 @@ class Recycling:
                 elif initial_cc == final_cc:
                     self.recycled_containers[initial_node][initial_cc] = replicas
                 else:
+                    a = 1
+
                     if initial_node not in self.scaled_containers:
                         self.scaled_containers[initial_node] = {(initial_cc, final_cc): replicas}
                     else:    

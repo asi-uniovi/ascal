@@ -28,7 +28,7 @@ class HVPredictiveAutoscaler(Autoscaler):
         :param timing_args: Timings for creation/removal of nodes and containers.
         :param algorithm: Allocation/transition algorithm.
         :param hot_node_scale_up: Set to enable hot node scaling-up.
-        :param hot_container_scale: Set to enable hot scaling up and down of container computational parameters.
+        :param hot_container_scale: Set to enable hot container scaling-up and scaling-down.
         """
         super().__init__(timing_args)
         self.prediction_percentile = prediction_percentile
@@ -39,7 +39,6 @@ class HVPredictiveAutoscaler(Autoscaler):
         self.hot_node_scale_up = hot_node_scale_up
         self.hot_container_scale = hot_container_scale
         self.new_allocation = None
-        self._timedops = TimedOps(self.timing_args)
         self._app_load = None
         self._waiting_to_start_transition_calculation = False
 
