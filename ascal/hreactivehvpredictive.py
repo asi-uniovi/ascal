@@ -159,7 +159,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             # Calculate the transition from the current allocation to the intermediate allocation
             for node in self.allocation + intermediate_allocation:
                 NodeStates.set_state(node, NodeStates.READY)
-            commands1, _ = self.transition.calculate_sync(self.allocation, intermediate_allocation)
+            commands1, _ = self.transition.calculate_transition_plan_sync(self.allocation, intermediate_allocation)
 
             # Recycling levels coming from the first transition
             node_recycling_level1, container_recycling_level1 = self.transition.get_recycling_levels()
@@ -178,7 +178,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
                 for node in removed_nodes
             }
             intermediate_allocation.extend([node.clear() for node in removed_nodes])
-            commands2, _ = self.transition.calculate_sync(intermediate_allocation, new_allocation)
+            commands2, _ = self.transition.calculate_transition_plan_sync(intermediate_allocation, new_allocation)
             for node in removed_nodes:
                 node.free_cores, node.free_mem, node.cgs, node.history = removed_nodes_backup[node]
 

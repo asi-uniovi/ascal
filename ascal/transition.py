@@ -34,10 +34,12 @@ Three transition algorithms are implemented:
     2) Allocate all the containers in these created nodes, 
     3) Remove all the containers in the initial allocation 
     4) Remove all the nodes in the initial allocation.
-- RBT2. It is the simplest variant based on recycling. It does not perform remove-alocate-copy steps while new 
-nodes are created, or recycled nodes are upgraded.
-- RBT1. The same as RBT2, but it performs remove-allocate-copy steps while new nodes are created, or recycled 
-nodes are upgraded. 
+- RBT3. It is the simplest variant based on recycling. It does not perform any transition operation while
+ new/temporal nodes are created, or recycled nodes are upgraded. Copy is disabled in the remove-allocate-copy 
+ algorithm.
+- RBT2. It extends the RBT1 allowing transition operations until new/temporal nodes are created, or recycled nodes 
+are upgraded.
+- RBT1. It extends the RBT2 enabling the copy part of the remove-allocate-copy algorithm. 
 
 Limitations of the current implementation:
 - All the nodes belong to instance classes of the same family.
@@ -71,8 +73,9 @@ class TransitionAlgorithm(Enum):
     """
     RBT1 = 1          # Recycling-based Transition algorithm 1
     RBT2 = 2          # Recycling-based Transition algorithm 2
-    RBT  = RBT2       # Default RBT algorithm
-    BASELINE = 3      # Baseline transition algorithm
+    RBT3 = 3          # Recycling-based Transition algorithm 2
+    RBT  = RBT3       # Default RBT algorithm
+    BASELINE = 4      # Baseline transition algorithm
 
 
 @dataclass
@@ -301,9 +304,10 @@ class Transition(ABC):
         pass
 
     @abstractmethod    
-    def calculate_sync(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
+    def calculate_transition_plan_sync(self, initial_alloc: Allocation, 
+                                       final_alloc: Allocation) -> tuple[list[Command], int]:
         """
-        Calculate a synchronous transition from the initial allocation to the final allocation.
+        Calculate a synchronous transition plan from the initial allocation to the final allocation.
 
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
@@ -311,16 +315,17 @@ class Transition(ABC):
         """
         pass
 
-    def calculate_async(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
+    def calculate_transition_plan_async(self, initial_alloc: Allocation, 
+                                        final_alloc: Allocation) -> tuple[list[Command], int]:
         """
-        Calculate an asynchronous transition from the initial allocation to the final allocation,
+        Calculate an asynchronous transition plan from the initial allocation to the final allocation,
         while fulfilling the application's minimum performance requirement.
 
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
         :return: A tuple with thelist of commands and the worst-case time to perform the transition.
         """
-        sync_commands, worst_case_time = self.calculate_sync(initial_alloc, final_alloc)[:]
+        sync_commands, worst_case_time = self.calculate_transition_plan_sync(initial_alloc, final_alloc)[:]
         for command in sync_commands[:]:
             if command.sync_on_nodes_creation or command.sync_on_nodes_upgrade:
                 sync_commands[0].allocate_containers.extend(command.allocate_containers)
@@ -331,9 +336,10 @@ class Transition(ABC):
                     sync_commands.remove(command)
         return sync_commands, worst_case_time
 
-    def check_transition(self, initial_alloc: Allocation, final_alloc: Allocation, commands: list[Command]) -> bool:
+    def check_transition_plan(self, initial_alloc: Allocation, 
+                              final_alloc: Allocation, commands: list[Command]) -> bool:
         """
-        Check the transition between the initial and final allocations.
+        Check the transition plan between the initial and final allocations.
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
         :param commands: List of commands to transition.
@@ -346,7 +352,7 @@ class Transition(ABC):
         vm_to_vmt = dict(zip(initial_alloc + final_alloc, initial_alloc_vmt + final_alloc_vmt))
         app_perf_surplus = get_app_perf_surplus(min_perf, initial_alloc_vmt)
 
-        command_index = 0
+        command_index = -1
         for command in commands:
             command_index += 1
             app_perf_increment = defaultdict(lambda: 0)
@@ -608,9 +614,10 @@ class TransitionBaseline(Transition):
                 return False
         return True
 
-    def calculate_sync(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
+    def calculate_transition_plan_sync(self, initial_alloc: Allocation, 
+                                       final_alloc: Allocation) -> tuple[list[Command], int]:
         """
-        Calculate a synchronous transition from the initial allocation to the final allocation for
+        Calculate a synchronous transition plan from the initial allocation to the final allocation for
         the baseline algorithm.
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
@@ -696,7 +703,8 @@ class TransitionRBT(Transition):
         self._commands: list[Command] = None
         self._sync_on_next_alloc_upgraded_nodes = True
         self._rbt1 = transition_algorithm == TransitionAlgorithm.RBT1 
-        self._rbt2 = transition_algorithm == TransitionAlgorithm.RBT2
+        self._rbt2 = transition_algorithm == TransitionAlgorithm.RBT2 
+        self._rbt3 = transition_algorithm == TransitionAlgorithm.RBT3
         self.new_cc_id = 0
 
     def _remove_allocate(self, cc: ContainerClass, replicas: int, node: Vmt, command: Command, 
@@ -851,7 +859,15 @@ class TransitionRBT(Transition):
         )
         if removable_replicas == 0:
             return 0
-        command.remove_containers.append((node, cc, removable_replicas))
+        # Append the removal to the command, ading the new removable replicas to a previous similar
+        # removal if it exists
+        prev_r = 0
+        for n, c, r in command.remove_containers[:]:
+            if n == node and c == cc:
+                command.remove_containers.remove((n, c, r))
+                prev_r = r
+                break 
+        command.remove_containers.append((node, cc, prev_r + removable_replicas))
         node.replicas[cc] -= removable_replicas
         if node.replicas[cc] == 0:
             del node.replicas[cc]
@@ -935,7 +951,7 @@ class TransitionRBT(Transition):
                     replicas_count = self._remove_obsolete_replicas(obsolete_cc, replicas, node, command)
                     assert replicas_count == replicas, "All the replicas must be removable"
 
-    def _remove_obsolete_nodes(self, command: Command):
+    def _remove_empty_obsolete_nodes(self, command: Command):
         """
         Check if there are obsolete nodes that can be removed. Obsolete nodes can be removed when
         they do not allocate containers. A command with the node removal operation is generated, but the
@@ -1254,7 +1270,7 @@ class TransitionRBT(Transition):
         # since they may be useful during the transition. They appear as removed onlyin the command
         if len(self._unalloc_node_cs) == 0:
             # Check if obsolete nodes can be removed and update the command
-            self._remove_obsolete_nodes(command)
+            self._remove_empty_obsolete_nodes(command)
             command.simplification()  
             return command
         
@@ -1316,7 +1332,7 @@ class TransitionRBT(Transition):
                             self._unalloc_node_cs.pop(index)
 
         # Check if obsolete nodes can be removed and update the command
-        self._remove_obsolete_nodes(command)
+        self._remove_empty_obsolete_nodes(command)
 
         command.simplification()  
         return command
@@ -1621,81 +1637,56 @@ class TransitionRBT(Transition):
         return elapsed_time
 
     def _complete_allocation_in_temporary_nodes(self, create_nodes_command: Command,
-                                                allocate_in_new_nodes_command: Command):
+                                                allocate_in_new_nodes_command: Command,
+                                                reconfig_command: Command):
         """
         Complete the allocation using temporary nodes.
         :param create_nodes_command: Command where temporary nodes creations are appended.
         :param allocate_new_nodes_command: Command where container allocations in temporary nodes are appended.
+        :param reconfig_command: A command with container removals and allocations in recycled nodes.
         """
-        # Add a dummy node with enough capacity to allocate any number of containers
-        dummy_node = Vmt(Vm(self._current_alloc[0].ic, ignore_ic_index=True))
-        dummy_node.free_cores *= 10E12
-        dummy_node.free_mem *= 10E12
-        self._current_alloc.append(dummy_node)
-
         # Calculate application's performance provided by temporary nodes to allocate the
-        # remaining containers. The following approaches are valid in the calculation of the temporary nodes:
-        # - Execute the remove_allocate method allowing negative values for application's performance surplus. 
-        # Next, they are compensated by container replicas in temporary nodes.
-        # - Add a dummy node to the system with unlimited computational capacity, so all the remaining containers 
-        # can be allocated executing the remove_allocate_copy method. Next, the allocations in the dummy node 
-        # are compensated with container replicas in temporary nodes.
-        # The second approach has been followed, since it does not require to modify the remove_allocate method 
-        # to allow negative performance surplus values
-        copy_nodes = None if self._rbt1 else [dummy_node]
-        command = self._remove_allocate_copy(copy_nodes)
-        zero_rps = RequestsPerTime("0 rps")
-        tmp_app_perf = {app: zero_rps for app in self._app_perf_surplus}
-        for node, cc, replicas in command.allocate_containers:
-            if node == dummy_node:
-                # The allocations in the dummy node will be performed in a previous command, so
-                # a performance increment translates into a performance surplus increment
-                self._app_perf_increment[cc.app] -= replicas * cc.perf
-                self._app_perf_surplus[cc.app] += replicas * cc.perf
-                # Update the application performance provided by temporary nodes
-                tmp_app_perf[cc.app] += cc.perf * replicas
+        # remaining containers. It executes the remove_allocate method allowing negative values for 
+        # application's performance surplus. Next, they are compensated by container replicas in temporary nodes.
+        extra_perf = RequestsPerTime("1000000 rps")
+        for app in self._app_perf_surplus:
+            self._app_perf_surplus[app] += extra_perf
+        self._allocate_with_free_obsolete(reconfig_command)
+
+        zero_perf = RequestsPerTime("0 rps")
+        tmp_app_perf = {app: zero_perf for app in self._app_perf_surplus}
+        for app, perf_surplus in self._app_perf_surplus.items():
+            if perf_surplus < extra_perf:
+                tmp_app_perf[app] = extra_perf - perf_surplus
+            self._app_perf_surplus[app] -= extra_perf
 
         # Get an allocation for application's performance on temporary nodes
         tmp_nodes = [Vmt(node) for node in self._get_allocation(tmp_app_perf)]
+        # Update the allocation with the temporal nodes and allocated containers
+        self._current_alloc.extend(tmp_nodes)
+
         for tmp_node_index in range(len(tmp_nodes)):
+            tmp_node = tmp_nodes[tmp_node_index] 
             # Change the id of temporary nodes to negative values to be easily identified
-            tmp_nodes[tmp_node_index].id = -(tmp_node_index + 1)
-            tmp_nodes[tmp_node_index].vm.id = -(tmp_node_index + 1)
+            tmp_node.id = -(tmp_node_index + 1)
+            tmp_node.vm.id = -(tmp_node_index + 1)
+            # The temporal node is an obsolete node. Its containers are obsolete containers 
+            # that increase the performance surplus 
+            self._recycling.obsolete_nodes.append(tmp_node)
+            self._recycling.obsolete_containers[tmp_node] = {}
+            for c, r in tmp_node.replicas.items():
+                self._recycling.obsolete_containers[tmp_node][c] = r
+                self._app_perf_surplus[c.app] += r * c.perf
 
         # The temporary nodes are added to the command with the creation of new nodes
         create_nodes_command.create_nodes.extend(tmp_nodes)
 
-        # Move allocations from the dummy node to the temporary nodes
+        # Allocations in the temporary nodes
         containers_in_tmp_nodes = [
             (node, cc, replicas)
             for node in tmp_nodes for cc, replicas in node.replicas.items()
         ]
         allocate_in_new_nodes_command.allocate_containers.extend(containers_in_tmp_nodes)
-        command.allocate_containers = [
-            (node, cc, replicas)
-            for node, cc, replicas in command.allocate_containers[:]
-            if node != dummy_node
-        ]
-
-        # Remove obsolete containers and nodes from the recycling object
-        if dummy_node in self._recycling.obsolete_containers:
-            del self._recycling.obsolete_containers[dummy_node]
-
-        # Temporary nodes and their containers are obsolete 
-        for tmp_node in tmp_nodes:
-            self._recycling.obsolete_nodes.append(tmp_node)
-            self._recycling.obsolete_containers[tmp_node] = dict(tmp_node.replicas)
-
-        # Replace the dummy node with temporary nodes in the current allocation
-        self._current_alloc.remove(dummy_node)
-        self._current_alloc.extend(tmp_nodes)
-
-        # Some replicas can be allocated once temporary nodes are added, since some computational
-        # resources may remain free in these nodes after the allocation of containers_in_tmp_nodes
-        if self._rbt2:
-            self._allocate_with_free_obsolete(command)
-
-        self._append_command(command)
 
     def _get_new_cc_id(self):
         """
@@ -1808,10 +1799,12 @@ class TransitionRBT(Transition):
 
         return True
 
-    def calculate_sync(self, initial_alloc: Allocation, final_alloc: Allocation) -> tuple[list[Command], int]:
+    def calculate_transition_plan_sync(self, initial_alloc: Allocation, 
+                                       final_alloc: Allocation) -> tuple[list[Command], int]:
         """
-        Calculate a synchronous transition from the initial allocation to the final allocation, while fulfilling the
-        application's minimum performance requirement. It is based on the remove-allocate-copy algorithm.
+        Calculate a synchronous transition plan from the initial allocation to the final allocation, 
+        while fulfilling the application's minimum performance requirement. It is based on the 
+        remove-allocate algorithm.
 
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
@@ -1823,7 +1816,7 @@ class TransitionRBT(Transition):
                 
         # Node creation and node upgrade operations are the most time-consuming. Therefore, they are the first
         # operations to be performed. This command may be empty and extended later to include the creation of
-        # temporary nodes
+        # temporary nodes. It corresponds with the first setup command
         upgrade_node_info = [(n1, n2.ic) for n1, n2 in self._recycling.upgraded_node_pairs.items()]
         create_upgrade_nodes_command = Command(create_nodes=self._recycling.new_nodes, upgrade_nodes=upgrade_node_info)
         self._append_command(create_upgrade_nodes_command, append_null_command=True)
@@ -1850,40 +1843,55 @@ class TransitionRBT(Transition):
         elapsed_time = self._timing_args.node_creation_time
         self._current_alloc.extend(self._recycling.new_nodes)
 
+        # The copy in remove-allocate-copy will not be used again, so mixed the two lists of unallocated containers
+        self._unalloc_node_cs.extend(self._allocatable_cs_next_step)
+        self._allocatable_cs_next_step.clear()
+
         # Allocate new containers in new nodes. The corresponding command may be empty if there
         # are no new nodes in the final allocation. This command can be extended later to include
-        # containers in temporary nodes
+        # containers in temporary nodes. It corresponds with the second setup command
         allocate_in_new_nodes_command = Command(allocate_containers=self._unallocated_containers_in_new_nodes[:])
         allocate_in_new_nodes_command.sync_on_nodes_creation = True
         for _, cc, replicas in self._unallocated_containers_in_new_nodes:
-            self._app_perf_increment[cc.app] += replicas * cc.perf
+            self._app_perf_increment[cc.app] += replicas * cc.perf # DEbería ser surplus
             self._app_unalloc_perf[cc.app] -= replicas * cc.perf
             assert self._app_unalloc_perf[cc.app].magnitude >= - TransitionRBT._DELTA, "Invalid performance"
         self._unallocated_containers_in_new_nodes.clear()
         self._append_command(allocate_in_new_nodes_command, append_null_command=True)
 
-        # If there are still unallocated containers in recycled nodes
-        if len(self._allocatable_cs_next_step) > 0 or len(self._unalloc_node_cs) > 0:
-            # Temporary nodes are added if it were necessary
-            self._complete_allocation_in_temporary_nodes(create_upgrade_nodes_command, allocate_in_new_nodes_command)
+        # Once new containers in new nodes have been allocated, there is extra performance surplus,
+        # so it may be possible:
+        # 1. Remove obsolete containers of applications with all the new containers allocated.
+        # 2. Remove empty obsolete nodes.
+        # 3. Allocate some new containers in recycled nodes, using free computational resources in the same node 
+        # and removing obsolete containers from the same node if it were necessary
+        reconfig_command = Command()
+        self._remove_last_obsolete_containers(reconfig_command)
+        self._remove_empty_obsolete_nodes(reconfig_command)
+        self._allocate_with_free_obsolete(reconfig_command)
 
-        # Two remove-allocate-copy steps may be necessary to complete the transition. The first
-        # command to remove obsolete containers and next allocate the remaining new containers in recycled nodes.
-        # The second command to remove containers from the nodes and next the obsolete nodes
-        first_command = self._remove_allocate_copy()
-        if not first_command.is_null():
-            self._append_command(first_command)
-        second_command = self._remove_allocate_copy()
-        if not second_command.is_null():
-            self._append_command(second_command)
+        # If there are still unallocated containers in recycled nodes, complete the allocation using temporal nodes
+        if len(self._unalloc_node_cs) > 0: 
+            self._complete_allocation_in_temporary_nodes(create_upgrade_nodes_command, allocate_in_new_nodes_command,
+                                                         reconfig_command)
+
+        # The reconfiguration command comes after the two setup commands
+        self._append_command(reconfig_command)
+
+        # The transition is completed removing the remaining obsolete containers and obsolete nodes, included
+        # in the cleanup command
+        cleanup_command = Command()
+        self._remove_last_obsolete_containers(cleanup_command)
+        self._remove_empty_obsolete_nodes(cleanup_command)
+        self._append_command(cleanup_command)
 
         # Post-processing operations to obtain the final command list
         self._post_process_commands()
 
         # Check whether the commands implement a valid transition between the initial and the final allocations
         # Four commands must be enough for the RBT2 version
-        assert not self._rbt2 or len(self._commands) <= 4, "Too many commands"
-        assert self.check_transition(initial_alloc, final_alloc, self._commands), "Invalid transition"
+        assert not self._rbt3 or len(self._commands) <= 4, "Too many commands"
+        assert self.check_transition_plan(initial_alloc, final_alloc, self._commands), "Invalid transition"
 
         return self._commands, self.get_transition_time(self._commands, self._timing_args)
 

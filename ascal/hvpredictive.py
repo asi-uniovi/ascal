@@ -131,7 +131,7 @@ class HVPredictiveAutoscaler(Autoscaler):
             # Calculate the transition from the current allocation to the new allocation
             for node in self.allocation:
                 NodeStates.set_state(node, NodeStates.READY)
-            commands, transition_time = self.transition.calculate_sync(self.allocation, self.new_allocation)
+            commands, transition_time = self.transition.calculate_transition_plan_sync(self.allocation, self.new_allocation)
 
             transition_time = current_time() - transition_time_start
             self.log(f"Transition calculation: {transition_time:1.3f} seconds")
@@ -210,7 +210,7 @@ class HVPredictiveAutoscaler(Autoscaler):
             # Calculate the transition from the current allocation to the intermediate allocation
             for node in self.allocation:
                 NodeStates.set_state(node, NodeStates.READY)
-            commands1, _ = self.transition.calculate_sync(self.allocation, intermediate_allocation)
+            commands1, _ = self.transition.calculate_transition_plan_sync(self.allocation, intermediate_allocation)
 
             # Recycling levels coming from the first transition
             node_recycling_level1, container_recycling_level1 = self.transition.get_recycling_levels()
@@ -232,7 +232,7 @@ class HVPredictiveAutoscaler(Autoscaler):
             # Remove all the containers in the removed nodes of the first transition and add the nodes
             # to the intermediate allocation. These nodes may be useful in the second transition
             intermediate_allocation.extend([node.clear() for node in removed_nodes])
-            commands2, _ = self.transition.calculate_sync(intermediate_allocation, self.new_allocation)
+            commands2, _ = self.transition.calculate_transition_plan_sync(intermediate_allocation, self.new_allocation)
             for node in removed_nodes:
                 node.free_cores, node.free_mem, node.cgs, node.history = removed_nodes_backup[node]
 

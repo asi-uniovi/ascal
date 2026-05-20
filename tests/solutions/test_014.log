@@ -14,12 +14,12 @@
 360:  Current replicas 1x of app0 1, desired 1
 420:  Load of app0: 0.00 req/s
 420:  Current replicas 1x of app0 1, desired 1
-476:  Transition at 600:0 seconds
-476:  Predicted loads for 95.0 % percentile:
-476:  - app0 -> 0.00 req/s
-476:  - From ['c5.large[0]']
-476:  - To   ['c5.large[0]']
-476:  - Temporal nodes []
+478:  Transition at 600, calculation: 0.000 seconds
+478:  Predicted loads for 95.0 % percentile:
+478:  - app0 -> 0.00 req/s
+478:  - From ['c5.large[0]']
+478:  - To   ['c5.large[0]']
+478:  - Temporal nodes []
 480:  Load of app0: 0.00 req/s
 480:  Current replicas 1x of app0 1, desired 1
 540:  Load of app0: 0.00 req/s
@@ -40,12 +40,26 @@
 960:  Current replicas 1x of app0 1, desired 1
 1020:  Load of app0: 0.00 req/s
 1020:  Current replicas 1x of app0 1, desired 1
-1076:  Transition at 1084:116 seconds
-1076:  Predicted loads for 95.0 % percentile:
-1076:  - app0 -> 100.00 req/s
-1076:  - From ['c5.large[0]']
-1076:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]']
-1076:  - Temporal nodes ['c5.2xlarge[0]', 'c5.18xlarge[0]']
+1078:  Transition at 1084, calculation: 116.000 seconds
+1078:  Predicted loads for 95.0 % percentile:
+1078:  - app0 -> 100.00 req/s
+1078:  - From ['c5.large[0]']
+1078:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]']
+1078:  - Temporal nodes ['c5.2xlarge[0]', 'c5.18xlarge[0]']
+1084:  Creating node c5.2xlarge[0]
+1084:  Creating node c5.18xlarge[0]
+1104:  Billing of node c5.2xlarge[0] starts
+1104:  Billing of node c5.18xlarge[0] starts
+1184:  Node c5.2xlarge[0] is ready to execute containers
+1184:  Node c5.18xlarge[0] is ready to execute containers
+1184:  Allocating 5 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.2xlarge[0]
+1184:  Allocating 45 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.18xlarge[0]
+1185:  Completed the allocation of 5 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.2xlarge[0]
+1185:  Completed the allocation of 45 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) on node c5.18xlarge[0]
+1185:  Removing 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.large[0]
+1190:  Completed the removal of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.large[0]
+1190:  Removing node c5.large[0]
+1200:  Node c5.large[0] is removed
 1260:  Load of app0: 100.00 req/s
 1260:  Current replicas 1x of app0 100, desired 143
 1260:  Creating node c5.9xlarge[0]
@@ -67,12 +81,18 @@
 1560:  Current replicas 1x of app0 143, desired 143
 1620:  Load of app0: 100.00 req/s
 1620:  Current replicas 1x of app0 143, desired 143
-1676:  Transition at 1785:15 seconds
-1676:  Predicted loads for 95.0 % percentile:
-1676:  - app0 -> 100.00 req/s
-1676:  - From ['c5.2xlarge[0]', 'c5.18xlarge[0]', 'c5.9xlarge[0]']
-1676:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]']
-1676:  - Temporal nodes []
+1678:  Transition at 1785, calculation: 15.000 seconds
+1678:  Predicted loads for 95.0 % percentile:
+1678:  - app0 -> 100.00 req/s
+1678:  - From ['c5.2xlarge[0]', 'c5.18xlarge[0]', 'c5.9xlarge[0]']
+1678:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]']
+1678:  - Temporal nodes []
+1785:  Removing 21 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.9xlarge[0]
+1785:  Removing 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.9xlarge[0]
+1790:  Completed the removal of 21 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.9xlarge[0]
+1790:  Completed the removal of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.9xlarge[0]
+1790:  Removing node c5.9xlarge[0]
+1800:  Node c5.9xlarge[0] is removed
 1860:  Load of app0: 100.00 req/s
 1860:  Current replicas 1x of app0 100, desired 143
 1860:  Creating node c5.9xlarge[0]
@@ -94,12 +114,31 @@
 2160:  Current replicas 1x of app0 143, desired 143
 2220:  Load of app0: 100.00 req/s
 2220:  Current replicas 1x of app0 143, desired 143
-2276:  Transition at 2385:131 seconds
-2276:  Predicted loads for 95.0 % percentile:
-2276:  - app0 -> 0.00 req/s
-2276:  - From ['c5.2xlarge[0]', 'c5.18xlarge[0]', 'c5.9xlarge[0]']
-2276:  - To   ['c5.large[0]']
-2276:  - Temporal nodes []
+2278:  Transition at 2385, calculation: 131.000 seconds
+2278:  Predicted loads for 95.0 % percentile:
+2278:  - app0 -> 0.00 req/s
+2278:  - From ['c5.2xlarge[0]', 'c5.18xlarge[0]', 'c5.9xlarge[0]']
+2278:  - To   ['c5.large[0]']
+2278:  - Temporal nodes []
+2385:  Removing 21 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.9xlarge[0]
+2385:  Removing 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.9xlarge[0]
+2390:  Completed the removal of 21 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.9xlarge[0]
+2390:  Completed the removal of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) from node c5.9xlarge[0]
+2390:  Removing node c5.9xlarge[0]
+2400:  Creating node c5.large[0]
+2400:  Node c5.9xlarge[0] is removed
+2420:  Billing of node c5.large[0] starts
+2500:  Node c5.large[0] is ready to execute containers
+2500:  Allocating 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[0]
+2501:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.4C, 0.42G, 1.0RPS) on node c5.large[0]
+2501:  Removing 5 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.2xlarge[0]
+2501:  Removing 45 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.18xlarge[0]
+2506:  Completed the removal of 5 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.2xlarge[0]
+2506:  Completed the removal of 45 replicas app0-c5_m5_r5(0.8C, 0.42G, 2.0RPS) from node c5.18xlarge[0]
+2506:  Removing node c5.2xlarge[0]
+2506:  Removing node c5.18xlarge[0]
+2516:  Node c5.2xlarge[0] is removed
+2516:  Node c5.18xlarge[0] is removed
 2520:  Load of app0: 0.00 req/s
 2520:  Current replicas 1x of app0 1, desired 1
 2580:  Load of app0: 0.00 req/s
@@ -112,12 +151,12 @@
 2760:  Current replicas 1x of app0 1, desired 1
 2820:  Load of app0: 0.00 req/s
 2820:  Current replicas 1x of app0 1, desired 1
-2876:  Transition at 3000:0 seconds
-2876:  Predicted loads for 95.0 % percentile:
-2876:  - app0 -> 0.00 req/s
-2876:  - From ['c5.large[0]']
-2876:  - To   ['c5.large[0]']
-2876:  - Temporal nodes []
+2878:  Transition at 3000, calculation: 0.000 seconds
+2878:  Predicted loads for 95.0 % percentile:
+2878:  - app0 -> 0.00 req/s
+2878:  - From ['c5.large[0]']
+2878:  - To   ['c5.large[0]']
+2878:  - Temporal nodes []
 2880:  Load of app0: 0.00 req/s
 2880:  Current replicas 1x of app0 1, desired 1
 2940:  Load of app0: 0.00 req/s

@@ -157,7 +157,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             transition_time_start = current_time()
             for node in self.allocation + new_allocation:
                 NodeStates.set_state(node, NodeStates.READY)
-            commands, transition_time = self.transition.calculate_sync(self.allocation, new_allocation)
+            commands, transition_time = self.transition.calculate_transition_plan_sync(self.allocation, new_allocation)
             transition_calc_time = current_time() - transition_time_start
 
             self.log(f"Transition calculation: {transition_time:1.3f} seconds")
