@@ -206,12 +206,14 @@ class AscalConfig:
             transition = TransitionAlgorithm.RBT
         elif transition_str == 'rbt1':
             transition = TransitionAlgorithm.RBT1
+        elif transition_str == 'rbt2':
+            transition = TransitionAlgorithm.RBT2
         elif transition_str == 'rbt3':
             transition = TransitionAlgorithm.RBT3
         elif transition_str == 'baseline':
             transition = TransitionAlgorithm.BASELINE
         else:
-            raise ValueError("Valid transition algorithms are 'rbt', 'rbt1', 'rbt3' and 'baseline'")
+            raise ValueError("Valid transition algorithms are 'rbt', 'rbt1', 'rbt2', 'rbt3' and 'baseline'")
         return allocation, transition
 
     @staticmethod
