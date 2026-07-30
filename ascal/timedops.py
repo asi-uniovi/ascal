@@ -159,7 +159,7 @@ class TimedOps:
             self._dispatch_at_last_time()
             return
 
-        # Billing, perfromance and new node changes are recalculated when until_time > self._last_disptached_time,
+        # Billing, performance and new node changes are recalculated when until_time > self._last_dispatched_time,
         # so they start as False
         self.node_billing_changed = False
         self.perf_changed = False

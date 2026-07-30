@@ -31,8 +31,8 @@ class AutoscalerStatistics:
     """
     Statistics returned by the run() method of autoscalers.
     """
-    perf_changed: bool # True if the performance has changed
-    billing_changed: bool # True if the allocation has changed
+    perf_changed: bool # True if the allocation/performance has changed
+    billing_changed: bool # True if the system cost has changed
     transition_time: float # Time to calculate the transition
     total_time: float # Time to perform all the autoscaling calculations (includes transition)
     node_recycling_level: float = 0.0 # Node recycling level in [0, 1]
@@ -65,8 +65,8 @@ class Autoscaler(ABC):
         self._timedops = TimedOps(self.timing_args) # Event based timing machine
         self._log_path = None # Log path
         self._log_f = None # Log file
-        self.prediction_percentile = None
-        self.prediction_window = None
+        self._prediction_percentile = None
+        self._prediction_window = None
 
     @property
     def log_path(self):
@@ -132,10 +132,10 @@ class Autoscaler(ABC):
             predictive_autoscaler.predicted_workloads[time] = {}
             for app, workload_values in app_workloads.items():
                 workload = \
-                    percentile(workload_values[time: min(time + predictive_autoscaler.prediction_window, n_seconds)],
-                                      predictive_autoscaler.prediction_percentile)
+                    percentile(workload_values[time: min(time + predictive_autoscaler._prediction_window, n_seconds)],
+                                      predictive_autoscaler._prediction_percentile)
                 predictive_autoscaler.predicted_workloads[time][app] = RequestsPerTime(f'{workload} req/s')
-            time += predictive_autoscaler.prediction_window
+            time += predictive_autoscaler._prediction_window
 
     @staticmethod
     def _handle_node_removals(commands1: list[Command], commands2: list[Command], allocation: list[Vmt]):

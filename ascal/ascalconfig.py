@@ -232,6 +232,7 @@ class AscalConfig:
                 data['autoscalers']['h_reactive']['node_utilization_threshold'],
                 data['autoscalers']['h_reactive']['replica_scale_down_stabilization_time'],
                 data['autoscalers']['h_reactive']['node_scale_down_stabilization_time'],
+                data['autoscalers']['h_reactive']['tolerance_replicas'],
                 AscalConfig._get_aggs(data, config.apps, aggs=data["autoscalers"]['h_reactive']["aggs"]),
                 timing_args
             )
@@ -244,6 +245,7 @@ class AscalConfig:
                 data['autoscalers']['hv_reactive']['desired_cpu_utilization'],
                 timing_args,
                 algorithm,
+                data['autoscalers']['hv_reactive']['tolerance_util'],
                 data['autoscalers']['hv_reactive']['hot_node_scale_up'],
                 data['autoscalers']['hv_reactive']['hot_container_scale'] 
             )
@@ -256,6 +258,7 @@ class AscalConfig:
                 data['autoscalers']['hv_predictive']['prediction_percentile'],
                 timing_args,
                 algorithm,
+                data['autoscalers']['hv_predictive']['tolerance_util'],
                 data['autoscalers']['hv_predictive']['hot_node_scale_up'],
                 data['autoscalers']['hv_predictive']['hot_container_scale']
             )
@@ -269,9 +272,11 @@ class AscalConfig:
                 data['autoscalers']['h_reactive_hv_reactive']['h_node_utilization_threshold'],
                 data['autoscalers']['h_reactive_hv_reactive']['h_replica_scale_down_stabilization_time'],
                 data['autoscalers']['h_reactive_hv_reactive']['h_node_scale_down_stabilization_time'],
+                data['autoscalers']['h_reactive_hv_reactive']['h_tolerance_replicas'],
                 timing_args,
                 algorithm,
                 data['autoscalers']['h_reactive_hv_reactive']['hv_time_period'],
+                data['autoscalers']['h_reactive_hv_reactive']['hv_tolerance_util'],
                 data['autoscalers']['h_reactive_hv_reactive']['hv_hot_node_scale_up'],
                 data['autoscalers']['h_reactive_hv_reactive']['hv_hot_container_scale']
             )
@@ -285,10 +290,12 @@ class AscalConfig:
                 data['autoscalers']['h_reactive_hv_predictive']['h_node_utilization_threshold'],
                 data['autoscalers']['h_reactive_hv_predictive']['h_replica_scale_down_stabilization_time'],
                 data['autoscalers']['h_reactive_hv_predictive']['h_node_scale_down_stabilization_time'],
+                data['autoscalers']['h_reactive_hv_predictive']['h_tolerance_replicas'],
                 timing_args,
                 algorithm,
                 data['autoscalers']['h_reactive_hv_predictive']['hv_prediction_window'],
                 data['autoscalers']['h_reactive_hv_predictive']['hv_prediction_percentile'],
+                data['autoscalers']['h_reactive_hv_predictive']['hv_tolerance_util'],
                 data['autoscalers']['h_reactive_hv_predictive']['hv_hot_node_scale_up'],
                 data['autoscalers']['h_reactive_hv_predictive']['hv_hot_container_scale']
             )
@@ -350,6 +357,8 @@ class AscalConfig:
         for i in range(len(keys)):
             if keys[i] not in data:
                 raise ValueError(f"Key '{keys[i]}' is missing in {str(data)}")
+            if types[i] is None:
+                continue # Do not check
             if not isinstance(data[keys[i]], types[i]) or (types[i] == int and data[keys[i]] < 0):
                 raise ValueError(f"Invalid value of key '{keys[i]}'")
 
@@ -360,12 +369,16 @@ class AscalConfig:
         :param config: Configuration.
         :raises ValueError: When a validation fails.
         """
-        properties = ["time_period", "desired_cpu_utilization", "node_utilization_threshold",
-                      "replica_scale_down_stabilization_time", "node_scale_down_stabilization_time"]
-        if set(properties) | {"aggs"} != set(config["autoscalers"]["h_reactive"]):
+        if "tolerance_replicas" not in config["autoscalers"]["h_reactive"]:
+             config["autoscalers"]["h_reactive"]["tolerance_replicas"] = 0.0
+        mandatory = ["time_period", "desired_cpu_utilization", "node_utilization_threshold",
+                     "replica_scale_down_stabilization_time", "node_scale_down_stabilization_time", "aggs"]
+        AscalConfig._check_fields(config["autoscalers"]["h_reactive"], mandatory,
+                                  [int, float, float, int, int, None]) # "aggs" parameter is checked in _get_aggs() 
+        optional = ["tolerance_replicas"]
+        AscalConfig._check_fields(config["autoscalers"]["h_reactive"], optional, [float])
+        if set(mandatory + optional) != set(config["autoscalers"]["h_reactive"]):
             raise ValueError("Invalid or missing property in h_reactive")
-        AscalConfig._check_fields(config["autoscalers"]["h_reactive"], properties,
-                                  [int, float, float, int, int])
         if config["autoscalers"]["h_reactive"]["time_period"] < 0:
             raise ValueError("Time period must be possitive in h_reactive")
         if config["autoscalers"]["h_reactive"]["desired_cpu_utilization"] < 0.1:
@@ -376,6 +389,8 @@ class AscalConfig:
             raise ValueError("Replica scale-down stabilization time must be >= 0 in h_reactive")
         if config["autoscalers"]["h_reactive"]["node_scale_down_stabilization_time"] < 0:
             raise ValueError("Node scale-down stabilization time must be >= 0 in h_reactive")
+        if config["autoscalers"]["h_reactive"]["tolerance_replicas"] < 0:
+            raise ValueError("Tolerance must be >= 0 in h_reactive")
 
     @staticmethod
     def _validate_hv_reactive(config):
@@ -384,6 +399,8 @@ class AscalConfig:
         :param config: Configuration.
         :raises ValueError: When a validation fails.
         """
+        if "tolerance_util" not in config["autoscalers"]["hv_reactive"]:
+            config["autoscalers"]["hv_reactive"]["tolerance_util"] = 0.0 
         if "algorithm" not in config["autoscalers"]["hv_reactive"]:
             config["autoscalers"]["hv_reactive"]["algorithm"] = "fcma"
         if "hot_node_scale_up" not in config["autoscalers"]["hv_reactive"]:
@@ -392,19 +409,23 @@ class AscalConfig:
             config["autoscalers"]["hv_reactive"]["hot_container_scale"] = False
         mandatory = ["time_period", "desired_cpu_utilization"]
         AscalConfig._check_fields(config["autoscalers"]["hv_reactive"], mandatory ,[int, float])
-        optional = ["algorithm", "hot_node_scale_up", "hot_container_scale"]
-        AscalConfig._check_fields(config["autoscalers"]["hv_reactive"], optional, [str, bool, bool])
+        optional = ["algorithm", "tolerance_util", "hot_node_scale_up", "hot_container_scale"]
+        AscalConfig._check_fields(config["autoscalers"]["hv_reactive"], optional, [str, float, bool, bool])
         if set(mandatory + optional) != set(list(config["autoscalers"]["hv_reactive"].keys()) + optional):
             raise ValueError(f"Invalid property in hv_reactive need to be removed")
         if config["autoscalers"]["hv_reactive"]["time_period"] < 0:
             raise ValueError("Time period must be possitive in hv_reactive")
         if config["autoscalers"]["hv_reactive"]["desired_cpu_utilization"] < 0.1:
             raise ValueError("Desired CPU utilization must be >= 0.1 in hv_reactive")
+        if config["autoscalers"]["hv_reactive"]["tolerance_util"] < 0.0:
+            raise ValueError("Tolerance must be >= 0 in hv_reactive")
         # Check allocation and transition algorithms
         AscalConfig._get_algorithm(config["autoscalers"]["hv_reactive"]["algorithm"]) 
 
     @staticmethod
     def _validate_hv_predictive(config):
+        if "tolerance_util" not in config["autoscalers"]["hv_predictive"]:
+            config["autoscalers"]["hv_predictive"]["tolerance_util"] = 0.0 
         if "algorithm" not in config["autoscalers"]["hv_predictive"]:
             config["autoscalers"]["hv_predictive"]["algorithm"] = "fcma"
         if "hot_node_scale_up" not in config["autoscalers"]["hv_predictive"]:
@@ -413,14 +434,16 @@ class AscalConfig:
             config["autoscalers"]["hv_predictive"]["hot_container_scale"] = False
         mandatory = ["prediction_window", "prediction_percentile"]
         AscalConfig._check_fields(config["autoscalers"]["hv_predictive"], mandatory,[int, int])
-        optional = ["algorithm", "hot_node_scale_up", "hot_container_scale"]
-        AscalConfig._check_fields(config["autoscalers"]["hv_predictive"], optional, [str, bool, bool])
+        optional = ["algorithm", "tolerance_util", "hot_node_scale_up", "hot_container_scale"]
+        AscalConfig._check_fields(config["autoscalers"]["hv_predictive"], optional, [str, float, bool, bool])
         if set(mandatory + optional) != set(list(config["autoscalers"]["hv_predictive"].keys()) + optional):
             raise ValueError(f"Invalid property in hv_predictive need to be removed")
         if config["autoscalers"]["hv_predictive"]["prediction_window"] < 10:
             raise ValueError("Prediction window must be >= 10 in hv_predictive")
         if config["autoscalers"]["hv_predictive"]["prediction_percentile"] == 0:
             raise ValueError("Prediction percentile must be >= 0.1 in hv_predictive")
+        if config["autoscalers"]["hv_predictive"]["tolerance_util"] < 0.0:
+            raise ValueError("Tolerance must be >= 0 in hv_reactive")
         # Check allocation and transition algorithms
         AscalConfig._get_algorithm(config["autoscalers"]["hv_predictive"]["algorithm"]) 
         
@@ -431,6 +454,10 @@ class AscalConfig:
         :param config: Configuration.
         :raises ValueError: When a validation fails.
         """
+        if "h_tolerance_replicas" not in config["autoscalers"]["h_reactive_hv_reactive"]:
+             config["autoscalers"]["h_reactive_hv_reactive"]["h_tolerance_replicas"] = 0.0
+        if "hv_tolerance_util" not in config["autoscalers"]["h_reactive_hv_reactive"]:
+            config["autoscalers"]["h_reactive_hv_reactive"]["hv_tolerance_util"] = 0.0 
         if "hv_algorithm" not in config["autoscalers"]["h_reactive_hv_reactive"]:
             config["autoscalers"]["h_reactive_hv_reactive"]["hv_algorithm"] = "fcma"
         if "hv_hot_node_scale_up" not in config["autoscalers"]["h_reactive_hv_reactive"]:
@@ -439,11 +466,11 @@ class AscalConfig:
             config["autoscalers"]["h_reactive_hv_reactive"]["hv_hot_container_scale"] = False
         mandatory = ["h_time_period", "h_replica_scale_down_stabilization_time",
                      "h_node_scale_down_stabilization_time", "h_node_utilization_threshold", 
-                     "desired_cpu_utilization", "hv_time_period"] 
+                     "h_tolerance_replicas", "desired_cpu_utilization", "hv_time_period"] 
         AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_reactive"], mandatory,
-                                  [int, int, int, float, float, int])
-        optional = ["hv_algorithm", "hv_hot_node_scale_up", "hv_hot_container_scale"]
-        AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_reactive"], optional, [str, bool, bool])
+                                  [int, int, int, float, float, float, int])
+        optional = ["hv_tolerance_util", "hv_algorithm", "hv_hot_node_scale_up", "hv_hot_container_scale"]
+        AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_reactive"], optional, [float, str, bool, bool])
         if set(mandatory + optional) != set(list(config["autoscalers"]["h_reactive_hv_reactive"].keys()) + optional):
             raise ValueError(f"Invalid property in h_reactive_hv_reactive need to be removed")
         h_time_period = config["autoscalers"]["h_reactive_hv_reactive"]["h_time_period"]
@@ -461,6 +488,10 @@ class AscalConfig:
             raise ValueError("Replica scale-down stabilization time must be >= 0 in h_reactive_hv_reactive")
         if config["autoscalers"]["h_reactive_hv_reactive"]["h_node_scale_down_stabilization_time"] < 0:
             raise ValueError("Node scale-down stabilization time must be >= 0 in h_reactive_hv_reactive")
+        if config["autoscalers"]["h_reactive_hv_reactive"]["h_tolerance_replicas"] < 0:
+            raise ValueError("Tolerance must be >= 0 in h_reactive_hv_reactive")
+        if config["autoscalers"]["h_reactive_hv_reactive"]["hv_tolerance_util"] < 0.0:
+            raise ValueError("Tolerance must be >= 0 in h_reactive_hv_reactive")
         # Check allocation and transition algorithms
         AscalConfig._get_algorithm(config["autoscalers"]["h_reactive_hv_reactive"]["hv_algorithm"]) 
     
@@ -471,6 +502,10 @@ class AscalConfig:
         :param config: Configuration.
         :raises ValueError: When a validation fails.
         """
+        if "h_tolerance_replicas" not in config["autoscalers"]["h_reactive_hv_predictive"]:
+             config["autoscalers"]["h_reactive_hv_predictive"]["h_tolerance_replicas"] = 0.0
+        if "hv_tolerance_util" not in config["autoscalers"]["h_reactive_hv_predictive"]:
+            config["autoscalers"]["h_reactive_hv_predictive"]["hv_tolerance_util"] = 0.0 
         if "hv_algorithm" not in config["autoscalers"]["h_reactive_hv_predictive"]:
             config["autoscalers"]["h_reactive_hv_predictive"]["hv_algorithm"] = "fcma"
         if "hv_hot_node_scale_up" not in config["autoscalers"]["h_reactive_hv_predictive"]:
@@ -480,11 +515,12 @@ class AscalConfig:
         mandatory = ["h_time_period", "h_replica_scale_down_stabilization_time",
                      "h_node_scale_down_stabilization_time", 
                      "h_node_utilization_threshold", "h_desired_cpu_utilization",
-                     "hv_prediction_window", "hv_prediction_percentile"] 
+                     "h_tolerance_replicas", "hv_prediction_window", "hv_prediction_percentile"] 
         AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_predictive"], mandatory,
-                                  [int, int, int, float, float, int, int])
-        optional = ["hv_algorithm", "hv_hot_node_scale_up", "hv_hot_container_scale"]
-        AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_predictive"], optional, [str, bool, bool])
+                                  [int, int, int, float, float, float, int, int])
+        optional = ["hv_tolerance_util", "hv_algorithm", "hv_hot_node_scale_up", "hv_hot_container_scale"]
+        AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_predictive"], optional, \
+                                  [float, str, bool, bool])
         if set(mandatory + optional) != \
             set(list(config["autoscalers"]["h_reactive_hv_predictive"].keys()) + optional):
             raise ValueError(f"Invalid property in h_reactive_hv_predictive need to be removed")
@@ -505,6 +541,10 @@ class AscalConfig:
             raise ValueError("Replica scale-down stabilization time must be >= 0 in h_reactive_hv_predictive")
         if config["autoscalers"]["h_reactive_hv_predictive"]["h_node_scale_down_stabilization_time"] < 0:
             raise ValueError("Node scale-down stabilization time must be >= 0 in h_reactive_hv_predictive")
+        if config["autoscalers"]["h_reactive_hv_predictive"]["h_tolerance_replicas"] < 0:
+            raise ValueError("Tolerance must be >= 0 in h_reactive_hv_predictive")
+        if config["autoscalers"]["h_reactive_hv_predictive"]["hv_tolerance_util"] < 0.0:
+            raise ValueError("Tolerance must be >= 0 in h_reactive_hv_reactive")
         # Check allocation and transition algorithms
         AscalConfig._get_algorithm(config["autoscalers"]["h_reactive_hv_predictive"]["hv_algorithm"]) 
 

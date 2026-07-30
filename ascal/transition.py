@@ -1219,7 +1219,7 @@ class TransitionRBT(Transition):
 
         return allocatable_replicas, command
 
-    def _copy(self, copy_nodes: list[Vmt] = None) -> Command:
+    def _copy_allocation(self, copy_nodes: list[Vmt] = None) -> Command:
         """
         Copy part of the remove-allocate-copy algorithm. It executes only with RBT1 transitions, setting up 
         the allocation of new container replicas for the next remove-allocate-copy step. It is based on copying
@@ -1334,7 +1334,7 @@ class TransitionRBT(Transition):
 
         # If there are still unallocated containers and the copy part of the algorithm is enabled (RBT1 transitions)
         if len(self._unalloc_node_cs) > 0 and self._rbt1:
-            copy_command = self._copy(copy_nodes)
+            copy_command = self._copy_allocation(copy_nodes)
             command.allocate_containers.extend(copy_command.allocate_containers)
             command.remove_containers.extend(copy_command.remove_containers)
 

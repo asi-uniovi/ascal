@@ -9,6 +9,7 @@ from ascal.nodestates import NodeStates
 from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
 from ascal.recycling import Recycling
 from ascal.transition import TransitionAlgorithm, TransitionRBT, TransitionBaseline
+from ascal.helper import get_allocation_cost
 
 
 class HVReactiveAutoscaler(Autoscaler):
@@ -19,7 +20,8 @@ class HVReactiveAutoscaler(Autoscaler):
     def __init__(self, time_period: int = 60, desired_cpu_utilization: float = 0.6,
                  timing_args: TimedOps.TimingArgs = None, 
                  algorithm: tuple[AllocationSolver, TransitionAlgorithm] = \
-                    (AllocationSolver.FCMA, TransitionAlgorithm.RBT),
+                 (AllocationSolver.FCMA, TransitionAlgorithm.RBT),
+                 tolerance_util: float = 0.0, 
                  hot_node_scale_up: bool = False, hot_container_scale: bool = False):
         """
         Constructor for the horizontal/vertical reactive autoscaler.
@@ -27,17 +29,20 @@ class HVReactiveAutoscaler(Autoscaler):
         :param desired_cpu_utilization: Desired CPU utilization for the application containers.
         :param timing_args: Timings for creation/removal of nodes and containers.
         :param algorithm: Allocation/transition algorithm.
+        :param tolerance_util: Minimum relative variation in CPU utilization to enable a transition to a 
+        new deployment.
         :param hot_node_scale_up: Set to enable hot node scaling-up.
         :param hot_container_scale: Set to enable hot container scaling-up and scaling-down.
         """
         super().__init__(timing_args)
-        self.time_period = time_period
-        self.desired_cpu_utilization = desired_cpu_utilization
+        self._time_period = time_period
+        self._desired_cpu_utilization = desired_cpu_utilization
         self._app_loads = {}  # Application workloads in a time period
         self._allocation_solver, self._transition_algorithm = algorithm
-        self.transition = None
-        self.hot_node_scale_up = hot_node_scale_up
-        self.hot_container_scale = hot_container_scale
+        self._transition = None
+        self._tolerance_util = tolerance_util
+        self._hot_node_scale_up = hot_node_scale_up
+        self._hot_container_scale = hot_container_scale
         self._new_allocation = None
 
     def run(self, app_workloads: dict[App, RequestsPerTime]) -> AutoscalerStatistics:
@@ -55,21 +60,21 @@ class HVReactiveAutoscaler(Autoscaler):
         if self.time == 0:
             # Start with average loads equal to the first loads. Loads are incremented to obtain
             # the desired utilization
-            incremented_workloads = {app: app_workloads[app] / self.desired_cpu_utilization for app in app_workloads}
+            incremented_workloads = {app: app_workloads[app] / self._desired_cpu_utilization for app in app_workloads}
             # At least one application replica
             Autoscaler._set_delta_loads_if_zero(incremented_workloads)
             # Initialize the transition
             if self._transition_algorithm == TransitionAlgorithm.BASELINE:
-                self.transition = TransitionBaseline(self.timing_args, self.system)
+                self._transition = TransitionBaseline(self.timing_args, self.system)
             else:
-                self.transition = TransitionRBT(self.timing_args, self.system, 
+                self._transition = TransitionRBT(self.timing_args, self.system, 
                                                 transition_algorithm=self._transition_algorithm,
-                                                hot_node_scale_up=self.hot_node_scale_up,
-                                                hot_container_scale=self.hot_container_scale)
+                                                hot_node_scale_up=self._hot_node_scale_up,
+                                                hot_container_scale=self._hot_container_scale)
             # Calculate the first allocation
             self._new_allocation = self._solve_allocation(incremented_workloads, self._allocation_solver)
-            self._app_loads = {}  # Application workloads in a time period
             self.allocation = self._new_allocation
+            self._app_loads = {}  # Application workloads in a time period
             self.log_allocation_summary()
             for node in set(self.allocation):
                 NodeStates.set_state(node, NodeStates.READY)
@@ -84,15 +89,15 @@ class HVReactiveAutoscaler(Autoscaler):
             self._app_loads[app].append(app_workloads[app])
 
         # Time required to perform the transition
-        transition_time = 0
+        transition_time_duration = 0
 
         # A new allocation is calculated every time period if there are no pending transitions
-        if self.time % self.time_period == 0:
+        if self.time % self._time_period == 0:
             # Average workloads are artificially incremented to obtain the desired CPU utilization
             incremented_workloads = {}
             for app in self._app_loads:
                 incremented_workloads[app] = \
-                    sum(self._app_loads[app][-self.time_period:]) / self.time_period / self.desired_cpu_utilization
+                    sum(self._app_loads[app][-self._time_period:]) / self._time_period / self._desired_cpu_utilization
             # At least one application replica
             Autoscaler._set_delta_loads_if_zero(incremented_workloads)
             # If any transition is completed
@@ -104,9 +109,9 @@ class HVReactiveAutoscaler(Autoscaler):
                 transition_time_start = current_time()
                 for node in self.allocation + self._new_allocation:
                     NodeStates.set_state(node, NodeStates.READY)
-                commands, transition_time = self.transition.calculate_transition_plan_sync(self.allocation, self._new_allocation)
-                transition_time = current_time() - transition_time_start
-                self.log(f"Transition calculation: {transition_time:1.3f} seconds")
+                commands, transition_time_duration = self._transition.calculate_transition_plan_sync(self.allocation, self._new_allocation)
+                transition_time_duration = current_time() - transition_time_start
+                self.log(f"Transition calculation: {transition_time_duration:1.3f} seconds")
                 self.log(f"- From {[str(node) for node in self.allocation]}")
                 self.log(f"- To   {[str(node) for node in self._new_allocation]}")
                 if len(commands) > 0:
@@ -114,7 +119,7 @@ class HVReactiveAutoscaler(Autoscaler):
                     # Generate transition events from the current time
                     self._transition_execute_sync(commands)
                 # Get recycling levels
-                node_recycling_level, container_recycling_level = self.transition.get_recycling_levels()
+                node_recycling_level, container_recycling_level = self._transition.get_recycling_levels()
 
             # Reset loads
             for app in self._app_loads:
@@ -131,7 +136,7 @@ class HVReactiveAutoscaler(Autoscaler):
         self.time += 1
 
         statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
-                                          transition_time, current_time() - initial_time, node_recycling_level,
+                                          transition_time_duration, current_time() - initial_time, node_recycling_level,
                                           container_recycling_level)
         return statistics
 

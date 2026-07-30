@@ -59,6 +59,6 @@ def test_problem_allocation(problem_file_name):
     ascal_config = AscalConfig.get_from_config_yaml(file_path, aws_eu_west_1_c5m5r5.c5_m5_r5_fm)
     ascal_problem = Ascal(ascal_config)
     ascal_problem.run()
-    calculated_allocs = allocations_to_serializable_dict(ascal_problem.performance_changes)
+    calculated_allocs = allocations_to_serializable_dict(ascal_problem.allocation_changes)
     solution_allocs = read_allocations(f"{problem_file_name[:-len('.yaml')]}-alloc.yaml")
     assert calculated_allocs == solution_allocs, f"Check failed for {problem_file_name}"

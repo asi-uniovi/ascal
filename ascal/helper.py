@@ -5,8 +5,8 @@ from copy import deepcopy
 from math import ceil
 from json import dumps
 from collections import defaultdict, Counter
+from cloudmodel.unified.units import CurrencyPerTime
 from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, InstanceClass, ContainerGroup, System
-
 from ascal.recycling import Recycling
 
 class Vmt:
@@ -336,6 +336,14 @@ def get_required_nodes(ic_list: list[InstanceClass], cgs: list[ContainerGroup], 
             node.clear()
 
     return required_nodes
+
+def get_allocation_cost(allocation: list[Vm]) -> CurrencyPerTime:
+    """
+    Get the cost of an allocation.
+    :param allocation: An allocation, as a list of nodes with allocated containers.
+    :return: The cost of the allocation.
+    """
+    return sum((node.ic.price for node in allocation))
 
 def mncf_allocation(system: System, workloads: dict[App, RequestsPerTime]) -> Allocation:
     """

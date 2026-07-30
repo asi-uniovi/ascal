@@ -44,32 +44,33 @@ ascal_problem.write_allocations('allocations.yaml')
 
 # Get application traffic intensity as workload/performance
 workloads = ascal_problem.get_workloads()
-performances = ascal_problem.get_performances()
-traffic_intensity = {app: [w/p for w, p in zip(workloads[app], performances[app])] for app in workloads}
+committed_performances = ascal_problem.get_performances()
+traffic_intensity = {app: [w/p for w, p in zip(workloads[app], committed_performances[app])] for app in workloads}
 
-# Get queue waiting times relative to service times, assuming each container is a server in a heterogenous D/D/mqueue
-queue_waiting_times = ascal_problem.get_queue_waiting_times()
+# Get queue waiting times relative to service times, assuming each container is a server in a heterogenous D/D/m queue
+overcommittment_qwts = ascal_problem.get_queue_waiting_times(committed=False)
 avgs = {
     app_name: mean(waiting_times)
-    for app_name, waiting_times in queue_waiting_times.items()
+    for app_name, waiting_times in overcommittment_qwts.items()
 }
-for app_name in dict(queue_waiting_times):
-    queue_waiting_times[f"{app_name} QoS = {avgs[app_name]:.3f}"] = queue_waiting_times.pop(app_name)
+for app_name in dict(overcommittment_qwts):
+    overcommittment_qwts[f"{app_name} QoS = {avgs[app_name]:.3f}"] = overcommittment_qwts.pop(app_name)
     
 # Plot autoscaling information
 ascal_problem.plot(ascal_problem.get_workloads(), "Application Workloads", "req/s")
-ascal_problem.plot(ascal_problem.get_performances(), "Application Performances", "req/s")
+ascal_problem.plot(ascal_problem.get_performances(), "Committed Performances", "req/s")
+ascal_problem.plot(ascal_problem.get_performances(committed=False), "Overcommitted Performances", "req/s")
 cluster_cost = ascal_problem.get_cluster_cost()
 total_cost_str = f"total cost = {sum(cluster_cost)/3600:.3f} $"
 ascal_problem.plot({total_cost_str: cluster_cost}, "Cluster Cost", "$/hour")
 ascal_problem.plot(traffic_intensity, "Traffic Intensity")
-ascal_problem.plot(queue_waiting_times, "Queue Waiting Times")
+ascal_problem.plot(overcommittment_qwts, "Queue Waiting Times from Overcommitment Performances")
 
 # Useful properties
 last_time = ascal_problem.last_time # Last time that can be simulated
 current_time =  ascal_problem.time # Current simulated time in range [0, last_time]
 billing_changes = ascal_problem.billing_changes # Dictionary with times and cluster state on billing changes
-performance_changes = ascal_problem.performance_changes # Dictionary with times and cluster state on allocation changes
+performance_changes = ascal_problem.allocation_changes # Dictionary with times and cluster state on allocation changes
 calculation_times = ascal_problem.calc_times # Calculation times to obtain new allocations
 
 # Recycling levels for Horizontal/Vertical autoscalers

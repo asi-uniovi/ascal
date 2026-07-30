@@ -29,7 +29,8 @@ class HReactiveAutoscaler(Autoscaler):
     def __init__(self, time_period:int = 60, desired_cpu_utilization: float = 0.6,
                  node_utilization_threshold:float = 0.5, 
                  replica_scale_down_stabilization_time: int = 300,
-                 node_scale_down_stabilization_time: int = 600, 
+                 node_scale_down_stabilization_time: int = 600,
+                 tolerance_replicas: float = 0.0, 
                  aggs: dict[App, list[int]] = None,
                  timing_args: TimedOps.TimingArgs | None = None):
         """
@@ -41,18 +42,20 @@ class HReactiveAutoscaler(Autoscaler):
         to a replica scale-down.
         :param node_scale_down_stabilization_time: Minimum time from a previous node scale-up
         to a node scale-down.
+        :param tolerance_replicas: Minimum relative variation in CPU to enable an horizontal scaling of replicas.
         :param aggs: The aggregation level for each application. A None value allows the use of the
         application aggregation levels.
         :param timing_args: Timings for creation/removal of nodes and containers.
         """
         super().__init__(timing_args)
-        self.time_period = time_period
-        self.desired_cpu_utilization = desired_cpu_utilization
-        self.node_utilization_threshold = node_utilization_threshold
+        self._time_period = time_period
+        self._desired_cpu_utilization = desired_cpu_utilization
+        self._node_utilization_threshold = node_utilization_threshold
         self._last_node_scale_up_time = 0
         self._last_replica_scale_up_time = defaultdict(lambda: 0)
         self._replica_scale_down_stabilization_time = replica_scale_down_stabilization_time
         self._node_scale_down_stabilization_time = node_scale_down_stabilization_time
+        self._tolerance_replicas = tolerance_replicas
         self._app_loads: dict[App, list[RequestsPerTime]] = {} # Application workloads in a time period
         self._ics: list[InstanceClass] = [] # Instance class family
         self._app_ccs: dict[App, list[ContainerClass]] = {} # Application container classes
@@ -71,10 +74,9 @@ class HReactiveAutoscaler(Autoscaler):
         :param workloads: First workload sample for each application.
         :return: The initial allocation.
         """
-
         incremented_workloads = {}
         for app in workloads:
-            incremented_workloads[app] = workloads[app] / self.desired_cpu_utilization
+            incremented_workloads[app] = workloads[app] / self._desired_cpu_utilization
         allocation = mncf_allocation(self.system, incremented_workloads)
         for node in allocation:
             NodeStates.set_state(node, NodeStates.READY)
@@ -93,7 +95,6 @@ class HReactiveAutoscaler(Autoscaler):
         :param node: Restrict to this node.
         :return: Number of replicas.
         """
-
         if node is None:
             nodes = [n for n in self.allocation if NodeStates.get_state(n) in (NodeStates.READY, NodeStates.MOVINGC)]
         elif NodeStates.get_state(node) not in (NodeStates.READY, NodeStates.MOVINGC):
@@ -263,7 +264,6 @@ class HReactiveAutoscaler(Autoscaler):
         :param sim: When it is true, allocation is simmulated and so it is not actually performed.
         :return: True if the replicas can be allocated.
         """
-
         if sim:
             other_nodes = copy.deepcopy(other_nodes)
         else:
@@ -309,7 +309,6 @@ class HReactiveAutoscaler(Autoscaler):
         """
         Try to remove nodes with CPU and memory utilization below the utilization threshold.
         """
-
         if not self._enable_node_removal:
             return
 
@@ -330,8 +329,8 @@ class HReactiveAutoscaler(Autoscaler):
             if len(node.cgs) == 0:
                 self._timedops.remove_node(self.time, node)
             # Check the threshold utilization condition
-            elif node.free_cores / node.ic.cores > self.node_utilization_threshold and \
-                    node.free_mem / node.ic.mem > self.node_utilization_threshold:
+            elif node.free_cores / node.ic.cores > self._node_utilization_threshold and \
+                    node.free_mem / node.ic.mem > self._node_utilization_threshold:
                 other_nodes = [
                     other_node
                     for other_node in nodes
@@ -368,14 +367,17 @@ class HReactiveAutoscaler(Autoscaler):
         for app, icf in self.system:
             replica_perf = self.system[(app, icf)].perf
             current_replicas = self._get_replicas(app)
-            average_load = sum(self._app_loads[app][-self.time_period:]) / self.time_period
+            average_load = sum(self._app_loads[app][-self._time_period:]) / self._time_period
             average_cpu_utilization = (average_load / (replica_perf * current_replicas)).magnitude
             if average_cpu_utilization == 0:
                 # At least one replica with the minimum aggregation is required
                 self._desired_app_replicas[app] = self._app_ccs[app][-1].agg_level
             else:
-                self._desired_app_replicas[app] = \
-                    ceil(current_replicas * average_cpu_utilization / self.desired_cpu_utilization)
+                required_replicas = current_replicas * average_cpu_utilization / self._desired_cpu_utilization
+                if abs(required_replicas - current_replicas) / current_replicas > self._tolerance_replicas: 
+                    self._desired_app_replicas[app] = ceil(required_replicas)
+                else:
+                    self._desired_app_replicas[app] = current_replicas
             self._timedops.timed_log(self.time,
                                      f'Load of {app}: {average_load.to("req/s").magnitude:.2f} req/s')
             self._timedops.timed_log(self.time, f'Current replicas 1x of {app} {current_replicas}, '
@@ -413,7 +415,7 @@ class HReactiveAutoscaler(Autoscaler):
             # Clear from the allocation nodes in the removed state
             self._clear_removed_nodes()
             # At the beginning of each time period
-            if self.time % self.time_period == 0:
+            if self.time % self._time_period == 0:
                 self._set_desired_replicas()
                 if self._enable_container_removal:
                     self._remove_excess_of_replicas()

@@ -22,12 +22,14 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
                  h_node_utilization_threshold: float = 0.5, 
                  h_replica_scale_down_stabilization_time: int = 300,
                  h_node_scale_down_stabilization_time: int = 600, 
+                 h_tolerance_replicas: float = 0.0, 
                  timing_args: TimedOps.TimingArgs = None,
                  hv_algorithm: tuple[AllocationSolver, TransitionAlgorithm] = \
                     (AllocationSolver.FCMA, TransitionAlgorithm.RBT),
                  hv_time_period: int = 300,
-                 hot_node_scale_up: bool = False,
-                 hot_container_scale: bool = False):
+                 hv_tolerance_util: float = 0.0,
+                 hv_hot_node_scale_up: bool = False,
+                 hv_hot_container_scale: bool = False):
         """
         Constructor for the mixed reactive horizontal and reactive horizontal/vertical autoscaler.
         :param h_time_period: Time period to evaluate a new autoscaling.
@@ -37,28 +39,32 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         to a replica scale-down.
         :param h_node_scale_down_stabilization_time: Minimum time from a previous node scale-up
         to a node scale-down.
+        :param h_tolerance_replicas: Minimum relative variation in CPU to enable an horizontal scaling of replicas.
         :param timing_args: Timings for creation/removal of nodes and containers.
         :param hv_algorithm: Allocation/transition algorithm.
         :param hv_time_period: Time period for H/V autoscaling.
-        :param hot_node_scale_up: If True, hot vertical scale-up of nodes is used.
-        :param hot_container_scale: Set to enable hot container scaling-up and scaling-down.
+        :param hv_tolerance_util: Minimum relative variation in CPU utilization to enable a transition to a 
+        new deployment.
+        :param hv_hot_node_scale_up: If True, hot vertical scale-up of nodes is used.
+        :param hv_hot_container_scale: Set to enable hot container scaling-up and scaling-down.
         """
         super().__init__(h_time_period, desired_cpu_utilization, h_node_utilization_threshold, 
                          h_replica_scale_down_stabilization_time,
-                         h_node_scale_down_stabilization_time, None, timing_args)
-        self.h_time_period = h_time_period
-        self.hv_time_period = hv_time_period
-        self.desired_cpu_utilization = desired_cpu_utilization
+                         h_node_scale_down_stabilization_time, h_tolerance_replicas, None, timing_args)
+        self._h_time_period = h_time_period
+        self._hv_time_period = hv_time_period
+        self._desired_cpu_utilization = desired_cpu_utilization
         self._hv_app_loads = {} # Application workloads in a time period for the HV autoscaler
         self._aggs = None # H autoscaler works with all the aggregation levels
         self._allocation_solver, self._transition_algorithm = hv_algorithm
-        self.transition = None
-        self.hot_node_scale_up = hot_node_scale_up
-        self.hot_container_scale = hot_container_scale
+        self._transition = None
+        self._hv_tolerance_util = hv_tolerance_util
+        self._hot_node_scale_up = hv_hot_node_scale_up
+        self._hot_container_scale = hv_hot_container_scale
         self._new_allocation = None
         self._hv_timedops = TimedOps(self.timing_args)
         self._hv_timedops.log = self.log
-        self._next_hv_autoscaling_time = self.hv_time_period
+        self._next_hv_autoscaling_time = self._hv_time_period
 
     def enable_disable_near_h_operations(self):
         """
@@ -97,12 +103,12 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             self._hv_app_loads = {app: [] for app in app_workloads}
             # Initialize the transition
             if self._transition_algorithm == TransitionAlgorithm.BASELINE:
-                self.transition = TransitionBaseline(self.timing_args, self.system)
+                self._transition = TransitionBaseline(self.timing_args, self.system)
             else:
-                self.transition = TransitionRBT(self.timing_args, self.system, 
+                self._transition = TransitionRBT(self.timing_args, self.system, 
                                                 transition_algorithm=self._transition_algorithm,
-                                                hot_node_scale_up=self.hot_node_scale_up,
-                                                hot_container_scale=self.hot_container_scale)
+                                                hot_node_scale_up=self._hot_node_scale_up,
+                                                hot_container_scale=self._hot_container_scale)
             super().run(app_workloads)
             statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
                                               Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
@@ -142,7 +148,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             # Perform an HV autoscaling
             # The load is calculated averaging the last time_period samples
             incremented_workloads = {
-                app: sum(self._hv_app_loads[app][-self.time_period:]) / self.time_period / self.desired_cpu_utilization
+                app: sum(self._hv_app_loads[app][-self._time_period:]) / self._time_period / self._desired_cpu_utilization
                 for app in app_workloads
             }
             # At least one application replica
@@ -157,7 +163,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             transition_time_start = current_time()
             for node in self.allocation + new_allocation:
                 NodeStates.set_state(node, NodeStates.READY)
-            commands, transition_time = self.transition.calculate_transition_plan_sync(self.allocation, new_allocation)
+            commands, transition_time = self._transition.calculate_transition_plan_sync(self.allocation, new_allocation)
             transition_calc_time = current_time() - transition_time_start
 
             self.log(f"Transition calculation: {transition_time:1.3f} seconds")
@@ -168,9 +174,9 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
                 # Generate transition events from the current time and move the events to the HV event list
                 self._transition_execute_sync(commands, timedops=self._hv_timedops)
             # Calculate the next HV autoscaling time
-            self._next_hv_autoscaling_time = int(ceil(self.time / self.hv_time_period + 1)) * self.hv_time_period
+            self._next_hv_autoscaling_time = int(ceil(self.time / self._hv_time_period + 1)) * self._hv_time_period
             # Get recycling levels
-            node_recycling_level, container_recycling_level = self.transition.get_recycling_levels()
+            node_recycling_level, container_recycling_level = self._transition.get_recycling_levels()
 
         # Dispatch events in the HV event list
         self._hv_timedops.dispatch_events(self.time)
