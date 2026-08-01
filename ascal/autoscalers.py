@@ -55,9 +55,10 @@ class Autoscaler(ABC):
         :param timing_args: Timings for creation/removal of nodes and containers.
         """
         self.system = None                # Application performances of containers on instances class families
-        self.time = 0                    # Current time in seconds. Times start at zero
+        self.time = 0                     # Current time in seconds. Times start at zero
         self.apps = None                  # Applications
         self.allocation = None            # Current allocation
+        self.cpu_utils = None             # CPU utilizations for the current allocation in [0.0, 1.0]
         if timing_args is None:
             self.timing_args = TimedOps.TimingArgs(0, 0, 0, 0, 0) # All the creation/removal times are zero
         else:
@@ -264,3 +265,25 @@ class Autoscaler(ABC):
                     timedops.allocate_container_replicas(curr_time, cc, replicas, node)
                 elapsed_time = self.timing_args.container_creation_time
             curr_time += elapsed_time
+    
+    def _check_out_of_tolerance_cpu_utils(self, desired_cpu_util: float, tolerance: float) -> bool:
+        """
+        Check if CPU utilizations are out of tolerance. The weighted average CPU utilization using node prices 
+        as weights and the maximum CPU utilization must be in range 
+            [desired * (1 - tolerance), desired * ( 1 + tolerance)]
+        :param tolerance: Tolerance in [0.0, 1.0]
+        :return: True if CPU utilizations are out of tolerance, False otherwise.
+        """
+        out_of_tolerance = False
+        if self.cpu_utils is not None:
+            nodes = list(self.cpu_utils.keys())
+            cpu_util_values = list(self.cpu_utils.values())
+            node_prices = [node.ic.price.to("usd/hour").magnitude for node in nodes]
+            max_cpu_util_value = max(cpu_util_values)
+            cpu_util_weighted_avg = sum(v * p for v, p in zip(cpu_util_values, node_prices)) / sum(node_prices) 
+            if cpu_util_weighted_avg < desired_cpu_util * (1.0 - tolerance) or \
+                    desired_cpu_util * (1.0 + tolerance) < max_cpu_util_value:
+                out_of_tolerance = True
+        return out_of_tolerance
+
+

@@ -258,7 +258,7 @@ class AscalConfig:
                 data['autoscalers']['hv_predictive']['prediction_percentile'],
                 timing_args,
                 algorithm,
-                data['autoscalers']['hv_predictive']['tolerance_util'],
+                data['autoscalers']['hv_predictive']['tolerance_cost'],
                 data['autoscalers']['hv_predictive']['hot_node_scale_up'],
                 data['autoscalers']['hv_predictive']['hot_container_scale']
             )
@@ -295,7 +295,7 @@ class AscalConfig:
                 algorithm,
                 data['autoscalers']['h_reactive_hv_predictive']['hv_prediction_window'],
                 data['autoscalers']['h_reactive_hv_predictive']['hv_prediction_percentile'],
-                data['autoscalers']['h_reactive_hv_predictive']['hv_tolerance_util'],
+                data['autoscalers']['h_reactive_hv_predictive']['hv_tolerance_cost'],
                 data['autoscalers']['h_reactive_hv_predictive']['hv_hot_node_scale_up'],
                 data['autoscalers']['h_reactive_hv_predictive']['hv_hot_container_scale']
             )
@@ -424,8 +424,8 @@ class AscalConfig:
 
     @staticmethod
     def _validate_hv_predictive(config):
-        if "tolerance_util" not in config["autoscalers"]["hv_predictive"]:
-            config["autoscalers"]["hv_predictive"]["tolerance_util"] = 0.0 
+        if "tolerance_cost" not in config["autoscalers"]["hv_predictive"]:
+            config["autoscalers"]["hv_predictive"]["tolerance_cost"] = 0.0 
         if "algorithm" not in config["autoscalers"]["hv_predictive"]:
             config["autoscalers"]["hv_predictive"]["algorithm"] = "fcma"
         if "hot_node_scale_up" not in config["autoscalers"]["hv_predictive"]:
@@ -434,7 +434,7 @@ class AscalConfig:
             config["autoscalers"]["hv_predictive"]["hot_container_scale"] = False
         mandatory = ["prediction_window", "prediction_percentile"]
         AscalConfig._check_fields(config["autoscalers"]["hv_predictive"], mandatory,[int, int])
-        optional = ["algorithm", "tolerance_util", "hot_node_scale_up", "hot_container_scale"]
+        optional = ["algorithm", "tolerance_cost", "hot_node_scale_up", "hot_container_scale"]
         AscalConfig._check_fields(config["autoscalers"]["hv_predictive"], optional, [str, float, bool, bool])
         if set(mandatory + optional) != set(list(config["autoscalers"]["hv_predictive"].keys()) + optional):
             raise ValueError(f"Invalid property in hv_predictive need to be removed")
@@ -442,7 +442,7 @@ class AscalConfig:
             raise ValueError("Prediction window must be >= 10 in hv_predictive")
         if config["autoscalers"]["hv_predictive"]["prediction_percentile"] == 0:
             raise ValueError("Prediction percentile must be >= 0.1 in hv_predictive")
-        if config["autoscalers"]["hv_predictive"]["tolerance_util"] < 0.0:
+        if config["autoscalers"]["hv_predictive"]["tolerance_cost"] < 0.0:
             raise ValueError("Tolerance must be >= 0 in hv_reactive")
         # Check allocation and transition algorithms
         AscalConfig._get_algorithm(config["autoscalers"]["hv_predictive"]["algorithm"]) 
@@ -504,8 +504,8 @@ class AscalConfig:
         """
         if "h_tolerance_replicas" not in config["autoscalers"]["h_reactive_hv_predictive"]:
              config["autoscalers"]["h_reactive_hv_predictive"]["h_tolerance_replicas"] = 0.0
-        if "hv_tolerance_util" not in config["autoscalers"]["h_reactive_hv_predictive"]:
-            config["autoscalers"]["h_reactive_hv_predictive"]["hv_tolerance_util"] = 0.0 
+        if "hv_tolerance_cost" not in config["autoscalers"]["h_reactive_hv_predictive"]:
+            config["autoscalers"]["h_reactive_hv_predictive"]["hv_tolerance_cost"] = 0.0 
         if "hv_algorithm" not in config["autoscalers"]["h_reactive_hv_predictive"]:
             config["autoscalers"]["h_reactive_hv_predictive"]["hv_algorithm"] = "fcma"
         if "hv_hot_node_scale_up" not in config["autoscalers"]["h_reactive_hv_predictive"]:
@@ -518,7 +518,7 @@ class AscalConfig:
                      "h_tolerance_replicas", "hv_prediction_window", "hv_prediction_percentile"] 
         AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_predictive"], mandatory,
                                   [int, int, int, float, float, float, int, int])
-        optional = ["hv_tolerance_util", "hv_algorithm", "hv_hot_node_scale_up", "hv_hot_container_scale"]
+        optional = ["hv_tolerance_cost", "hv_algorithm", "hv_hot_node_scale_up", "hv_hot_container_scale"]
         AscalConfig._check_fields(config["autoscalers"]["h_reactive_hv_predictive"], optional, \
                                   [float, str, bool, bool])
         if set(mandatory + optional) != \
@@ -543,7 +543,7 @@ class AscalConfig:
             raise ValueError("Node scale-down stabilization time must be >= 0 in h_reactive_hv_predictive")
         if config["autoscalers"]["h_reactive_hv_predictive"]["h_tolerance_replicas"] < 0:
             raise ValueError("Tolerance must be >= 0 in h_reactive_hv_predictive")
-        if config["autoscalers"]["h_reactive_hv_predictive"]["hv_tolerance_util"] < 0.0:
+        if config["autoscalers"]["h_reactive_hv_predictive"]["hv_tolerance_cost"] < 0.0:
             raise ValueError("Tolerance must be >= 0 in h_reactive_hv_reactive")
         # Check allocation and transition algorithms
         AscalConfig._get_algorithm(config["autoscalers"]["h_reactive_hv_predictive"]["hv_algorithm"]) 

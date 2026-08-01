@@ -3,6 +3,7 @@ Implement a mixed horizontal and horizontal/vertical predictive autoscaler
 """
 
 from time import time as current_time
+from copy import deepcopy
 from fcma import App, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
@@ -10,7 +11,7 @@ from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
 from ascal.hreactive import HReactiveAutoscaler
 from ascal.recycling import Recycling
 from ascal.transition import TransitionAlgorithm, TransitionRBT
-from ascal.helper import get_min_max_load
+from ascal.helper import get_min_max_load, get_allocation_cost
 
 
 class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
@@ -27,7 +28,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
                  hv_algorithm: tuple[AllocationSolver, TransitionAlgorithm] = \
                     (AllocationSolver.FCMA, TransitionAlgorithm.RBT),
                  hv_prediction_window: int = 600, hv_prediction_percentile: float = 0.95,
-                 hv_tolerance_util: float = 0.0,
+                 hv_tolerance_cost: float = 0.0,
                  hot_node_scale_up: bool = False,
                  hot_container_scale: bool = False):
         """
@@ -44,8 +45,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         :param hv_algorithm: Allocation/transition algorithm.
         :param hv_prediction_window: Prediction window for the H/V autoscaler.
         :àram hv_prediction_percentile: Prediction percentile for the H/V autoscaler.
-        :param hv_tolerance_util: Minimum relative variation in CPU utilization to enable a transition to a 
-        new deployment.
+        :param hv_tolerance_cost: Minimum relative cost increment to enable the second transition to a new deployment.
         :param hot_node_scale_up: If True, hot vertical scale-up of nodes is used.
         :param hot_container_scale: Set to enable hot container scaling-up and scaling-down.
         """
@@ -58,7 +58,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         self.predicted_workloads = None
         self._allocation_solver, self._transition_algorithm = hv_algorithm
         self._transition = None
-        self._hv_tolerance_util = hv_tolerance_util
+        self._hv_tolerance_cost = hv_tolerance_cost
         self._hot_node_scale_up = hot_node_scale_up
         self._hot_container_scale = hot_container_scale
         self._hv_timedops = TimedOps(self.timing_args)
@@ -157,10 +157,13 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             Autoscaler._set_delta_loads_if_zero(hv_new_app_load)
             _, max_app_load = get_min_max_load(hv_app_load, hv_new_app_load)
             intermediate_allocation = self._solve_allocation(max_app_load, self._allocation_solver)
+            intermediate_cost = get_allocation_cost(intermediate_allocation).to("usd/hour").magnitude
             new_allocation = self._solve_allocation(hv_new_app_load, self._allocation_solver)
+            new_cost = get_allocation_cost(intermediate_allocation).to("usd/hour").magnitude
 
-            # We need to measure the time required to perform the transition
-            transition_time_start = current_time()
+            # There is not second transition when the cost savings are small
+            if (intermediate_cost - new_cost) / intermediate_cost <= self._hv_tolerance_cost:
+                self._new_allocation = deepcopy(intermediate_allocation)
 
             # Calculate the transition from the current allocation to the intermediate allocation
             for node in self.allocation + intermediate_allocation:
@@ -198,18 +201,12 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             # Common node removals in both transitions must be handled
             Autoscaler._handle_node_removals(commands1, commands2, new_allocation)
 
-            # Time required to perform the transition
-            transition_time = current_time() - transition_time_start
-
             # Calculate the times for the two transitions
             transition1_time = self._transition.get_transition_time(commands1, self.timing_args)
             transition2_time = self._transition.get_transition_time(commands2, self.timing_args)
 
-            self.log(f"Transition at {self._next_prediction_window_time - transition1_time}, calculation: "
+            self.log(f"Transition at {self._next_prediction_window_time - transition1_time}. Duration: "
                      f"{transition1_time + transition2_time:1.3f} seconds")
-            self.log(f"Predicted loads for {self._prediction_percentile:.1f} % percentile:")
-            for app, load in hv_new_app_load.items():
-                self.log(f"- {app.name} -> {load.to('req/s').magnitude:.2f} req/s")
             self.log(f"- From {[str(node) for node in self.allocation]}")
             self.log(f"- To   {[str(node) for node in new_allocation]}")
             temporal_nodes = []

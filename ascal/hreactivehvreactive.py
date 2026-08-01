@@ -134,6 +134,10 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         for app in app_workloads:
             self._app_loads[app].append(app_workloads[app])
 
+        # Check if CPU utilizations are out of tolerance
+        out_of_tolerance = \
+            self._check_out_of_tolerance_cpu_utils(self._desired_cpu_utilization, self._hv_tolerance_util)
+
         # After this point, we want to perform a new HV autoscaling, but we need to process pending
         # events of the H autoscaler before performing an HV autoscaling
         if not self._timedops.is_event_list_empty():
@@ -144,7 +148,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
                                               Recycling.INVALID_RECYCLING)
             return statistics
 
-        elif self._hv_timedops.is_event_list_empty():
+        elif self._hv_timedops.is_event_list_empty() and out_of_tolerance:
             # Perform an HV autoscaling
             # The load is calculated averaging the last time_period samples
             incremented_workloads = {
@@ -163,10 +167,11 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             transition_time_start = current_time()
             for node in self.allocation + new_allocation:
                 NodeStates.set_state(node, NodeStates.READY)
-            commands, transition_time = self._transition.calculate_transition_plan_sync(self.allocation, new_allocation)
+            commands, transition_time = \
+                self._transition.calculate_transition_plan_sync(self.allocation, new_allocation)
             transition_calc_time = current_time() - transition_time_start
 
-            self.log(f"Transition calculation: {transition_time:1.3f} seconds")
+            self.log(f"Transition at {self.time} seconds. Duration: {transition_time} seconds")
             self.log(f"- From {[str(node) for node in self.allocation]}")
             self.log(f"- To   {[str(node) for node in new_allocation]}")
             if len(commands) > 0:

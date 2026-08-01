@@ -265,14 +265,17 @@ class Ascal:
             # are added to current workloads to calculate CPU utilizations.
             # Overcommittment of container cores is assumed
             cai = self._get_app_cores(workloads, self._autoscaler.allocation, app_perf_per_core)
-            cpu_util = {
+            cpu_utils = {
                 node: sum(cai[a][node] / node.ic.cores.magnitude 
                           for a in cai if node in cai[a]) 
                 for node in self._autoscaler.allocation
             }
 
+            # Set CPU utilizations in the autoscaler
+            self._autoscaler.cpu_utils = cpu_utils
+
             # Update the average CPU utilization in each node
-            self.avg_cpu_util = self._get_avg_cpu_util(cpu_util)
+            self.avg_cpu_util = self._get_avg_cpu_util(cpu_utils)
 
             # Save applications performance in req/s, which depends on current workloads.
             perf = {
@@ -295,7 +298,7 @@ class Ascal:
             if len(added_qwts) > 0:
                 self.queue_waiting_times.append((self.time, added_qwts))
 
-            # Save transition statistics. REVISAR PUES LAS ESCRIBE EN CADA SEGUNDO Y DEBERÍA SER CON CADA TRANSICION
+            # Save transition statistics
             self.calc_times["transition_times"].append(statistics.transition_time)
             self.calc_times["total_times"].append(statistics.total_time)
             self.node_recycling_levels.append(statistics.node_recycling_level)
