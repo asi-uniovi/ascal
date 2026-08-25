@@ -453,7 +453,7 @@ class Ascal:
         """
         with open(csv_file, mode='w', newline='') as file:
             writer = csv.writer(file)
-            performances = self.get_performances()
+            performances = self.get_performances(committed)
             writer.writerow([f'{app_name} (req/s)' for app_name in performances])
             for row in zip(*performances.values()):
                 writer.writerow(row)
@@ -518,6 +518,7 @@ class Ascal:
 
         :param dict_values: Dictionary to plot. Example: {'app0': [0.1, 2.0, 3.1], 'app1': [-1.0, 1.0, 3.1]}.
                             Only zero or positive values are displayed; negative values are ignored.
+                            Zero values are replaced with a small positive value (0.01) to ensure they are visible.
         :param title: Title of the plot.
         :param unit: Label for the vertical axis (e.g., "MB", "requests", etc.).
         """
@@ -526,6 +527,9 @@ class Ascal:
         labels = list(dict_values.keys())
         values = [np.array(dict_values[label]) for label in labels]
         x = np.arange(len(values[0]))
+
+        # Replace 0 values with a small positive value to ensure they are visible in the bar chart
+        values = [np.where(v == 0.0, 0.01, v) for v in values]
 
         # Replace negative values with NaN
         masked_values = [np.where(v >= 0, v, np.nan) for v in values]

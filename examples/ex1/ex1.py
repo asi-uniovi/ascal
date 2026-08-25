@@ -36,18 +36,18 @@ ascal_problem.run()
 
 # Write workloads, performance and cost into csv files
 ascal_problem.write_workload_csv('workloads.csv')
-ascal_problem.write_performance_csv('performances.csv')
+ascal_problem.write_performance_csv('performances.csv', committed=False)
 ascal_problem.write_cost_csv('cost.csv')
 
 # Write allocations in a YAML file
 ascal_problem.write_allocations('allocations.yaml')
 
-# Get application traffic intensity as workload/performance
+# Get application traffic intensity as workload/committed performance
 workloads = ascal_problem.get_workloads()
-committed_performances = ascal_problem.get_performances()
+committed_performances = ascal_problem.get_performances(committed=True)
 traffic_intensity = {app: [w/p for w, p in zip(workloads[app], committed_performances[app])] for app in workloads}
 
-# Get queue waiting times relative to service times, assuming each container is a server in a heterogenous D/D/m queue
+# Get queue waiting times, assuming each container is a server in a heterogenous D/D/m queue
 overcommittment_qwts = ascal_problem.get_queue_waiting_times(committed=False)
 avgs = {
     app_name: mean(waiting_times)

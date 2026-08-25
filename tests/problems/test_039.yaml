@@ -1,12 +1,17 @@
 autoscalers:
-  hv_reactive: # Horizontal/vertical+reactive autoscaling
-    time_period: 60 # Time period to evaluate autoscaling
-    desired_cpu_utilization: 0.7  # Desired CPU utilization
-    algorithm: fcma, rbt1 # Allocation/transition algorithm
-    tolerance_util: 0.2 # Utilization tolerance to avoid unnecessary scalings
+  h_reactive_hv_reactive:
+    desired_cpu_utilization: 0.7  # Desired CPU utilization for both, the horizontal and vertical autoscaler
+    h_time_period: 60 # Time period to evaluate autoscaling for the horizontal autoscaler
+    h_node_utilization_threshold: 0.5 # Below this utilization, node removal is tried by the horizontal autoscaler
+    h_replica_scale_down_stabilization_time: 300 # Minimum time from a previous replica scale-up to a replica scale-down
+    h_node_scale_down_stabilization_time: 600 # Minimum time from a previous node scale-up to a node scale-down
+    h_tolerance_replicas: 0.1 # Tolerance for the number of replicas to avoid unnecessary scaling actions
+    hv_time_period: 600 # Time period to evaluate autoscaling for the horizontal/vertical autoscaler
+    hv_algorithm: fcma, rbt1 # Allocation/transition algorithm
+    hv_tolerance_util: 0.2 # Tolerance for CPU utilization to avoid unnecessary scaling actions
 
 # Select autoscaler
-autoscaler: hv_reactive
+autoscaler: h_reactive_hv_reactive
 
 # Times in seconds for node/container creation/removal
 timing_args:
@@ -52,3 +57,5 @@ apps:
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
 simulation_time: 3600
+
+

@@ -4,7 +4,7 @@ A synchronous transition defines predefined times to start node/container creati
 fixed durations to perform these operations. A command starts when the previous command completes
 and the node creation/upgrade time has elapsed if the command flag 
 "sync_on_nodes_creation"/"sync_on_nodes_upgrade" is set. 
-A command completes after finishing all its container removals, allocations and scales. 
+A command completes after finishing all its container removals, allocations, scale-ups and scale-downs. 
 Node creations and removals execute in background.
 Within a command operations are executed following these restrictions:
 
@@ -31,8 +31,8 @@ computational resources.
 Three transition algorithms are implemented:
 - Baseline transition. It performs the transition in 4 steps: 
     1) Create all the nodes in the final allocation. 
-    2) Allocate all the containers in these created nodes, 
-    3) Remove all the containers in the initial allocation 
+    2) Allocate all the containers in these created nodes.
+    3) Remove all the containers in the initial allocation. 
     4) Remove all the nodes in the initial allocation.
 - RBT3. It is the simplest variant based on recycling. It does not perform any transition operation while
  new/temporal nodes are created, or recycled nodes are upgraded. Copy is disabled in the remove-allocate-copy 
@@ -45,7 +45,6 @@ Limitations of the current implementation:
 - All the nodes belong to instance classes of the same family.
 - All the containers of a given application are configured with the same amount of memory. Nevertheless, CPU 
 and performance parameters can be different for different container classes of the same application.
-
 """
 
 from enum import Enum
@@ -73,7 +72,7 @@ class TransitionAlgorithm(Enum):
     """
     RBT1 = 1          # Recycling-based Transition algorithm 1
     RBT2 = 2          # Recycling-based Transition algorithm 2
-    RBT3 = 3          # Recycling-based Transition algorithm 2
+    RBT3 = 3          # Recycling-based Transition algorithm 3
     RBT  = RBT3       # Default RBT algorithm
     BASELINE = 4      # Baseline transition algorithm
 
@@ -1841,7 +1840,7 @@ class TransitionRBT(Transition):
         for initial_node, final_node in self._recycling.upgraded_node_pairs.items():
             initial_node.upgrade(final_node)
 
-        # Allocation loop until node creation completes for RBT1 variant.
+        # Allocation loop until node creation completes for RBT1 and RBT2 variants.
         # Upgraded nodes can be used in the allocation of new containers meanwhile
         if (self._rbt1 or self._rbt2) and elapsed_time < self._timing_args.node_creation_time:
             max_time = self._timing_args.node_creation_time - elapsed_time

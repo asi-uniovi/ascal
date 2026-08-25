@@ -268,9 +268,9 @@ class Autoscaler(ABC):
     
     def _check_out_of_tolerance_cpu_utils(self, desired_cpu_util: float, tolerance: float) -> bool:
         """
-        Check if CPU utilizations are out of tolerance. The weighted average CPU utilization using node prices 
-        as weights and the maximum CPU utilization must be in range 
-            [desired * (1 - tolerance), desired * ( 1 + tolerance)]
+        Check if CPU utilizations are out of tolerance. The weighted average CPU utilization using node prices
+        should be higher than desired * (1 - tolerance) and the maximum CPU utilization should be lower than 
+        desired * (1 + tolerance).
         :param tolerance: Tolerance in [0.0, 1.0]
         :return: True if CPU utilizations are out of tolerance, False otherwise.
         """

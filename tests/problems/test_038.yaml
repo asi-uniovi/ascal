@@ -1,12 +1,12 @@
 autoscalers:
-  hv_reactive: # Horizontal/vertical+reactive autoscaling
-    time_period: 60 # Time period to evaluate autoscaling
-    desired_cpu_utilization: 0.7  # Desired CPU utilization
+  hv_predictive: # Horizontal/vertical+predictive autoscaling
+    prediction_window: 240 # Prediction window in seconds
+    prediction_percentile: 95 # Percentile for application's load in the prediction window
     algorithm: fcma, rbt1 # Allocation/transition algorithm
-    tolerance_util: 0.2 # Utilization tolerance to avoid unnecessary scalings
-
+    tolerance_cost: 0.05 # Tolerance for cost to avoid unnecessary scaling-down actions
+    
 # Select autoscaler
-autoscaler: hv_reactive
+autoscaler: hv_predictive
 
 # Times in seconds for node/container creation/removal
 timing_args:
@@ -52,3 +52,5 @@ apps:
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
 simulation_time: 3600
+
+

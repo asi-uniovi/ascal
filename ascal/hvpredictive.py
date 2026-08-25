@@ -29,7 +29,8 @@ class HVPredictiveAutoscaler(Autoscaler):
         :param prediction_window: Prediction window in seconds.
         :param timing_args: Timings for creation/removal of nodes and containers.
         :param algorithm: Allocation/transition algorithm.
-        :param tolerance_cost: Minimum relative cost increment to enable the second transition to a new deployment.
+        :param tolerance_cost: Minimum relative cost decrement to enable the transition part related
+        to applications with decreasing workload.
         :param hot_node_scale_up: Set to enable hot node scaling-up.
         :param hot_container_scale: Set to enable hot container scaling-up and scaling-down.
         """

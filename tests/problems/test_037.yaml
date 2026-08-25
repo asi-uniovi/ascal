@@ -3,7 +3,7 @@ autoscalers:
     time_period: 60 # Time period to evaluate autoscaling
     desired_cpu_utilization: 0.7  # Desired CPU utilization
     algorithm: fcma, rbt1 # Allocation/transition algorithm
-    tolerance_util: 0.2 # Utilization tolerance to avoid unnecessary scalings
+    tolerance_util: 0.2 # Tolerance for CPU utilization to avoid unnecessary scaling actions
 
 # Select autoscaler
 autoscaler: hv_reactive
@@ -52,3 +52,5 @@ apps:
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
 simulation_time: 3600
+
+
