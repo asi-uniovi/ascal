@@ -10,7 +10,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
-from fcma import RequestsPerTime, Allocation, App, Vm, ContainerGroup
+from fcma import RequestsPerTime, Allocation, App, Vm
 from ascal.autoscalers import Autoscaler
 from ascal.hvpredictive import HVPredictiveAutoscaler
 from ascal.hreactivehvpredictive import HReactiveHVPredictiveAutoscaler
@@ -31,6 +31,7 @@ class Ascal:
         :param ascal_config: Configuration for the Ascal problem. It is not currently checked.
         """
         self._workload_vectors = ascal_config.workload_vectors
+        self._pending_workload_vectors = {app: [] for app in ascal_config.apps}
         self._autoscaler = ascal_config.autoscaler
         self._autoscaler.system = ascal_config.system
         self._autoscaler.apps = ascal_config.apps
@@ -261,6 +262,10 @@ class Ascal:
             # Application's performance in req/s/core
             app_perf_per_core = self._get_perf_per_core() 
 
+            # The pending workload at the current time comes from the previous time
+            for app in self._autoscaler.apps:
+                self._pending_workload_vectors[app].append(self._pending_workload[app])
+
             # Get cores in use in each node for the current workloads. Pending workloads 
             # are added to current workloads to calculate CPU utilizations.
             # Overcommittment of container cores is assumed
@@ -288,6 +293,7 @@ class Ascal:
             # Calculate the pending workload for each application after 1 second
             for app in self._autoscaler.apps:
                 total_w = self._pending_workload[app] + workloads[app].to("req/s").magnitude
+                assert perf[app] - total_w <= 1e-6, f"Performance for {app} is invalid"
                 self._pending_workload[app] = round(max(0.0, total_w - perf[app]), 6)
 
             # Update queue waiting time samples with possitive values
@@ -311,6 +317,13 @@ class Ascal:
         :return: For each application the workloads in req/s at every second, starting from 0 seconds.
         """
         return {str(key): value for key, value in self._workload_vectors.items()}
+
+    def get_queue_workloads(self) -> dict[str, list[int]]:
+        """
+        Get application workloads pending in the queue.
+        :return: For each application the workloads in req/s at every second, starting from 0 seconds.
+        """
+        return {str(key): value for key, value in self._pending_workload_vectors.items()}
 
     def get_recycling_levels(self) -> tuple[list[float], list[float]]:
         """
