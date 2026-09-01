@@ -677,13 +677,13 @@ class TransitionRBT(Transition):
 
     def __init__(self, timing_args: TimedOps.TimingArgs, system: System, 
                  transition_algorithm: TransitionAlgorithm.RBT,
-                 hot_node_scale_up: bool = False, hot_container_scale: bool = False):
+                 hot_scale_up_nodes: bool|list[Vm] = True, hot_container_scale: bool = False):
         """
         Creates an object for transition between two allocations.
         :param timing_args: Creation/removal/scaling times for containers and nodes.
         :param system: Applications's performance on different container classes and available instance classes.
         :param transition_algorithm: The specific RBT variant to use (RBT1 or RBT2).
-        :param hot_node_scale_up: Set to enable hot node scaling-up.
+        :param hot_scale_up_nodes: Nodes with hot node scaling-up enabled.
         :param hot_container_scale: Set to enable hot container scaling-up and scaling-down.
         """
         self._timing_args: TimedOps.TimingArgs = timing_args
@@ -697,7 +697,7 @@ class TransitionRBT(Transition):
         self._app_perf_increment: defaultdict[App, RequestsPerTime]  = None
         self._allocatable_cs_next_step: list[tuple[Vm, ContainerClass, int]] = []
         self._unallocated_containers_in_new_nodes: list[tuple[Vm, ContainerClass, int]] = []
-        self._hot_node_scale_up = hot_node_scale_up
+        self._hot_scale_up_nodes = hot_scale_up_nodes
         self._hot_container_scale = hot_container_scale
         self._commands: list[Command] = None
         self._sync_on_next_alloc_upgraded_nodes = True
@@ -1390,6 +1390,11 @@ class TransitionRBT(Transition):
             command.sync_on_nodes_upgrade = True
             self._sync_on_next_alloc_upgraded_nodes = False
         
+        # Combine fragments to create/scale-up containers
+        compacted_fragments = defaultdict(int)
+        for node, fcc, fr in command.allocate_containers:
+            compacted_fragments[(node, fcc)] += fr
+        command.allocate_containers = [(node, fcc, fr) for (node, fcc), fr in compacted_fragments.items()]
         for node, fcc, fr in command.allocate_containers[:]:
             if fcc.id > 0: # If the container is a fragment
                 # The allocation of fragments will be replaced by allocations and scaling-ups of replicas
@@ -1398,7 +1403,7 @@ class TransitionRBT(Transition):
                     # Create a new group of fragments. This happens when the first fragments are
                     # copies coming from another node
                     max_r = int(ceil(fr / fcc.aggs[-1])) 
-                    node.fragments[fcc.id] = (max_r, 0) # Group of ragments before the allocation
+                    node.fragments[fcc.id] = (max_r, 0) # Group of fragments before the allocation
                 # First, try to scale-up fragments in a group with the same ID. New containers can 
                 # always be allocated in this way. Copies of obsolete containers may require another try,
                 # using an extension group (negative id) if the principal group is full. 
@@ -1433,6 +1438,10 @@ class TransitionRBT(Transition):
                     node.fragments[ext_fcc.id] = (max_r, fr) # Update the node fragments
 
         # Combine fragments to remove/scale-down containers
+        compacted_fragments = defaultdict(int)
+        for node, fcc, fr in command.remove_containers:
+            compacted_fragments[(node, fcc)] += fr
+        command.remove_containers = [(node, fcc, fr) for (node, fcc), fr in compacted_fragments.items()]
         for node, fcc, fr in command.remove_containers[:]:
             # If the container is a fragment
             if fcc.id > 0:
@@ -1654,7 +1663,7 @@ class TransitionRBT(Transition):
         """
         # Calculate application's performance provided by temporary nodes to allocate the
         # remaining containers. It executes the remove_allocate method allowing negative values for 
-        # application's performance surplus. Next, they are compensated by container replicas in temporary nodes.
+        # application's performance surplus. Next, they are compensated by container replicas in temporary nodes
         extra_perf = RequestsPerTime("1000000 rps")
         for app in self._app_perf_surplus:
             self._app_perf_surplus[app] += extra_perf
@@ -1773,7 +1782,9 @@ class TransitionRBT(Transition):
 
         # Calculate recycled node pairs, new nodes, nodes to remove, recycled containers, new containers
         # and containers to remove when transitioning from the initial allocation to the final allocation
-        self._recycling_vm = Recycling(initial_alloc, final_alloc, self._hot_node_scale_up, self._hot_container_scale)
+        if self._hot_scale_up_nodes is True:
+            self._hot_scale_up_nodes = initial_alloc # All the nodes in the initial allocation can be sacled-up
+        self._recycling_vm = Recycling(initial_alloc, final_alloc, self._hot_scale_up_nodes, self._hot_container_scale)
         
         self._recycling = RecyclingVmt(self._recycling_vm, vm_to_vmt)
 
@@ -1812,7 +1823,6 @@ class TransitionRBT(Transition):
         Calculate a synchronous transition plan from the initial allocation to the final allocation, 
         while fulfilling the application's minimum performance requirement. It is based on the 
         remove-allocate algorithm.
-
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
         :return: A list of commands and the time to perform the transition.
@@ -1861,7 +1871,7 @@ class TransitionRBT(Transition):
         allocate_in_new_nodes_command = Command(allocate_containers=self._unallocated_containers_in_new_nodes[:])
         allocate_in_new_nodes_command.sync_on_nodes_creation = True
         for _, cc, replicas in self._unallocated_containers_in_new_nodes:
-            self._app_perf_increment[cc.app] += replicas * cc.perf # DEbería ser surplus
+            self._app_perf_increment[cc.app] += replicas * cc.perf
             self._app_unalloc_perf[cc.app] -= replicas * cc.perf
             assert self._app_unalloc_perf[cc.app].magnitude >= - TransitionRBT._DELTA, "Invalid performance"
         self._unallocated_containers_in_new_nodes.clear()
@@ -1878,7 +1888,10 @@ class TransitionRBT(Transition):
         self._remove_empty_obsolete_nodes(reconfig_command)
         self._allocate_with_free_obsolete(reconfig_command)
 
-        # If there are still unallocated containers in recycled nodes, complete the allocation using temporal nodes
+        # If there are still unallocated containers in recycled nodes, complete the allocation using temporal nodes.
+        # Temporal (obsolete) containers are allocated in the temporal nodes and included in the allocate new nodes 
+        # command. Any container removal must be performed after the allocation in the temporal nodes, as it depends
+        # on this allocation, so it is included in the reconfiguration command
         if len(self._unalloc_node_cs) > 0: 
             self._complete_allocation_in_temporary_nodes(create_upgrade_nodes_command, allocate_in_new_nodes_command,
                                                          reconfig_command)

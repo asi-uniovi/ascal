@@ -4,6 +4,7 @@ Implement the horizontal/vertical predictive autoscaler
 
 from time import time as current_time
 from copy import deepcopy
+from fcma import Vm
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
 from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
@@ -46,6 +47,7 @@ class HVPredictiveAutoscaler(Autoscaler):
         self._new_allocation = None
         self._app_load = None
         self._waiting_to_start_transition_calculation = False
+        self._hot_scale_up_nodes = None
 
     def _initialize_allocation(self, initial_time: float) -> AutoscalerStatistics:
         """
@@ -59,14 +61,11 @@ class HVPredictiveAutoscaler(Autoscaler):
         # A minimum load is required for each application
         Autoscaler._set_delta_loads_if_zero(self._app_load)
 
-        # Initialize the transition
+        # Initialize the baseline transition. The initialization of RBT transitions depend on workload predictions,
+        # so it is performed on each transition calculation
         if self._transition_algorithm == TransitionAlgorithm.BASELINE:
             self._transition = TransitionBaseline(self.timing_args, self.system)
-        else:
-            self._transition = TransitionRBT(self.timing_args, self.system, 
-                                            transition_algorithm=self._transition_algorithm,
-                                            hot_node_scale_up=self._hot_node_scale_up,
-                                            hot_container_scale=self._hot_container_scale)
+
         # Calculate a new allocation
         self._new_allocation = self._solve_allocation(self._app_load, self._allocation_solver)
         self.allocation = self._new_allocation
@@ -167,6 +166,17 @@ class HVPredictiveAutoscaler(Autoscaler):
                                           container_recycling_level)
         return statistics
 
+    @staticmethod
+    def get_same_ic_recycled_nodes(initial_alloc: list[Vm], final_alloc: list[Vm]) -> list[Vm]:
+        """
+        Get recycled nodes with the same instance class in the initial and final allocations.
+        :param initial_alloc: Initial allocation.
+        :param final_alloc: Final allocation.
+        :return: List of recycled nodes with the same instance class in the initial and final allocations.
+        """
+        node_recyclings = Recycling(initial_alloc, final_alloc)
+        return list(node_recyclings.recycled_node_pairs.keys())
+
     def run_rbt(self) -> tuple[bool, bool, float]:
         """
         Simulate for 1 second the horizontal/vertical and predictive autoscaling of containers and nodes
@@ -217,6 +227,26 @@ class HVPredictiveAutoscaler(Autoscaler):
             # Prepare application's load for the next prediction window
             self._app_load = new_app_load
 
+            # Those nodes with the same instance class and a high probability of being recycled 
+            # work with hot node scaling-up disabled in the first transition.
+            # Note that these nodes may be otherwise scaled-up to obtain an upgraded node in the first transition,
+            # and the process should be reversed with a new node creation and a a node removal in the
+            # second transition
+            if self._hot_node_scale_up:
+                self._hot_scale_up_nodes = [
+                    node
+                    for node in self.allocation
+                    if node not in self.get_same_ic_recycled_nodes(self.allocation, self._new_allocation)
+                ]
+            else:
+                self._hot_scale_up_nodes = []
+
+            # Initialize the first RBT transition. The initialization of RBT transitions depend on workload predictions
+            self._transition = TransitionRBT(self.timing_args, self.system, 
+                                             transition_algorithm=self._transition_algorithm,
+                                             hot_scale_up_nodes=self._hot_scale_up_nodes,
+                                             hot_container_scale=self._hot_container_scale)
+
             # Calculate the transition from the current allocation to the intermediate allocation
             for node in self.allocation:
                 NodeStates.set_state(node, NodeStates.READY)
@@ -242,7 +272,14 @@ class HVPredictiveAutoscaler(Autoscaler):
             # Remove all the containers in the removed nodes of the first transition and add the nodes
             # to the intermediate allocation. These nodes may be useful in the second transition
             intermediate_allocation.extend([node.clear() for node in removed_nodes])
-            commands2, _ = self._transition.calculate_transition_plan_sync(intermediate_allocation, self._new_allocation)
+
+            # Second transition. All the nodes can scale-up in the second transition
+            self._transition = TransitionRBT(self.timing_args, self.system, 
+                                             transition_algorithm=self._transition_algorithm,
+                                             hot_scale_up_nodes=True,
+                                             hot_container_scale=self._hot_container_scale)
+            commands2, _ = self._transition.calculate_transition_plan_sync(intermediate_allocation, 
+                                                                           self._new_allocation)
             for node in removed_nodes:
                 node.free_cores, node.free_mem, node.cgs, node.history = removed_nodes_backup[node]
 
@@ -260,24 +297,26 @@ class HVPredictiveAutoscaler(Autoscaler):
             transition1_time = self._transition.get_transition_time(commands1, self.timing_args)
             transition2_time = self._transition.get_transition_time(commands2, self.timing_args)
 
-            # Log transition info
-            self.log(f"Transition at {next_prediction_window_time - transition1_time}. "
-                     f"Duration: {transition1_time + transition2_time} seconds")
-            self.log(f"Predicted loads for {self._prediction_percentile:.1f} % percentile:")
-            for app, load in new_app_load.items():
-                self.log(f"- {app.name} -> {load.to('req/s').magnitude:.2f} req/s")
-            self.log(f"- From {[str(node) for node in self.allocation]}")
-            self.log(f"- To   {[str(node) for node in self._new_allocation]}")
-            temporal_nodes = []
-            for command1 in commands1:
-                for node in command1.create_nodes:
-                    if node not in self._new_allocation:
-                        temporal_nodes.append(str(node))
-                for command2 in commands2:
-                    for node in command2.create_nodes:
-                        if node not in self._new_allocation:
+            # Log transition info when a transition is performed
+            if len(commands1) > 0 or len(commands2) > 0:
+                self.log(f"Transition at {next_prediction_window_time - transition1_time}. "
+                        f"Duration: {transition1_time + transition2_time} seconds")
+                self.log(f"Predicted loads for {self._prediction_percentile:.1f} % percentile:")
+                for app, load in new_app_load.items():
+                    self.log(f"- {app.name} -> {load.to('req/s').magnitude:.2f} req/s")
+                self.log(f"- From {[str(node) for node in self.allocation]}")
+                self.log(f"- To   {[str(node) for node in self._new_allocation]}")
+                # Temporal nodes have negative IDs
+                temporal_nodes = []
+                for command1 in commands1:
+                    for node in command1.create_nodes:
+                        if node.id < 0:
                             temporal_nodes.append(str(node))
-            self.log(f"- Temporal nodes {temporal_nodes}")
+                    for command2 in commands2:
+                        for node in command2.create_nodes:
+                            if node.id < 0:
+                                temporal_nodes.append(str(node))
+                self.log(f"- Temporal nodes {temporal_nodes}")
 
             # Generate transition events
             self._transition_execute_sync(commands1, next_prediction_window_time - transition1_time)

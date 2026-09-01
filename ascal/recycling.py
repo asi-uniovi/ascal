@@ -102,24 +102,24 @@ class Recycling:
         return scaled_up_pairs
 
     def __init__(self, initial_alloc: Allocation, final_alloc: Allocation, 
-                 hot_node_scale_up: bool = False, hot_container_scale: bool = False):
+                 hot_scale_up_nodes: list[Vm] = [], hot_container_scale: bool = False):
         """
         Constructor for the Recycling class. Computes node and container recycling between two allocations
         using the same instance class family.
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
-        :param hot_node_scale_up: Set when hot node scaling-up is possible.
+        :param hot_scale_up_nodes: Nodes for which hot node scaling-up is possible.
         :param hot_container_scale: Set when hot container scaling is possible.
         """
 
         # Check that we are working with a single instance class family
         assert len(set(node.ic.family for node in initial_alloc + final_alloc)) == 1, "Invalid recycling problem"
 
-        self._hot_node_scale_up = hot_node_scale_up
+        self._hot_scale_up_nodes = hot_scale_up_nodes
         self._hot_container_scale = hot_container_scale
         self._initialize_fields()
 
-        if self._hot_node_scale_up:
+        if self._hot_scale_up_nodes:
             # Calculate a recycling that includes all the nodes
             node_recyclings = self.calculate_node_recycling(initial_alloc, final_alloc)
             self.obsolete_nodes.extend(node_recyclings["obsolete"])
@@ -155,12 +155,10 @@ class Recycling:
         """
         if initial_node.ic.family != final_node.ic.family:
             return False
-        if self._hot_node_scale_up:
-            if initial_node.ic.cores > final_node.ic.cores or initial_node.ic.mem > final_node.ic.mem:
-                return False
-        else:
-            if initial_node.ic != final_node.ic:
-                return False
+        if initial_node.ic.cores > final_node.ic.cores or initial_node.ic.mem > final_node.ic.mem:
+            return False
+        if initial_node not in self._hot_scale_up_nodes and initial_node.ic != final_node.ic:
+            return False
         return True
 
     def _get_container_pairs(self, initial_containers: list[ContainerGroup], final_containers: list[ContainerGroup]) \
@@ -531,8 +529,6 @@ class Recycling:
                 elif initial_cc == final_cc:
                     self.recycled_containers[initial_node][initial_cc] = replicas
                 else:
-                    a = 1
-
                     if initial_node not in self.scaled_containers:
                         self.scaled_containers[initial_node] = {(initial_cc, final_cc): replicas}
                     else:    

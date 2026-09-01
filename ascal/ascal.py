@@ -50,7 +50,7 @@ class Ascal:
         # Pending workload
         self._pending_workload: dict[App, float] = {app: 0.0 for app in self._autoscaler.apps} 
 
-        # Pairs (time, queue waiting times). Only pairs with at least one possitive QWT are saved
+        # Pairs (time, queue waiting times). Only pairs with at least one positive QWT are saved
         self.queue_waiting_times: list[int, dict[App, float]] =  [] 
 
         self.time = -1 # Current simulation time
@@ -251,6 +251,14 @@ class Ascal:
             # The autoscaler may change the allocation of nodes and containers.
             statistics = self._autoscaler.run(workloads)
 
+            # The number of replicas of each container class must be a positive integer
+            for node in self._autoscaler.allocation:
+                for cg in node.cgs:
+                    rounded_replicas = round(cg.replicas)
+                    assert rounded_replicas > 0 and abs(cg.replicas - rounded_replicas) < 1e-6, \
+                        "Invalid number of replicas"
+                    cg.replicas = int(rounded_replicas)
+
             # Update autoscaling info
             if statistics.perf_changed or statistics.billing_changed or self.time == break_point:
                 allocation_copy = (self.time, deepcopy(self._autoscaler.allocation))
@@ -296,7 +304,7 @@ class Ascal:
                 assert perf[app] - total_w <= 1e-6, f"Performance for {app} is invalid"
                 self._pending_workload[app] = round(max(0.0, total_w - perf[app]), 6)
 
-            # Update queue waiting time samples with possitive values
+            # Update queue waiting time samples with positive values
             added_qwts = {}
             for app in self._autoscaler.apps:
                 if round(self._pending_workload[app], 6) > 0.0:
