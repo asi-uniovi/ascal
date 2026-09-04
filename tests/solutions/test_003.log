@@ -10,13 +10,13 @@
 0:    - Allocated 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) on node c5.12xlarge[0]
 0:    - Allocated 40 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
 0:    - Allocated 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.large[0]
-1:  Transition at 124:116 seconds
+1:  Transition at 124. Duration: 116 seconds
 1:  Predicted loads for 95.0 % percentile:
 1:  - app0 -> 104.00 req/s
 1:  - app1 -> 195.00 req/s
 1:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]', 'c5.large[0]']
 1:  - To   ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
-1:  - Temporal nodes ['c5.18xlarge[0]']
+1:  - Temporal nodes []
 124:  Creating node c5.18xlarge[0]
 144:  Billing of node c5.18xlarge[0] starts
 224:  Node c5.18xlarge[0] is ready to execute containers
@@ -52,13 +52,13 @@
 240:  Node c5.4xlarge[0] is removed
 240:  Node c5.12xlarge[0] is removed
 240:  Node c5.large[0] is removed
-241:  Transition at 364:116 seconds
+241:  Transition at 364. Duration: 116 seconds
 241:  Predicted loads for 95.0 % percentile:
 241:  - app0 -> 112.00 req/s
 241:  - app1 -> 201.00 req/s
 241:  - From ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 241:  - To   ['c5.9xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]']
-241:  - Temporal nodes ['c5.9xlarge[0]', 'c5.12xlarge[0]']
+241:  - Temporal nodes []
 364:  Creating node c5.9xlarge[0]
 364:  Creating node c5.12xlarge[0]
 384:  Billing of node c5.9xlarge[0] starts
@@ -97,13 +97,13 @@
 470:  Removing node c5.18xlarge[0]
 480:  Node c5.xlarge[0] is removed
 480:  Node c5.18xlarge[0] is removed
-481:  Transition at 604:116 seconds
+481:  Transition at 604. Duration: 116 seconds
 481:  Predicted loads for 95.0 % percentile:
 481:  - app0 -> 120.00 req/s
 481:  - app1 -> 207.00 req/s
 481:  - From ['c5.9xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[0]']
 481:  - To   ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
-481:  - Temporal nodes ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.18xlarge[0]']
+481:  - Temporal nodes []
 604:  Creating node c5.xlarge[0]
 604:  Creating node c5.4xlarge[0]
 604:  Creating node c5.18xlarge[0]
@@ -147,13 +147,13 @@
 710:  Removing node c5.12xlarge[0]
 720:  Node c5.9xlarge[0] is removed
 720:  Node c5.12xlarge[0] is removed
-721:  Transition at 844:116 seconds
+721:  Transition at 844. Duration: 116 seconds
 721:  Predicted loads for 95.0 % percentile:
 721:  - app0 -> 124.00 req/s
 721:  - app1 -> 210.00 req/s
 721:  - From ['c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[0]']
 721:  - To   ['c5.24xlarge[0]', 'c5.24xlarge[1]']
-721:  - Temporal nodes ['c5.24xlarge[1]']
+721:  - Temporal nodes []
 844:  Creating node c5.24xlarge[1]
 864:  Billing of node c5.24xlarge[1] starts
 944:  Node c5.24xlarge[1] is ready to execute containers
@@ -185,13 +185,13 @@
 960:  Node c5.xlarge[0] is removed
 960:  Node c5.4xlarge[0] is removed
 960:  Node c5.18xlarge[0] is removed
-961:  Transition at 1078:122 seconds
+961:  Transition at 1078. Duration: 122 seconds
 961:  Predicted loads for 95.0 % percentile:
 961:  - app0 -> 132.00 req/s
 961:  - app1 -> 216.00 req/s
 961:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]']
 961:  - To   ['c5.2xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
-961:  - Temporal nodes ['c5.2xlarge[0]', 'c5.large[-1]']
+961:  - Temporal nodes ['c5.large[-1]']
 1078:  Creating node c5.2xlarge[0]
 1078:  Creating node c5.large[-1]
 1098:  Billing of node c5.2xlarge[0] starts
@@ -206,15 +206,13 @@
 1179:  Removing 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.24xlarge[1]
 1184:  Completed the removal of 1 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.24xlarge[1]
 1184:  Completed the removal of 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.24xlarge[1]
-1184:  Allocating 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
-1184:  Allocating 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
-1185:  Completed the allocation of 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
-1185:  Completed the allocation of 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
+1184:  Allocating 2 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
+1185:  Completed the allocation of 2 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[1]
 1185:  Removing 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.large[-1]
 1190:  Completed the removal of 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.large[-1]
 1190:  Removing node c5.large[-1]
 1200:  Node c5.large[-1] is removed
-1201:  Transition at 1328:228 seconds
+1201:  Transition at 1328. Duration: 228 seconds
 1201:  Predicted loads for 95.0 % percentile:
 1201:  - app0 -> 128.00 req/s
 1201:  - app1 -> 216.15 req/s
@@ -255,13 +253,13 @@
 1546:  Completed the removal of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.2xlarge[0]
 1546:  Removing node c5.2xlarge[0]
 1556:  Node c5.2xlarge[0] is removed
-1557:  Transition at 1564:116 seconds
+1557:  Transition at 1564. Duration: 116 seconds
 1557:  Predicted loads for 95.0 % percentile:
 1557:  - app0 -> 132.00 req/s
 1557:  - app1 -> 216.15 req/s
 1557:  - From ['c5.large[-1]', 'c5.xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1557:  - To   ['c5.2xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
-1557:  - Temporal nodes ['c5.2xlarge[0]']
+1557:  - Temporal nodes []
 1564:  Creating node c5.2xlarge[0]
 1584:  Billing of node c5.2xlarge[0] starts
 1664:  Node c5.2xlarge[0] is ready to execute containers
@@ -283,13 +281,13 @@
 1670:  Removing node c5.xlarge[0]
 1680:  Node c5.large[-1] is removed
 1680:  Node c5.xlarge[0] is removed
-1681:  Transition at 1813:107 seconds
+1681:  Transition at 1813. Duration: 107 seconds
 1681:  Predicted loads for 95.0 % percentile:
 1681:  - app0 -> 132.00 req/s
 1681:  - app1 -> 219.00 req/s
 1681:  - From ['c5.2xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
 1681:  - To   ['c5.large[0]', 'c5.2xlarge[0]', 'c5.24xlarge[0]', 'c5.24xlarge[1]']
-1681:  - Temporal nodes ['c5.large[0]']
+1681:  - Temporal nodes []
 1813:  Creating node c5.large[0]
 1813:  Allocating 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.2xlarge[0]
 1814:  Completed the allocation of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) on node c5.2xlarge[0]
@@ -301,7 +299,7 @@
 1919:  Completed the removal of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.24xlarge[1]
 1919:  Allocating 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) on node c5.24xlarge[1]
 1920:  Completed the allocation of 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) on node c5.24xlarge[1]
-1921:  Transition at 2160:116 seconds
+1921:  Transition at 2160. Duration: 116 seconds
 1921:  Predicted loads for 95.0 % percentile:
 1921:  - app0 -> 128.00 req/s
 1921:  - app1 -> 216.15 req/s
@@ -331,7 +329,7 @@
 2266:  Completed the removal of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) from node c5.2xlarge[0]
 2266:  Removing node c5.2xlarge[0]
 2276:  Node c5.2xlarge[0] is removed
-2277:  Transition at 2400:21 seconds
+2277:  Transition at 2400. Duration: 21 seconds
 2277:  Predicted loads for 95.0 % percentile:
 2277:  - app0 -> 124.00 req/s
 2277:  - app1 -> 216.00 req/s
@@ -354,7 +352,7 @@
 2411:  Completed the removal of 1 replicas app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS) from node c5.xlarge[0]
 2411:  Removing node c5.large[0]
 2421:  Node c5.large[0] is removed
-2422:  Transition at 2640:27 seconds
+2422:  Transition at 2640. Duration: 27 seconds
 2422:  Predicted loads for 95.0 % percentile:
 2422:  - app0 -> 120.00 req/s
 2422:  - app1 -> 213.00 req/s
@@ -373,7 +371,7 @@
 2657:  Completed the removal of 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) from node c5.xlarge[0]
 2657:  Removing node c5.xlarge[0]
 2667:  Node c5.xlarge[0] is removed
-2668:  Transition at 2880:116 seconds
+2668:  Transition at 2880. Duration: 116 seconds
 2668:  Predicted loads for 95.0 % percentile:
 2668:  - app0 -> 112.00 req/s
 2668:  - app1 -> 207.00 req/s
@@ -404,7 +402,7 @@
 2986:  Completed the removal of 30 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.24xlarge[1]
 2986:  Removing node c5.24xlarge[1]
 2996:  Node c5.24xlarge[1] is removed
-2997:  Transition at 3120:116 seconds
+2997:  Transition at 3120. Duration: 116 seconds
 2997:  Predicted loads for 95.0 % percentile:
 2997:  - app0 -> 104.00 req/s
 2997:  - app1 -> 198.00 req/s
@@ -439,7 +437,7 @@
 3226:  Completed the removal of 7 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.4xlarge[0]
 3226:  Removing node c5.4xlarge[0]
 3236:  Node c5.4xlarge[0] is removed
-3237:  Transition at 3360:27 seconds
+3237:  Transition at 3360. Duration: 27 seconds
 3237:  Predicted loads for 95.0 % percentile:
 3237:  - app0 -> 96.00 req/s
 3237:  - app1 -> 195.00 req/s

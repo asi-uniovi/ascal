@@ -94,7 +94,7 @@
 540:  Current replicas 1x of app0 134, desired 137
 540:  Load of app1: 189.55 req/s
 540:  Current replicas 1x of app1 247, desired 271
-541:  Transition calculation: 122.000 seconds
+541:  Transition at 541 seconds. Duration: 122 seconds
 541:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.xlarge[0]', 'c5.large[0]', 'c5.xlarge[1]', 'c5.large[1]', 'c5.2xlarge[0]', 'c5.2xlarge[1]']
 541:  - To   ['c5.2xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[1]', 'c5.24xlarge[0]']
 541:  - Temporal nodes []
@@ -217,7 +217,7 @@
 1080:  Creating node c5.xlarge[3]
 1101:  Billing of node c5.xlarge[3] starts
 1181:  Node c5.xlarge[3] is ready to execute containers
-1181:  Transition calculation: 122.000 seconds
+1181:  Transition at 1181 seconds. Duration: 122 seconds
 1181:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.2xlarge[0]', 'c5.9xlarge[0]', 'c5.xlarge[0]', 'c5.xlarge[1]', 'c5.xlarge[2]', 'c5.xlarge[3]']
 1181:  - To   ['c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.24xlarge[1]', 'c5.24xlarge[0]', 'c5.large[0]']
 1181:  - Temporal nodes ['c5.large[-1]']
@@ -273,14 +273,12 @@
 1287:  Completed the removal of 5 replicas app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS) from node c5.24xlarge[0]
 1287:  Completed the removal of 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.24xlarge[0]
 1287:  Completed the removal of 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) from node c5.24xlarge[0]
-1287:  Allocating 4 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
-1287:  Allocating 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
+1287:  Allocating 5 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
 1287:  Removing node c5.2xlarge[0]
 1287:  Removing node c5.9xlarge[0]
 1287:  Removing node c5.xlarge[0]
 1287:  Removing node c5.xlarge[3]
-1288:  Completed the allocation of 4 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
-1288:  Completed the allocation of 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
+1288:  Completed the allocation of 5 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) on node c5.24xlarge[0]
 1288:  Removing 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) from node c5.xlarge[1]
 1288:  Removing 1 replicas app1-c5_m5_r5(0.6C, 0.5G, 2.0RPS) from node c5.xlarge[2]
 1288:  Removing 1 replicas app1-c5_m5_r5(0.3C, 0.5G, 1.0RPS) from node c5.xlarge[2]
@@ -365,7 +363,7 @@
 1740:  Current replicas 1x of app0 168, desired 166
 1740:  Load of app1: 207.65 req/s
 1740:  Current replicas 1x of app1 297, desired 297
-1800:  Transition calculation: 122.000 seconds
+1800:  Transition at 1800 seconds. Duration: 122 seconds
 1800:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.4xlarge[0]', 'c5.12xlarge[0]', 'c5.large[0]', 'c5.xlarge[0]', 'c5.large[1]', 'c5.large[2]', 'c5.large[3]']
 1800:  - To   ['c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[1]', 'c5.24xlarge[0]']
 1800:  - Temporal nodes ['c5.large[-1]']
@@ -478,7 +476,7 @@
 2340:  Current replicas 1x of app1 299, desired 295
 2340:  Removing 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.24xlarge[0]
 2345:  Completed the removal of 1 replicas app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS) from node c5.24xlarge[0]
-2400:  Transition calculation: 21.000 seconds
+2400:  Transition at 2400 seconds. Duration: 21 seconds
 2400:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.xlarge[0]', 'c5.18xlarge[0]', 'c5.large[1]']
 2400:  - To   ['c5.18xlarge[0]', 'c5.24xlarge[1]', 'c5.24xlarge[0]']
 2400:  - Temporal nodes []
@@ -550,7 +548,7 @@
 2940:  Current replicas 1x of app1 288, desired 282
 2940:  Removing 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) from node c5.24xlarge[0]
 2945:  Completed the removal of 1 replicas app1-c5_m5_r5(1.2C, 0.5G, 4.0RPS) from node c5.24xlarge[0]
-3000:  Transition calculation: 122.000 seconds
+3000:  Transition at 3000 seconds. Duration: 122 seconds
 3000:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.18xlarge[0]']
 3000:  - To   ['c5.4xlarge[0]', 'c5.9xlarge[0]', 'c5.24xlarge[1]', 'c5.24xlarge[0]', 'c5.large[0]']
 3000:  - Temporal nodes ['c5.large[-1]']

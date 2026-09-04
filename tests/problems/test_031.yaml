@@ -1,10 +1,14 @@
+# All available autoscalers
 autoscalers:
   hv_predictive: # Horizontal/vertical+predictive autoscaling
-    prediction_window: 240 # Prediction window in seconds
+    prediction_window: 300 # Prediction window in seconds
     prediction_percentile: 95 # Percentile for application's load in the prediction window
-    algorithm: fcma, rbt1 # Allocation/transition algorithm
-    hot_container_scale: True # Hot scaling-up and scaling-down of containers
-    
+    algorithm: fcma, rbt2  # Allocation/transition algorithm
+    hot_node_scale_up: True # True if hot scaling-up of nodes is possible
+    hot_container_scale: True # True if hot scaling-up and scaling-down of containers is possible
+    tolerance_cost: 0.05 # Minimum relative cost decrement to enable the transition part related
+                         # to applications with decreasing workload
+  
 # Select autoscaler
 autoscaler: hv_predictive
 
@@ -21,27 +25,27 @@ timing_args:
 
 # Define applications
 apps:
-  app0:
+  $A_0$:
     load:
-      file: ../../traces/triangle_rand.csv # Integer load samples in req/s
-      time_interval: 1 # Integer time in seconds between two consecutive samples
+      file: ../../traces/trapezoid1.csv # Integer load samples in req/s
+      time_interval: 60 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
-      load_offset: 10 # Integer value to be added to every load sample
-      load_mult: 4 # Multiplier for the load samples (multiplies also the load offset)
+      load_offset: 0 # Integer value to be added to every load sample
+      load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
       cpu: 260 mcores
       mem: 0.420 GiB
       perf: 1 req/s
       aggs: [1, 2, 4]
-  app1:
+  $A_1$:
     load:
-      file: ../../traces/triangle_rand.csv # Integer load samples in req/s
-      time_interval: 1 # Integer time in seconds between two consecutive samples
+      file: ../../traces/trapezoid2.csv # Integer load samples in req/s
+      time_interval: 60 # Integer time in seconds between two consecutive samples
       repeat: 1 # The whole set of samples in the file is repeated this number of times
-      load_offset: 50 # Integer value to be added to every load sample
-      load_mult: 3 # Multiplier for the load samples (multiplies also the load offset)
-      time_offset: 100 # Advance this number of samples and complete with the last value
+      load_offset: 0 # Integer value to be added to every load sample
+      load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
+      time_offset: 0 # Advance this number of samples and complete with the last value
     container:
       cpu: 300 mcores
       mem: 0.500 GiB
@@ -51,6 +55,4 @@ apps:
 # Simulation time in seconds.
 # If application traces are short, the last load in the trace is repeated.
 # If application traces are too long, they are truncated at the end.
-simulation_time: 3600
-
-
+simulation_time: 86400 # 24 hours

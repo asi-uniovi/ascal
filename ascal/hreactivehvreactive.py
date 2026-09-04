@@ -97,6 +97,9 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         # Time required to calculate the transition
         transition_calc_time = 0
 
+        # Time to perform the transition
+        transition_time = 0
+
         # If it is the first execution
         if self.time == 0:
             # Initialize the HV application load in the last period
@@ -110,7 +113,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
                                                 hot_node_scale_up=self._hot_node_scale_up,
                                                 hot_container_scale=self._hot_container_scale)
             super().run(app_workloads)
-            statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
+            statistics = AutoscalerStatistics(True, True, 0, 0, current_time() - initial_time,
                                               Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
             return statistics
 
@@ -144,7 +147,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             self.time += 1
             self._timedops.dispatch_events(self.time)
             statistics = AutoscalerStatistics(self._timedops.node_billing_changed, self._timedops.perf_changed,
-                                              0, current_time() - initial_time, Recycling.INVALID_RECYCLING,
+                                              0, 0, current_time() - initial_time, Recycling.INVALID_RECYCLING,
                                               Recycling.INVALID_RECYCLING)
             return statistics
 
@@ -193,7 +196,7 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         self.time += 1
 
         statistics = AutoscalerStatistics(self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed,
-                                          transition_calc_time, current_time() - initial_time, node_recycling_level,
-                                          container_recycling_level)
+                                          transition_time, transition_calc_time, 
+                                          current_time() - initial_time, node_recycling_level, container_recycling_level)
         return statistics
 

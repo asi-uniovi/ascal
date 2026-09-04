@@ -79,7 +79,7 @@ class HVReactiveAutoscaler(Autoscaler):
                 NodeStates.set_state(node, NodeStates.READY)
             self._app_loads = {app: [workload] for app, workload in app_workloads.items()}
             self.time += 1
-            statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time, 
+            statistics = AutoscalerStatistics(True, True, 0, 0, current_time() - initial_time, 
                                               Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
             return statistics
 
@@ -87,8 +87,11 @@ class HVReactiveAutoscaler(Autoscaler):
         for app in app_workloads:
             self._app_loads[app].append(app_workloads[app])
 
-        # Time required to perform the transition
+        # Time required to calculate the transition
         transition_calc_time = 0
+
+        # Times two perform the transition
+        transition_time = 0
 
         # A new allocation is calculated every time period if there are no pending transitions
         if self.time % self._time_period == 0:
@@ -109,12 +112,12 @@ class HVReactiveAutoscaler(Autoscaler):
                 # Use FCMA algorithm to calculate the new allocation
                 self._new_allocation = self._solve_allocation(incremented_workloads, self._allocation_solver)
                 # Calculate the transition between the previous allocation and the new one
-                transition_time_start = current_time()
+                transition_calc_time_start = current_time()
                 for node in self.allocation + self._new_allocation:
                     NodeStates.set_state(node, NodeStates.READY)
                 commands, transition_time = \
                     self._transition.calculate_transition_plan_sync(self.allocation, self._new_allocation)
-                transition_calc_time = current_time() - transition_time_start
+                transition_calc_time = current_time() - transition_calc_time_start
                 self.log(f"Transition at {self.time} seconds. Duration: {transition_time} seconds")
                 self.log(f"- From {[str(node) for node in self.allocation]}")
                 self.log(f"- To   {[str(node) for node in self._new_allocation]}")
@@ -140,7 +143,7 @@ class HVReactiveAutoscaler(Autoscaler):
         self.time += 1
 
         statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
-                                          transition_calc_time, current_time() - initial_time, node_recycling_level,
-                                          container_recycling_level)
+                                          transition_time, transition_calc_time, current_time() - initial_time, 
+                                          node_recycling_level, container_recycling_level)
         return statistics
 

@@ -55,7 +55,8 @@ class Ascal:
 
         self.time = -1 # Current simulation time
         self.last_time = len(next(iter(self._workload_vectors.values()))) - 1 # Last simulation time
-        self.calc_times: dict[str, list[float]] = {"transition_times": [], "total_times": []} # Calculation times
+        self.calc_times: dict[str, list[float]] = {"transition": [], "total": []} # Calculation times
+        self.transition_times: list[float] = [] # Transition times
         self.node_recycling_levels: list[float] = [] # List of node recycling levels
         self.container_recycling_levels: list[float] = [] # List of container recycling levels
         # Allocation changes and billing changes as pairs (time, allocation). Billing can change some time
@@ -313,8 +314,9 @@ class Ascal:
                 self.queue_waiting_times.append((self.time, added_qwts))
 
             # Save transition statistics
-            self.calc_times["transition_times"].append(statistics.transition_time)
-            self.calc_times["total_times"].append(statistics.total_time)
+            self.calc_times["transition"].append(statistics.transition_calc_time)
+            self.calc_times["total"].append(statistics.total_calc_time)
+            self.transition_times.append(statistics.transition_time)
             self.node_recycling_levels.append(statistics.node_recycling_level)
             self.container_recycling_levels.append(statistics.container_recycling_level)
         self._autoscaler.log_allocation_summary()

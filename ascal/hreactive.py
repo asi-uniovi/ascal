@@ -403,7 +403,7 @@ class HReactiveAutoscaler(Autoscaler):
             # Node creation time and container allocation time are assumed to be zero for the initial allocation
             self.allocation = self._initial_allocation(app_workloads)
             self.time += 1
-            statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
+            statistics = AutoscalerStatistics(True, True, 0, 0, current_time() - initial_time,
                                               Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
             return statistics
         else:
@@ -437,7 +437,7 @@ class HReactiveAutoscaler(Autoscaler):
 
             self.time += 1
             statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
-                                              0, current_time() - initial_time, Recycling.INVALID_RECYCLING,
+                                              0, 0, current_time() - initial_time, Recycling.INVALID_RECYCLING,
                                               Recycling.INVALID_RECYCLING)
             return statistics
 

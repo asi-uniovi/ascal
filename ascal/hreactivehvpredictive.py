@@ -4,7 +4,7 @@ Implement a mixed horizontal and horizontal/vertical predictive autoscaler
 
 from time import time as current_time
 from copy import deepcopy
-from fcma import App, RequestsPerTime
+from fcma import App, RequestsPerTime, Vm
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
 from ascal.autoscalers import AllocationSolver, Autoscaler, AutoscalerStatistics
@@ -71,7 +71,7 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         Disable horizontal node/container creation/removal operations when they are too close
         to the next horizontal/vertical prediction window.
         """
-        transition_time = self._transition.get_worst_case_transition_time()
+        transition_time = self._worst_case_transition_time
         if self.time + self.timing_args.node_creation_time >= self._next_prediction_window_time - transition_time:
             self._enable_node_creation = False
         else:
@@ -88,6 +88,17 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             self._enable_container_removal = False
         else:
             self._enable_container_removal = True
+
+    @staticmethod
+    def _get_same_ic_recycled_nodes(initial_alloc: list[Vm], final_alloc: list[Vm]) -> list[Vm]:
+        """
+        Get recycled nodes with the same instance class in the initial and final allocations.
+        :param initial_alloc: Initial allocation.
+        :param final_alloc: Final allocation.
+        :return: List of recycled nodes with the same instance class in the initial and final allocations.
+        """
+        node_recyclings = Recycling(initial_alloc, final_alloc)
+        return list(node_recyclings.recycled_node_pairs.keys())
 
     def run(self, app_workloads: dict[App, RequestsPerTime]) -> AutoscalerStatistics:
         """
@@ -110,14 +121,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             # Initialize the transition
             if self._transition_algorithm == TransitionAlgorithm.BASELINE:
                 ValueError("'baseline' transition is not valid for the horizontal/vertical predictive autoscaler")
-            else:
-                self._transition = TransitionRBT(self.timing_args, self.system, 
-                                                transition_algorithm=self._transition_algorithm,
-                                                hot_node_scale_up=self._hot_node_scale_up,
-                                                hot_container_scale=self._hot_container_scale)
-                
             super().run(app_workloads)
-            statistics = AutoscalerStatistics(True, True, 0, current_time() - initial_time,
+            statistics = AutoscalerStatistics(True, True, 0, 0, current_time() - initial_time,
                                               Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
             return statistics
 
@@ -125,8 +130,14 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         for app in app_workloads:
             self._hv_app_loads[app].append(app_workloads[app])
 
-        # If HV autoscaling is not in progress, and there is enough time until the first transition
-        latest_h_time = self._next_prediction_window_time - self._transition.get_worst_case_transition_time()
+        # A dummy transition to calculate the worst case transition time. 
+        # The transition is not used to perform any transition
+        self._dummy_transition = TransitionRBT(self.timing_args, self.system, 
+                                               transition_algorithm=self._transition_algorithm)
+        self._worst_case_transition_time = self._dummy_transition.get_worst_case_transition_time()
+
+        # If HV autoscaling is not in progress, and there is enough time until the beginning of the first transition
+        latest_h_time = self._next_prediction_window_time - self._worst_case_transition_time
         if self.time <  latest_h_time and self._hv_timedops.is_event_list_empty():
             self.enable_disable_close_h_operations()
             # Perform H autoscaling. Note that calling run() method increments the value of self.time
@@ -138,8 +149,12 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         for app in app_workloads:
             self._app_loads[app].append(app_workloads[app])
 
-        # Time required to perform the transition
-        transition_time = 0
+        # Time required to calculate the transition
+        transition_calc_time = 0
+
+        # Times two perform the two transitions
+        transition1_time = 0
+        transition2_time = 0
 
         # Perform an HV transition after completing any event of the horizontal autoscaler
         if self._hv_timedops.is_event_list_empty() and self._next_prediction_window_time in self.predicted_workloads:
@@ -165,9 +180,27 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             if (intermediate_cost - new_cost) / intermediate_cost <= self._hv_tolerance_cost:
                 self._new_allocation = deepcopy(intermediate_allocation)
 
-            # Calculate the transition from the current allocation to the intermediate allocation
+            # We need to measure the time required to calculate the transition
+            transition_calc_time_start = current_time()
+                
             for node in self.allocation + intermediate_allocation:
                 NodeStates.set_state(node, NodeStates.READY)
+
+            # Calculate the transition from the current allocation to the intermediate allocation
+            # Those nodes with the same instance class and a high probability of being recycled 
+            # work with hot node scaling-up disabled in the first transition.
+            # Note that these nodes may be otherwise scaled-up to obtain an upgraded node in the first transition,
+            # and the process should be reversed with a new node creation and a a node removal in the
+            # second transition
+            if self._hot_node_scale_up:
+                common_nodes = self._get_same_ic_recycled_nodes(self.allocation, self._new_allocation) 
+                hot_node_scale_up = [node for node in self.allocation if node not in common_nodes]
+            else:
+                hot_node_scale_up = False # Disable hot node scaling-up in the first transition
+            self._transition = TransitionRBT(self.timing_args, self.system, 
+                                             transition_algorithm=self._transition_algorithm,
+                                             hot_node_scale_up=hot_node_scale_up,
+                                             hot_container_scale=self._hot_container_scale)
             commands1, _ = self._transition.calculate_transition_plan_sync(self.allocation, intermediate_allocation)
 
             # Recycling levels coming from the first transition
@@ -187,6 +220,10 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
                 for node in removed_nodes
             }
             intermediate_allocation.extend([node.clear() for node in removed_nodes])
+            self._transition = TransitionRBT(self.timing_args, self.system, 
+                                             transition_algorithm=self._transition_algorithm,
+                                             hot_node_scale_up=self._hot_node_scale_up,
+                                             hot_container_scale=self._hot_container_scale)
             commands2, _ = self._transition.calculate_transition_plan_sync(intermediate_allocation, new_allocation)
             for node in removed_nodes:
                 node.free_cores, node.free_mem, node.cgs, node.history = removed_nodes_backup[node]
@@ -200,6 +237,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
 
             # Common node removals in both transitions must be handled
             Autoscaler._handle_node_removals(commands1, commands2, new_allocation)
+
+            transition_calc_time = current_time() - transition_calc_time_start
 
             # Calculate the times for the two transitions
             transition1_time = self._transition.get_transition_time(commands1, self.timing_args)
@@ -238,7 +277,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         self.time += 1
 
         statistics = AutoscalerStatistics(self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed,
-                                          transition_time, current_time() - initial_time,
+                                          transition1_time + transition2_time,
+                                          transition_calc_time, current_time() - initial_time,
                                           min(node_recycling_level1, node_recycling_level2),
                                           min(container_recycling_level1, container_recycling_level2))
         return statistics

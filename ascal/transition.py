@@ -65,7 +65,6 @@ from ascal.helper import (
     similar_ccs
 )
 
-
 class TransitionAlgorithm(Enum):
     """
     Different algorithms for calculating the transition between two allocations.
@@ -677,13 +676,13 @@ class TransitionRBT(Transition):
 
     def __init__(self, timing_args: TimedOps.TimingArgs, system: System, 
                  transition_algorithm: TransitionAlgorithm.RBT,
-                 hot_scale_up_nodes: bool|list[Vm] = True, hot_container_scale: bool = False):
+                 hot_node_scale_up: bool|list[Vm] = False, hot_container_scale: bool = False):
         """
         Creates an object for transition between two allocations.
         :param timing_args: Creation/removal/scaling times for containers and nodes.
         :param system: Applications's performance on different container classes and available instance classes.
         :param transition_algorithm: The specific RBT variant to use (RBT1 or RBT2).
-        :param hot_scale_up_nodes: Nodes with hot node scaling-up enabled.
+        :param hot_node_scale_up: Set to enable hot node scaling-up for all the nodes or a given subset in the list.
         :param hot_container_scale: Set to enable hot container scaling-up and scaling-down.
         """
         self._timing_args: TimedOps.TimingArgs = timing_args
@@ -697,7 +696,7 @@ class TransitionRBT(Transition):
         self._app_perf_increment: defaultdict[App, RequestsPerTime]  = None
         self._allocatable_cs_next_step: list[tuple[Vm, ContainerClass, int]] = []
         self._unallocated_containers_in_new_nodes: list[tuple[Vm, ContainerClass, int]] = []
-        self._hot_scale_up_nodes = hot_scale_up_nodes
+        self._hot_node_scale_up = hot_node_scale_up
         self._hot_container_scale = hot_container_scale
         self._commands: list[Command] = None
         self._sync_on_next_alloc_upgraded_nodes = True
@@ -1782,10 +1781,13 @@ class TransitionRBT(Transition):
 
         # Calculate recycled node pairs, new nodes, nodes to remove, recycled containers, new containers
         # and containers to remove when transitioning from the initial allocation to the final allocation
-        if self._hot_scale_up_nodes is True:
-            self._hot_scale_up_nodes = initial_alloc # All the nodes in the initial allocation can be sacled-up
-        self._recycling_vm = Recycling(initial_alloc, final_alloc, self._hot_scale_up_nodes, self._hot_container_scale)
-        
+        if self._hot_node_scale_up is True:
+            hot_scale_up_nodes = initial_alloc # All the nodes in the initial allocation can be scaled-up
+        elif self._hot_node_scale_up is False:
+            hot_scale_up_nodes = [] # No nodes can be scaled-up
+        else:
+            hot_scale_up_nodes = self._hot_node_scale_up # Only the nodes in the list can be scaled-up
+        self._recycling_vm = Recycling(initial_alloc, final_alloc, hot_scale_up_nodes, self._hot_container_scale)
         self._recycling = RecyclingVmt(self._recycling_vm, vm_to_vmt)
 
         if self._hot_container_scale:

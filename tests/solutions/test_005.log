@@ -71,10 +71,7 @@
 420:  Current replicas 1x of app0 127, desired 132
 420:  Load of app1: 185.05 req/s
 420:  Current replicas 1x of app1 240, desired 265
-478:  Transition at 484, calculation: 116.000 seconds
-478:  Predicted loads for 95.0 % percentile:
-478:  - app0 -> 120.00 req/s
-478:  - app1 -> 210.00 req/s
+478:  Transition at 484. Duration: 116.000 seconds
 478:  - From ['c5.24xlarge[0]', 'c5.24xlarge[1]', 'c5.xlarge[0]', 'c5.large[0]', 'c5.xlarge[1]', 'c5.large[1]', 'c5.2xlarge[0]']
 478:  - To   ['c5.large[0]', 'c5.xlarge[0]', 'c5.4xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[1]']
 478:  - Temporal nodes ['c5.4xlarge[0]', 'c5.18xlarge[0]']
@@ -185,10 +182,7 @@
 1020:  Current replicas 1x of app0 153, desired 154
 1020:  Load of app1: 198.20 req/s
 1020:  Current replicas 1x of app1 247, desired 284
-1078:  Transition at 1084, calculation: 116.000 seconds
-1078:  Predicted loads for 95.0 % percentile:
-1078:  - app0 -> 128.00 req/s
-1078:  - app1 -> 216.00 req/s
+1078:  Transition at 1084. Duration: 116.000 seconds
 1078:  - From ['c5.24xlarge[1]', 'c5.xlarge[0]', 'c5.large[0]', 'c5.4xlarge[0]', 'c5.18xlarge[0]', 'c5.4xlarge[1]', 'c5.4xlarge[2]', 'c5.2xlarge[0]']
 1078:  - To   ['c5.large[0]', 'c5.xlarge[0]', 'c5.24xlarge[1]', 'c5.24xlarge[2]']
 1078:  - Temporal nodes ['c5.24xlarge[2]']
@@ -305,10 +299,7 @@
 1620:  Current replicas 1x of app0 168, desired 168
 1620:  Load of app1: 208.05 req/s
 1620:  Current replicas 1x of app1 271, desired 298
-1678:  Transition at 1779, calculation: 21.000 seconds
-1678:  Predicted loads for 95.0 % percentile:
-1678:  - app0 -> 132.00 req/s
-1678:  - app1 -> 219.00 req/s
+1678:  Transition at 1779. Duration: 21.000 seconds
 1678:  - From ['c5.24xlarge[1]', 'c5.xlarge[0]', 'c5.large[0]', 'c5.24xlarge[2]', 'c5.9xlarge[0]', 'c5.2xlarge[0]', 'c5.large[1]', 'c5.2xlarge[1]']
 1678:  - To   ['c5.large[0]', 'c5.2xlarge[0]', 'c5.24xlarge[1]', 'c5.24xlarge[2]']
 1678:  - Temporal nodes []
@@ -407,10 +398,7 @@
 2220:  Current replicas 1x of app0 170, desired 165
 2220:  Load of app1: 207.65 req/s
 2220:  Current replicas 1x of app1 273, desired 297
-2278:  Transition at 2379, calculation: 21.000 seconds
-2278:  Predicted loads for 95.0 % percentile:
-2278:  - app0 -> 120.00 req/s
-2278:  - app1 -> 213.00 req/s
+2278:  Transition at 2379. Duration: 21.000 seconds
 2278:  - From ['c5.24xlarge[1]', 'c5.large[0]', 'c5.24xlarge[2]', 'c5.2xlarge[0]', 'c5.9xlarge[0]', 'c5.2xlarge[1]', 'c5.2xlarge[2]']
 2278:  - To   ['c5.24xlarge[1]', 'c5.24xlarge[2]']
 2278:  - Temporal nodes []
@@ -505,10 +493,7 @@
 2820:  Current replicas 1x of app0 159, desired 149
 2820:  Load of app1: 200.10 req/s
 2820:  Current replicas 1x of app1 267, desired 286
-2878:  Transition at 2884, calculation: 116.000 seconds
-2878:  Predicted loads for 95.0 % percentile:
-2878:  - app0 -> 104.00 req/s
-2878:  - app1 -> 201.00 req/s
+2878:  Transition at 2884. Duration: 116.000 seconds
 2878:  - From ['c5.24xlarge[1]', 'c5.24xlarge[2]', 'c5.9xlarge[0]', 'c5.2xlarge[0]', 'c5.2xlarge[1]']
 2878:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]', 'c5.24xlarge[1]']
 2878:  - Temporal nodes ['c5.18xlarge[0]']

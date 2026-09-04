@@ -14,9 +14,7 @@
 360:  Current replicas 1x of app0 1, desired 1
 420:  Load of app0: 0.00 req/s
 420:  Current replicas 1x of app0 1, desired 1
-478:  Transition at 600, calculation: 0.000 seconds
-478:  Predicted loads for 95.0 % percentile:
-478:  - app0 -> 0.00 req/s
+478:  Transition at 600. Duration: 0.000 seconds
 478:  - From ['c5.large[0]']
 478:  - To   ['c5.large[0]']
 478:  - Temporal nodes []
@@ -40,9 +38,7 @@
 960:  Current replicas 1x of app0 1, desired 1
 1020:  Load of app0: 0.00 req/s
 1020:  Current replicas 1x of app0 1, desired 1
-1078:  Transition at 1084, calculation: 116.000 seconds
-1078:  Predicted loads for 95.0 % percentile:
-1078:  - app0 -> 100.00 req/s
+1078:  Transition at 1084. Duration: 116.000 seconds
 1078:  - From ['c5.large[0]']
 1078:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]']
 1078:  - Temporal nodes ['c5.2xlarge[0]', 'c5.18xlarge[0]']
@@ -81,9 +77,7 @@
 1560:  Current replicas 1x of app0 143, desired 143
 1620:  Load of app0: 100.00 req/s
 1620:  Current replicas 1x of app0 143, desired 143
-1678:  Transition at 1785, calculation: 15.000 seconds
-1678:  Predicted loads for 95.0 % percentile:
-1678:  - app0 -> 100.00 req/s
+1678:  Transition at 1785. Duration: 15.000 seconds
 1678:  - From ['c5.2xlarge[0]', 'c5.18xlarge[0]', 'c5.9xlarge[0]']
 1678:  - To   ['c5.2xlarge[0]', 'c5.18xlarge[0]']
 1678:  - Temporal nodes []
@@ -114,9 +108,7 @@
 2160:  Current replicas 1x of app0 143, desired 143
 2220:  Load of app0: 100.00 req/s
 2220:  Current replicas 1x of app0 143, desired 143
-2278:  Transition at 2385, calculation: 131.000 seconds
-2278:  Predicted loads for 95.0 % percentile:
-2278:  - app0 -> 0.00 req/s
+2278:  Transition at 2385. Duration: 131.000 seconds
 2278:  - From ['c5.2xlarge[0]', 'c5.18xlarge[0]', 'c5.9xlarge[0]']
 2278:  - To   ['c5.large[0]']
 2278:  - Temporal nodes []
@@ -151,9 +143,7 @@
 2760:  Current replicas 1x of app0 1, desired 1
 2820:  Load of app0: 0.00 req/s
 2820:  Current replicas 1x of app0 1, desired 1
-2878:  Transition at 3000, calculation: 0.000 seconds
-2878:  Predicted loads for 95.0 % percentile:
-2878:  - app0 -> 0.00 req/s
+2878:  Transition at 3000. Duration: 0.000 seconds
 2878:  - From ['c5.large[0]']
 2878:  - To   ['c5.large[0]']
 2878:  - Temporal nodes []

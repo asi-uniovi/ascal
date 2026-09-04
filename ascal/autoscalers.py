@@ -33,8 +33,9 @@ class AutoscalerStatistics:
     """
     perf_changed: bool # True if the allocation/performance has changed
     billing_changed: bool # True if the system cost has changed
-    transition_time: float # Time to calculate the transition
-    total_time: float # Time to perform all the autoscaling calculations (includes transition)
+    transition_time: float # Time to perform the transition
+    transition_calc_time: float # Time to calculate the transition
+    total_calc_time: float # Time to perform all the autoscaling calculations (includes transition)
     node_recycling_level: float = 0.0 # Node recycling level in [0, 1]
     container_recycling_level: float = 0.0 # Container recycling level in [0,1]
 

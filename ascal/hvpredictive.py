@@ -81,7 +81,7 @@ class HVPredictiveAutoscaler(Autoscaler):
         self._waiting_to_start_transition_calculation = True
         self.time += 1
 
-        return AutoscalerStatistics(True, True, 0, current_time() - initial_time, 0, 0)
+        return AutoscalerStatistics(True, True, 0, 0, current_time() - initial_time, 0, 0)
 
     def run(self, dummy) -> tuple[bool, bool, float]:
         """
@@ -111,6 +111,9 @@ class HVPredictiveAutoscaler(Autoscaler):
 
         # Time required to perform the transition
         transition_calc_time = 0
+
+        # Time to perform the transition
+        transition_time = 0
 
         # An allocation for the next prediction window is calculated when the transition for the current window ends
         if self.time % self._prediction_window == 0:
@@ -162,12 +165,12 @@ class HVPredictiveAutoscaler(Autoscaler):
         self.time += 1
 
         statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
-                                          transition_calc_time, current_time() - initial_time, node_recycling_level,
-                                          container_recycling_level)
+                                          transition_time, transition_calc_time, current_time() - initial_time, 
+                                          node_recycling_level, container_recycling_level)
         return statistics
 
     @staticmethod
-    def get_same_ic_recycled_nodes(initial_alloc: list[Vm], final_alloc: list[Vm]) -> list[Vm]:
+    def _get_same_ic_recycled_nodes(initial_alloc: list[Vm], final_alloc: list[Vm]) -> list[Vm]:
         """
         Get recycled nodes with the same instance class in the initial and final allocations.
         :param initial_alloc: Initial allocation.
@@ -233,18 +236,13 @@ class HVPredictiveAutoscaler(Autoscaler):
             # and the process should be reversed with a new node creation and a a node removal in the
             # second transition
             if self._hot_node_scale_up:
-                self._hot_scale_up_nodes = [
-                    node
-                    for node in self.allocation
-                    if node not in self.get_same_ic_recycled_nodes(self.allocation, self._new_allocation)
-                ]
+                common_nodes = self._get_same_ic_recycled_nodes(self.allocation, self._new_allocation) 
+                hot_node_scale_up = [node for node in self.allocation if node not in common_nodes]
             else:
-                self._hot_scale_up_nodes = []
-
-            # Initialize the first RBT transition. The initialization of RBT transitions depend on workload predictions
+                hot_node_scale_up = False # Disable hot node scaling-up in the first transition
             self._transition = TransitionRBT(self.timing_args, self.system, 
                                              transition_algorithm=self._transition_algorithm,
-                                             hot_scale_up_nodes=self._hot_scale_up_nodes,
+                                             hot_node_scale_up=hot_node_scale_up,
                                              hot_container_scale=self._hot_container_scale)
 
             # Calculate the transition from the current allocation to the intermediate allocation
@@ -276,7 +274,7 @@ class HVPredictiveAutoscaler(Autoscaler):
             # Second transition. All the nodes can scale-up in the second transition
             self._transition = TransitionRBT(self.timing_args, self.system, 
                                              transition_algorithm=self._transition_algorithm,
-                                             hot_scale_up_nodes=True,
+                                             hot_node_scale_up=self._hot_node_scale_up,
                                              hot_container_scale=self._hot_container_scale)
             commands2, _ = self._transition.calculate_transition_plan_sync(intermediate_allocation, 
                                                                            self._new_allocation)
@@ -294,8 +292,8 @@ class HVPredictiveAutoscaler(Autoscaler):
             Autoscaler._handle_node_removals(commands1, commands2, self._new_allocation)
 
             # Calculate the times for the two transitions
-            transition1_time = self._transition.get_transition_time(commands1, self.timing_args)
-            transition2_time = self._transition.get_transition_time(commands2, self.timing_args)
+            transition1_time = TransitionRBT.get_transition_time(commands1, self.timing_args)
+            transition2_time = TransitionRBT.get_transition_time(commands2, self.timing_args)
 
             # Log transition info when a transition is performed
             if len(commands1) > 0 or len(commands2) > 0:
