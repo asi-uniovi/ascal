@@ -1,0 +1,467 @@
+0:
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+251:
+  c5.large--1:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+257:
+  c5.large--1:
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 1
+401:
+  c5.large-0:
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+  c5.xlarge-0:
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 1
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+  c5.xlarge-1:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+407:
+  c5.xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 1
+  c5.xlarge-1:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+551:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 2
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 1
+  c5.xlarge-1:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+701:
+  c5.2xlarge-0:
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 2
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+  c5.large--1:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+707:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
+  c5.large--1:
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+  c5.large-0:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+851:
+  c5.2xlarge-0:
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+857:
+  c5.2xlarge-0:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+1001:
+  c5.2xlarge-0:
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 3
+  c5.4xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 4
+  c5.large-0:
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+  c5.xlarge-0:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+1151:
+  c5.4xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 4
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+  c5.large--1:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1157:
+  c5.4xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 5
+  c5.large--1:
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1301:
+  c5.4xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 5
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+  c5.large--1:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1307:
+  c5.4xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large--1:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1451:
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+  c5.large--1:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+  c5.large-0:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+  c5.xlarge-1:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1457:
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large--1:
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+  c5.xlarge-1:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1601:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 3
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.xlarge-0:
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+  c5.xlarge-1:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+1751:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1757:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1901:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large--1:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+1907:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large--1:
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+2051:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large--1:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+2057:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 3
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large--1:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+  c5.xlarge-0:
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+2201:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+  c5.xlarge--1:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+2207:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge--1:
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+2351:
+  c5.2xlarge-0:
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 2
+    None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large-0:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+  c5.xlarge-1:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+2501:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.xlarge-0:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+  c5.xlarge-1:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+2550:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+2701:
+  c5.2xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 2
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+2951:
+  c5.2xlarge-0:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 2
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+3000:
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 6
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+3150:
+  c5.4xlarge-0:
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 5
+    None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+3156:
+  c5.4xlarge-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 5
+  c5.large-0:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+  c5.xlarge-0:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+3401:
+  c5.2xlarge-0:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 3
+  c5.4xlarge-0:
+    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 5
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+3450:
+  c5.2xlarge-0:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 2
+    None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 1
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+  c5.xlarge-0:
+    $A_0$-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+3456:
+  c5.2xlarge-0:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 2
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+  c5.xlarge-0:
+    None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+3599:
+  c5.2xlarge-0:
+    $A_1$-c5_m5_r5(0.3C, 0.5G, 1.0RPS): 1
+    $A_1$-c5_m5_r5(0.6C, 0.5G, 2.0RPS): 1
+    $A_1$-c5_m5_r5(1.2C, 0.5G, 4.0RPS): 2
+  c5.large-0:
+    $A_0$-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    $A_0$-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1

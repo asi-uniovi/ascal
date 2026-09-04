@@ -197,6 +197,10 @@ class HVPredictiveAutoscaler(Autoscaler):
         # Time required to perform the transition
         transition_calc_time = 0
 
+        # Time two perform the transition
+        transition1_time = 0
+        transition2_time = 0
+
         # An allocation for the next prediction window is calculated when the transition for the current window ends
         if self.time % self._prediction_window == 0:
             self._waiting_to_start_transition_calculation = True
@@ -332,6 +336,7 @@ class HVPredictiveAutoscaler(Autoscaler):
 
         # Generate statistics
         statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
+                                          transition1_time + transition2_time,
                                           transition_calc_time, current_time() - initial_time,
                                           min(node_recycling_level1, node_recycling_level2),
                                           min(container_recycling_level1, container_recycling_level2))

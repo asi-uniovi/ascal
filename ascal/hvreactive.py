@@ -90,7 +90,7 @@ class HVReactiveAutoscaler(Autoscaler):
         # Time required to calculate the transition
         transition_calc_time = 0
 
-        # Times two perform the transition
+        # Time two perform the transition
         transition_time = 0
 
         # A new allocation is calculated every time period if there are no pending transitions
