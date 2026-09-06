@@ -34,6 +34,7 @@ new instance class families.
 Outputs:
 
 - Application performances.
+- QoS
 - System cost.
 
 Installation
@@ -66,7 +67,7 @@ Usage
 cd examples/ex1
 uv run ex1.py
 ```
-A jupyter notebook with the same example can be found in _examples/ex1/ex1.ipynb_.
+A jupyter notebook with a similar example can be found in _examples/ex1/ex1.ipynb_.
 
 If order to use the package in your own code, the scheme provided in the example can be followed. 
 

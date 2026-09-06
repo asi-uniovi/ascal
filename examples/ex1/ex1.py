@@ -73,7 +73,7 @@ billing_changes = ascal_problem.billing_changes # Dictionary with times and clus
 performance_changes = ascal_problem.allocation_changes # Dictionary with times and cluster state on allocation changes
 calculation_times = ascal_problem.calc_times # Calculation times to obtain new allocations
 
-# Recycling levels for Horizontal/Vertical autoscalers
+# Recycling levels for history-unaware autoscalers
 node_recycling_levels, container_recycling_levels = ascal_problem.get_recycling_levels()
 
 # Plot times to calculate transitions

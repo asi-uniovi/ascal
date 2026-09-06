@@ -6,3 +6,8 @@ htmlcov/
 *.pyc
 .gitignore
 *.log
+examples/ex1/*.csv
+examples/pub1/*.csv
+examples/pub1/*.png
+examples/pub1/*.parquet
+examples/prueba*

@@ -28,7 +28,7 @@ with the command. However, any individual node removal is suspended until its co
 Similarly, any individual container allocation or scale-up is suspended until the destination node has enough 
 computational resources.
 
-Three transition algorithms are implemented:
+Four transition algorithms are implemented:
 - Baseline transition. It performs the transition in 4 steps: 
     1) Create all the nodes in the final allocation. 
     2) Allocate all the containers in these created nodes.
