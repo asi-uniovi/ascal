@@ -18,6 +18,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fcma" },
     { name = "matplotlib" },
+    { name = "numpy" },
     { name = "pyyaml" },
     { name = "scipy" },
 ]
@@ -37,6 +38,7 @@ examples = [
 requires-dist = [
     { name = "fcma", git = "https://github.com/asi-uniovi/fcma.git" },
     { name = "matplotlib", specifier = ">=3.10.3" },
+    { name = "numpy", specifier = ">=2.3.2" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "scipy", specifier = ">=1.16.0" },
 ]

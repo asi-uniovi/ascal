@@ -2,7 +2,6 @@ __pycache__/
 ascal.egg-info/
 build/
 htmlcov/
-.*
 *.pyc
 .gitignore
 *.log
