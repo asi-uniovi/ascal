@@ -77,7 +77,7 @@ calculation_times = ascal_problem.calc_times # Calculation times to obtain new a
 node_recycling_levels, container_recycling_levels = ascal_problem.get_recycling_levels()
 
 # Plot times to calculate transitions
-transition_times = calculation_times["transition_times"]
+transition_times = calculation_times["transition"]
 ascal_problem.plot({'_nolegend_': transition_times}, "Transition Times", "Seconds")
 
 # Plot recyclings
