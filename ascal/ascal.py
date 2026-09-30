@@ -64,6 +64,12 @@ class Ascal:
         self.allocation_changes: list[(int, Allocation)] = []
         self.billing_changes: list[(int, Allocation)] = []
 
+    def get_container_removal_index(self) -> float:
+        """
+        Get the Container Removal Index (CRI).
+        """
+        return self._autoscaler.removed_containers_ratio_sum / self.time
+
     def _get_perf_per_core(self) -> dict[App, float]:
         """
         Get application's performance in req/s/core.

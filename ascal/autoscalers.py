@@ -64,6 +64,7 @@ class Autoscaler(ABC):
             self.timing_args = TimedOps.TimingArgs(0, 0, 0, 0, 0) # All the creation/removal times are zero
         else:
             self.timing_args = timing_args
+        self.removed_containers_ratio_sum = 0
         self._timedops = TimedOps(self.timing_args) # Event based timing machine
         self._log_path = None # Log path
         self._log_f = None # Log file
@@ -94,6 +95,9 @@ class Autoscaler(ABC):
             fcma_speed_level = solver.value
             problem = Fcma(self.system, workloads=workloads)
             solution = problem.solve(SolvingPars(speed_level=fcma_speed_level))
+            for _, nodes in solution.allocation.items():
+                for node in nodes:
+                    node.vm_before_promotion = None # It will be used to store the node before upgrade in the transition
             return [node for _, nodes in solution.allocation.items() for node in nodes]
         elif solver == AllocationSolver.MNCF:
             return mncf_allocation(self.system, workloads)

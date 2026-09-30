@@ -142,6 +142,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             self.enable_disable_close_h_operations()
             # Perform H autoscaling. Note that calling run() method increments the value of self.time
             statistics = super().run(app_workloads)
+            self.removed_containers_ratio_sum = self._timedops.removed_containers_ratio_sum + \
+                self._hv_timedops.removed_containers_ratio_sum
             return statistics
 
         # Horizontal autoscaler does not run in the code that follows, so application loads for the
@@ -273,6 +275,9 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
         for node in self.allocation:
             if NodeStates.get_state(node) == NodeStates.REMOVED:
                 self.allocation.remove(node)
+
+        self.removed_containers_ratio_sum = self._timedops.removed_containers_ratio_sum + \
+            self._hv_timedops.removed_containers_ratio_sum
 
         self.time += 1
 

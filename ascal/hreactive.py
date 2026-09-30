@@ -439,5 +439,8 @@ class HReactiveAutoscaler(Autoscaler):
             statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,
                                               0, 0, current_time() - initial_time, Recycling.INVALID_RECYCLING,
                                               Recycling.INVALID_RECYCLING)
+
+            self.removed_containers_ratio_sum = self._timedops.removed_containers_ratio_sum
+
             return statistics
 

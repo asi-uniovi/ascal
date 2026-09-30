@@ -72,6 +72,7 @@ current_time =  ascal_problem.time # Current simulated time in range [0, last_ti
 billing_changes = ascal_problem.billing_changes # Dictionary with times and cluster state on billing changes
 performance_changes = ascal_problem.allocation_changes # Dictionary with times and cluster state on allocation changes
 calculation_times = ascal_problem.calc_times # Calculation times to obtain new allocations
+cri = ascal_problem.get_container_removal_index() # Container Removal Index (CRI) for the autoscaling problem
 
 # Recycling levels for history-unaware autoscalers
 node_recycling_levels, container_recycling_levels = ascal_problem.get_recycling_levels()

@@ -130,6 +130,8 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
             node_creation_end = self.time + self.timing_args.node_creation_time
             if self._new_nodes_required and node_creation_end >= self._next_hv_autoscaling_time:
                 self._next_hv_autoscaling_time = self.time
+            self.removed_containers_ratio_sum = self._timedops.removed_containers_ratio_sum + \
+                self._hv_timedops.removed_containers_ratio_sum
             return statistics
 
         # Update application loads for the horizontal autoscaler. Note that run() method does not execute
@@ -144,6 +146,8 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         # After this point, we want to perform a new HV autoscaling, but we need to process pending
         # events of the H autoscaler before performing an HV autoscaling
         if not self._timedops.is_event_list_empty():
+            self.removed_containers_ratio_sum = self._timedops.removed_containers_ratio_sum + \
+                self._hv_timedops.removed_containers_ratio_sum
             self.time += 1
             self._timedops.dispatch_events(self.time)
             statistics = AutoscalerStatistics(self._timedops.node_billing_changed, self._timedops.perf_changed,
@@ -193,6 +197,10 @@ class HReactiveHVReactiveAutoscaler(HReactiveAutoscaler):
         for node in list(self.allocation):
             if NodeStates.get_state(node) == NodeStates.REMOVED:
                 self.allocation.remove(node)
+
+        self.removed_containers_ratio_sum = self._timedops.removed_containers_ratio_sum + \
+            self._hv_timedops.removed_containers_ratio_sum
+
         self.time += 1
 
         statistics = AutoscalerStatistics(self._hv_timedops.perf_changed, self._hv_timedops.node_billing_changed,

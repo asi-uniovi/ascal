@@ -140,6 +140,8 @@ class HVReactiveAutoscaler(Autoscaler):
             if NodeStates.get_state(node) == NodeStates.REMOVED:
                 self.allocation.remove(node)
 
+        self.removed_containers_ratio_sum = self._timedops.removed_containers_ratio_sum
+
         self.time += 1
 
         statistics = AutoscalerStatistics(self._timedops.perf_changed, self._timedops.node_billing_changed,

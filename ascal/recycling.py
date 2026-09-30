@@ -637,9 +637,10 @@ class Recycling:
         for init_node, final_node in self.recycled_node_pairs.items():
             final_node.id = init_node.id # Recycled node pairs have the same ID
             last_initial_node_ids[init_node.ic] = max(last_initial_node_ids[init_node.ic], init_node.id)
-        for _, final_node in self.upgraded_node_pairs.items():
+        for init_node, final_node in self.upgraded_node_pairs.items():
             last_initial_node_ids[final_node.ic] += 1
             final_node.id = last_initial_node_ids[final_node.ic]
+            final_node.vm_before_promotion = init_node # Store the initial node before upgrade in the transition
         for node in self.new_nodes:
             last_initial_node_ids[node.ic] += 1
             node.id = last_initial_node_ids[node.ic]

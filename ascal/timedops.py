@@ -79,6 +79,7 @@ class TimedOps:
         self.perf_changed = False # True if containers are removed or allocated at the current time
         self._last_dispatched_time = -1 # Current time. It is the time of the last dispatched event
         self.log: Callable[..., None] = lambda _: None # Method used to print a log message
+        self.removed_containers_ratio_sum = 0 # Sum of released cores ratios, coming from the removal of containers  
 
     def is_event_list_empty(self) -> bool:
         """
@@ -398,6 +399,8 @@ class TimedOps:
         node.free_mem += replicas * cc.memv
         node.cgs.remove(ContainerGroup(zero_perf_cc, replicas))
         self.log(f'Completed the removal of {replicas} replicas {cc} from node {node}')
+        # Update the count of removed containers at the current time
+        self.removed_containers_ratio_sum += replicas * (cc.cores.magnitude / node.ic.cores.magnitude)
 
     def scale_container_replicas(self, at_time: int, cc: ContainerClass, multiplier: float, replicas: int, node: Vm):
         """
