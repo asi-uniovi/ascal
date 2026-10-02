@@ -658,7 +658,7 @@ class TimedOps:
         NodeStates.set_state(initial_node, NodeStates.UPGRADING)
         event = TimedOps.Event(TimedOps.EventTypes.UPGRADE_NODE_END, node=event.node,
                                callback=self._at_upgrade_node_end)
-        self._add_event(self._last_dispatched_time + self.time_args.node_removal_time, event)
+        self._add_event(self._last_dispatched_time + self.time_args.hot_node_scale_up_time, event)
         self.log(f"Upgrading node {initial_node} to instance class {final_ic}")
 
     def _at_upgrade_node_end(self, event: Event):

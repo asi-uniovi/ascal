@@ -445,7 +445,7 @@ wheels = [
 [[package]]
 name = "fcma"
 version = "1.0.0"
-source = { git = "https://github.com/asi-uniovi/fcma.git#ce6a4519249fad6d528236b112b266a107829e49" }
+source = { git = "https://github.com/asi-uniovi/fcma.git" }
 dependencies = [
     { name = "cloudmodel" },
     { name = "pulp" },

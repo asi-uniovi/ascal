@@ -251,7 +251,7 @@ class Command:
             if node in node_pairs:
                 new_command.scale_containers.append((node_pairs[node], cc, replicas, multiplier))
             else:
-                new_command.scale_up_containers.append((node, cc, replicas, multiplier))
+                new_command.scale_containers.append((node, cc, replicas, multiplier))
         for node in self.create_nodes:
             if node in node_pairs:
                 new_command.create_nodes.append(node_pairs[node])
