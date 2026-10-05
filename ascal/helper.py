@@ -9,6 +9,8 @@ from cloudmodel.unified.units import CurrencyPerTime
 from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, InstanceClass, ContainerGroup, System
 from ascal.recycling import Recycling
 
+_DELTA_VAL = 0.000001
+
 class Vmt:
     """
     Node class for transitions, with direct access to the number of replicas of a container class.
@@ -126,9 +128,10 @@ def similar_ccs(cc1: ContainerClass, cc2: ContainerClass)->bool:
     :param cc2: Another container class.
     :return: True if the container classes are similar.
     """
-    return cc1.fm == cc2.fm and cc1.app == cc2.app and abs(cc1.cores - cc2.cores).magnitude < 0.000001 and \
-        abs(cc1.memv - cc2.memv).magnitude < 0.000001 and abs(cc1.perf - cc2.perf).magnitude < 0.000001
-            
+    return cc1.fm == cc2.fm and cc1.app == cc2.app and abs(cc1.cores - cc2.cores).magnitude < _DELTA_VAL and \
+        abs(cc1.memv - cc2.memv).magnitude < _DELTA_VAL and\
+        abs(cc1.perf.to("req/s") - cc2.perf.to("req/s")).magnitude < _DELTA_VAL
+
 def get_min_max_perf(alloc1: Allocation, alloc2: Allocation) ->\
         tuple[dict[App, RequestsPerTime], dict[App, RequestsPerTime]]:
     """
@@ -199,6 +202,9 @@ def get_app_perf_surplus(min_perf: dict[App, RequestsPerTime], alloc: list[Vmt])
     for node in alloc:
         for cc, replicas in node.replicas.items():
             app_perf_surplus[cc.app] += replicas * cc.perf
+    for app, surplus in app_perf_surplus.items():
+        if -_DELTA_VAL <= surplus.to("req/s").magnitude < _DELTA_VAL:
+            app_perf_surplus[app] = RequestsPerTime("0 req/s")
     return app_perf_surplus
 
 def get_app_ccs(system: System, app_aggs: dict[App, list[int]] = None) -> dict[App, list[ContainerClass]]:
@@ -281,7 +287,7 @@ def get_required_nodes(ic_list: list[InstanceClass], cgs: list[ContainerGroup], 
     """
 
     # Constant used to deal with numerical approximations
-    delta = 0.000001
+    delta = _DELTA_VAL
 
     required_nodes = []
 

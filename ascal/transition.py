@@ -195,12 +195,16 @@ class Command:
         """
         # Remove labels in container classes
         self.allocate_containers = [
-            (node, replace(cc, label=""), replicas) 
+            (node, replace(cc, label="", id=0), replicas) 
             for node, cc, replicas in self.allocate_containers
         ] 
         self.remove_containers = [
-            (node, replace(cc, label=""), replicas) 
+            (node, replace(cc, label="", id=0), replicas) 
             for node, cc, replicas in self.remove_containers
+        ]
+        self.scale_containers = [
+            (node, replace(cc, label="", id=0), replicas, multiplier)
+            for node, cc, replicas, multiplier in self.scale_containers
         ]
 
         # Sum up replicas of the same container class in the same node. The same for removals
@@ -378,7 +382,8 @@ class Transition(ABC):
                 if (node_vmt.free_mem - node_vmt.ic.mem).magnitude > TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. Too many mem')
                 
-            # Container scale-up and scale-down commands
+            # Container scale-down commands and next container scale-up containers.
+            # Note that command.scale_containers are sorted by incresing multipliers
             for node, cc, replicas, multiplier in command.scale_containers:
                 op_str = f'Command #{command_index}. Scale containers ({node}, {cc}, {replicas}, {multiplier})'
                 if node not in vm_to_vmt:
@@ -853,7 +858,7 @@ class TransitionRBT(Transition):
         removable_replicas = min(
             node.replicas[cc], 
             replicas, 
-            int(performance_surplus[cc.app]/cc.perf)
+            int(performance_surplus[cc.app]/cc.perf + TransitionRBT._DELTA)
         )
         if removable_replicas == 0:
             return 0
@@ -881,6 +886,8 @@ class TransitionRBT(Transition):
 
         assert (node.free_mem - node.ic.mem).magnitude < TransitionRBT._DELTA, "Invalid node free mem"
         performance_surplus[cc.app] -= cc.perf * removable_replicas
+        if -TransitionRBT._DELTA <= performance_surplus[cc.app].to("req/s").magnitude < 0:
+            performance_surplus[cc.app] = RequestsPerTime("0 req/s")
         self._recycling.obsolete_containers[node][cc] -= removable_replicas
         if self._recycling.obsolete_containers[node][cc] == 0:
             del self._recycling.obsolete_containers[node][cc]
@@ -898,7 +905,7 @@ class TransitionRBT(Transition):
         :return: The actual number of removable replicas.
         """
         n_removable = min(
-            int(available_perf_surplus / cc.perf),
+            int(available_perf_surplus / cc.perf + TransitionRBT._DELTA),
             replicas_to_remove,
             self._recycling.obsolete_containers[node][cc]
         )
@@ -1337,11 +1344,10 @@ class TransitionRBT(Transition):
             command.remove_containers.extend(copy_command.remove_containers)
 
         # Check if obsolete nodes can be removed and update the command.
-        # Nodes are not actualy removed from the allocation until the end of the transition, 
+        # Nodes are not actually removed from the allocation until the end of the transition, 
         # since they may be useful during the transition. They appear as removed only in the command
         self._remove_empty_obsolete_nodes(command)
 
-        command.simplification()  
         return command
 
     def _get_allocation(self, app_performance: dict[App, RequestsPerTime]) -> list[Vm]:
@@ -1389,6 +1395,35 @@ class TransitionRBT(Transition):
             command.sync_on_nodes_upgrade = True
             self._sync_on_next_alloc_upgraded_nodes = False
         
+        # Combine fragments to remove/scale-down containers
+        compacted_fragments = defaultdict(int)
+        for node, fcc, fr in command.remove_containers:
+            compacted_fragments[(node, fcc)] += fr
+        command.remove_containers = [(node, fcc, fr) for (node, fcc), fr in compacted_fragments.items()]
+        for node, fcc, fr in command.remove_containers[:]:
+            # If the container is a fragment
+            if fcc.id > 0:
+                # The removal command will be replaced
+                command.remove_containers.remove((node, fcc, fr))
+                ext_fcc = replace(fcc, id=-fcc.id) # Extended group of fragments           
+                for cc in (ext_fcc, fcc): # Firstly, remove the fragments from the extended group it it exists
+                    if cc.id not in node.fragments:
+                        continue
+                    # Maximum number of replicas and previous fragments of the group
+                    max_r, f = node.fragments[cc.id] 
+                    removable_fragments = min(f, fr)
+                    fr -= removable_fragments
+                    new_command = self.combine_fragments(node, cc, removable_fragments, up_down=-1)
+                    command.scale_containers.extend(new_command.scale_containers)
+                    command.remove_containers.extend(new_command.remove_containers)
+                    if f - removable_fragments > 0:
+                        node.fragments[cc.id] = (max_r, f - removable_fragments)
+                    else:
+                        del node.fragments[cc.id]
+                    if fr == 0:
+                        break
+                assert fr == 0, "Can not remove all the requested fragments"
+
         # Combine fragments to create/scale-up containers
         compacted_fragments = defaultdict(int)
         for node, fcc, fr in command.allocate_containers:
@@ -1435,35 +1470,6 @@ class TransitionRBT(Transition):
                     new_command = self.combine_fragments(node, ext_fcc, fr, up_down=1)
                     command.allocate_containers.extend(new_command.allocate_containers)
                     node.fragments[ext_fcc.id] = (max_r, fr) # Update the node fragments
-
-        # Combine fragments to remove/scale-down containers
-        compacted_fragments = defaultdict(int)
-        for node, fcc, fr in command.remove_containers:
-            compacted_fragments[(node, fcc)] += fr
-        command.remove_containers = [(node, fcc, fr) for (node, fcc), fr in compacted_fragments.items()]
-        for node, fcc, fr in command.remove_containers[:]:
-            # If the container is a fragment
-            if fcc.id > 0:
-                # The removal command will be replaced
-                command.remove_containers.remove((node, fcc, fr))
-                ext_fcc = replace(fcc, id=-fcc.id) # Extended group of fragments           
-                for cc in (ext_fcc, fcc): # Firstly, remove the fragments from the extended group it it exists
-                    if cc.id not in node.fragments:
-                        continue
-                    # Maximum number of replicas and previous fragments of the group
-                    max_r, f = node.fragments[cc.id] 
-                    removable_fragments = min(f, fr)
-                    fr -= removable_fragments
-                    new_command = self.combine_fragments(node, cc, removable_fragments, up_down=-1)
-                    command.scale_containers.extend(new_command.scale_containers)
-                    command.remove_containers.extend(new_command.remove_containers)
-                    if f - removable_fragments > 0:
-                        node.fragments[cc.id] = (max_r, f - removable_fragments)
-                    else:
-                        del node.fragments[cc.id]
-                    if fr == 0:
-                        break
-                assert fr == 0, "Can not remove all the requested fragments"
 
         # Sort scaled containers in the command by increasing multiplier, so scaling-downs appear before
         command.scale_containers.sort(key=lambda s: s[3])
@@ -1580,6 +1586,8 @@ class TransitionRBT(Transition):
     def _post_process_commands(self):
         """
         Perform the following post-processing on the comand list:
+        - Perform command simplifications. Common container allocations and removals are combined.
+        In addition, container labels and ids are reset
         - Delete a node removal if the node is used in a later command for container allocations.
         Note that obsolete nodes are not actually removed from the allocation, since they can be used
         as temporary nodes in later commands.
@@ -1588,6 +1596,10 @@ class TransitionRBT(Transition):
         - Remove obsolete nodes from the current allocation.
         - Replace Vmt nodes by Vm nodes in the commands.
         """
+        # Perform command simplifications
+        for command in self._commands:
+            command.simplification()  
+
         # Node removal commands are generated when all the containers of an obsolete node are removed.
         # However, the nodes could be useful in future to help in the transition of recycled nodes, so
         # they could be used after a removal command. A node removal command is invalid when there is
@@ -1840,7 +1852,7 @@ class TransitionRBT(Transition):
         create_upgrade_nodes_command = Command(create_nodes=self._recycling.new_nodes, upgrade_nodes=upgrade_node_info)
         self._append_command(create_upgrade_nodes_command, append_null_command=True)
 
-        # Allocation loop until node upgrading completes for RBT1 variant. 
+        # Allocation loop until node upgrading completes for RBT1 and RBT2 variants.
         # Node upgrading time is less time-consuming than node creation time, so it completes before node creation.
         # The elapsed time can not be higher than the hot node scale up time
         elapsed_time = 0

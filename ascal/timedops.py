@@ -397,7 +397,12 @@ class TimedOps:
         # Update free computational resources in the node
         node.free_cores += replicas * cc.cores
         node.free_mem += replicas * cc.memv
-        node.cgs.remove(ContainerGroup(zero_perf_cc, replicas))
+        for cg in node.cgs[:]:
+            if cg.cc == zero_perf_cc and cg.replicas >= replicas:
+                cg.replicas -= replicas
+                if cg.replicas == 0:
+                    node.cgs.remove(cg)
+                break
         self.log(f'Completed the removal of {replicas} replicas {cc} from node {node}')
         # Update the count of removed containers at the current time
         self.removed_containers_ratio_sum += replicas * (cc.cores.magnitude / node.ic.cores.magnitude)
