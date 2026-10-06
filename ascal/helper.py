@@ -61,26 +61,18 @@ class Vmt:
                 return False
         return True
 
-    def get_similar_ccs(self, cc: ContainerClass) -> list[ContainerClass]:
-        """
-        Get the similar container classes allocated in the node.
-        :param cc: The container class of reference.
-        :return: A list of similar container classes allocated in the node.
-        """
-        return [cc1 for cc1 in self.replicas if similar_ccs(cc, cc1) and self.replicas[cc1] > 0]
-
     def compact_similar_ccs_replicas(self, cc: ContainerClass) -> int:
         """
         Compact the replicas of similar container classes allocated in the node.
         :param cc: The container class of reference.
         :return: The number of replicas compacted.
         """
-        similar_ccs = self.get_similar_ccs(cc)
-        if len(similar_ccs) == 0:
+        ccs = [cc1 for cc1 in self.replicas if similar_ccs(cc, cc1)]
+        if len(ccs) == 0:
             return 0
-        if len(similar_ccs) > 1 or similar_ccs[0] != cc:
+        if len(ccs) > 1 or ccs[0] != cc:
             compacted_replicas = 0
-            for cc1 in similar_ccs:
+            for cc1 in ccs:
                 compacted_replicas += self.replicas[cc1]
                 del self.replicas[cc1]
             self.replicas[cc] = compacted_replicas
@@ -222,6 +214,27 @@ def similar_ccs(cc1: ContainerClass, cc2: ContainerClass)->bool:
         abs(cc1.memv - cc2.memv).magnitude < _DELTA and\
         abs(cc1.perf.to("req/s") - cc2.perf.to("req/s")).magnitude < _DELTA
 
+def compact_similar_cgs(node: Vm, cc: ContainerClass) -> ContainerGroup:
+    """
+    Compact the replicas of similar container groups allocated in the node.
+    :param vm: The node where the container groups are allocated.
+    :param cc: The container class of reference.
+    :return: The container group with the compacted replicas of similar container classes.
+    """
+    cgs = [cg for cg in node.cgs if similar_ccs(cg.cc, cc)]
+    if len(cgs) == 0:
+        return None
+    if len(cgs) > 1 or cgs[0].cc != cc:
+        compacted_replicas = 0
+        for cg in cgs:
+            compacted_replicas += cg.replicas
+            node.cgs.remove(cg)
+        cg = ContainerGroup(cc, compacted_replicas)
+        node.cgs.append(cg)
+        return cg
+    else:
+        return cgs[0]
+    
 def get_min_max_perf(alloc1: Allocation, alloc2: Allocation) ->\
         tuple[dict[App, RequestsPerTime], dict[App, RequestsPerTime]]:
     """

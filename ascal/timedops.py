@@ -4,10 +4,11 @@ It defines the TimedOps class to create/remove/scale container and nodes using a
 
 from dataclasses import dataclass, replace
 from enum import Enum
+from sched import Event
 from typing import Callable
 from fcma import ContainerGroup, ContainerClass, Vm, RequestsPerTime, InstanceClass
 from ascal.nodestates import NodeStates
-from ascal.helper import similar_ccs
+from ascal.helper import similar_ccs, compact_similar_cgs
 
 class TimedOps:
     """
@@ -302,15 +303,12 @@ class TimedOps:
             # The allocation is aborted before being completed
             self.log(f'Aborting the allocation of {replicas} replicas {cc} on node {node}')
             return
-        # Find a container group with ready replicas for the same container class and increment the number of replicas
-        found_cg = False
-        for cg in node.cgs:
-            if cg.cc == cc:
-                cg.replicas += replicas
-                found_cg = True
-                break
-        # If it is not found, create a new container group with the replicas
-        if not found_cg:
+        # Compact similar container classes and return the container group with the compacted replicas
+        cg = compact_similar_cgs(node, cc) 
+        # Increment the number of replicas
+        if cg is not None:
+            cg.replicas += replicas
+        else:
             node.cgs.append(ContainerGroup(cc, replicas))
         self.log(f'Completed the allocation of {replicas} replicas {cc} on node {node}')
 
@@ -330,15 +328,12 @@ class TimedOps:
             return 0
         # Calculate the number of replicas to remove
         if at_time == self._last_dispatched_time:
-            replicas_to_remove = 0
-            for cg in node.cgs:
-                # Replicas that are in the process of being created or being removed can not be removed.
-                # Thus, we use cc as a container to compare with
-                if cg.cc == cc:
-                    replicas_to_remove = min(cg.replicas, replicas)
-                    break
-            if replicas_to_remove == 0:
+            # Compact similar container classes and return the container group with the compacted replicas
+            cg = compact_similar_cgs(node, cc)
+            if cg is None:
                 return 0
+            else:
+                replicas_to_remove = min(cg.replicas, replicas)
         else:
             replicas_to_remove = replicas
 
@@ -379,6 +374,40 @@ class TimedOps:
         cg_with_replicas.replicas -= removable_replicas
         if cg_with_replicas.replicas == 0:
             node.cgs.remove(cg_with_replicas)
+        node.cgs.append(ContainerGroup(zero_perf_cc, removable_replicas))
+
+        # Create the related event to complete the containers removal
+        event = TimedOps.Event(TimedOps.EventTypes.REMOVE_CONTAINER_REPLICAS_END,
+                               containers=(removable_replicas, node, cc, zero_perf_cc),
+                               callback=self._at_remove_container_replicas_end)
+        self._add_event(self._last_dispatched_time + self.time_args.container_removal_time, event)
+
+    def _at_remove_container_replicas_begin2(self, event: Event):
+        """
+        Start the removal of container replicas when the event is fired.
+        :param event: Event that has just being fired.
+        """
+        replicas, node, cc = event.containers # The exact number of replicas to remove
+
+        # Compact similar container classes and return the container group with the compacted replicas
+        cg = compact_similar_cgs(node, cc)
+        if cg is not None:
+            removable_replicas = min(cg.replicas, replicas)
+        else:
+            # The replicas at the beginning of the removal process may being waiting for creation,
+            # so at theto remove may have changed from zero performance 
+            # to non-zero performance after completing their creation
+            return
+
+        self.log(f'Removing {removable_replicas} replicas {str(cc)} from node {node}')
+
+        # Move the replicas to remove to a new container group with zero performance
+        # replicas and None application (None application means replicas being removed)
+        zero_perf_cc = ContainerClass(None, cc.ic, cc.fm, cc.cores, cc.mem,
+                                      RequestsPerTime("0 req/s"), cc.aggs, cc.agg_level)
+        cg.replicas -= removable_replicas
+        if cg.replicas == 0:
+            node.cgs.remove(cg)
         node.cgs.append(ContainerGroup(zero_perf_cc, removable_replicas))
 
         # Create the related event to complete the containers removal
@@ -448,37 +477,26 @@ class TimedOps:
         if multiplier < 1.0:
             # Find the container group with the initial container class and decrement the scaled-down replicas.
             # Computational resources are reclaimed later
-            found_cg = None
-            for cg in node.cgs:
-                if cg.cc == initial_cc and cg.replicas >= replicas:
-                    found_cg = cg
-                    found_cg.replicas -= replicas
-                    if found_cg.replicas == 0:
-                        node.cgs.remove(found_cg)
-                    break
-            assert found_cg is not None, "Can not find the replicas to scale"
+            cg = compact_similar_cgs(node, initial_cc)
+            assert cg is not None and cg.replicas >= replicas, "Can not find the replicas to scale"
+            cg.replicas -= replicas
+            if cg.replicas == 0:
+                node.cgs.remove(cg)
             # Find a container group with the final container class and increment its number of replicas
-            found_cg = None
-            for cg in node.cgs:
-                if cg.cc == final_cc:
-                    found_cg = cg
-                    found_cg.replicas += replicas
-                    break
-            if not found_cg:
+            cg = compact_similar_cgs(node, final_cc)
+            if cg is not None:
+                cg.replicas += replicas
+            else:
                 node.cgs.append(ContainerGroup(final_cc, replicas))
-
         # Scale-up. Decrement the free computational resources. Memory resource does not change on scaling-ups
         else:
             node.free_cores -= diff_cc.cores * replicas
 
         # Scale-up and scale-down. Increment the number of replicas of the diff container class
-        found_cg = None
-        for cg in node.cgs:
-            if similar_ccs(cg.cc, diff_cc): # Compare ignoring rounding errors and performances
-                found_cg = cg
-                found_cg.replicas += replicas
-                break
-        if not found_cg:
+        cg = compact_similar_cgs(node, diff_cc)
+        if cg is not None:
+            cg.replicas += replicas
+        else:
             node.cgs.append(ContainerGroup(diff_cc, replicas))
 
         # Create the related event to complete the scale-up or scale-down
@@ -503,15 +521,11 @@ class TimedOps:
         diff_cc = replace(initial_cc * abs(1.0 - multiplier), app=None, perf=RequestsPerTime("0 req/s"))
 
         # Scale-up and scale-down. Remove the diff replicas
-        found_cg = None
-        for cg in node.cgs[:]:
-            if similar_ccs(cg.cc, diff_cc) and cg.replicas >= replicas:
-                found_cg = cg
-                found_cg.replicas -= replicas
-                if found_cg.replicas == 0:
-                    node.cgs.remove(found_cg)
-                break
-        assert found_cg is not None, "Can not complete the scaling of replicas"
+        cg = compact_similar_cgs(node, diff_cc)
+        assert cg is not None and cg.replicas >= replicas, "Can not complete the scaling of replicas"
+        cg.replicas -= replicas
+        if cg.replicas == 0:
+            node.cgs.remove(cg)
 
         # Scale-down. Reclaim the computational resources. Memory resource does not change on scaling-downs 
         if multiplier < 1.0:
@@ -524,25 +538,19 @@ class TimedOps:
                 self.log(f'Aborting the scaling-up of {replicas} replicas of {initial_cc}'
                         f' x {multiplier:1.2f}  on node {node}')
                 return
-            # Find a container group with the initial replicas
-            found_cg = None
-            for cg in node.cgs:
-                if cg.cc == initial_cc and cg.replicas >= replicas:
-                    found_cg = cg
-                    found_cg.replicas -= replicas
-                    if found_cg.replicas == 0:
-                        node.cgs.remove(found_cg)
-                    break
-            assert found_cg is not None, "Can not complete the replicas scaling-up"
+
+            # Find the container group with the initial replicas
+            cg = compact_similar_cgs(node, initial_cc)
+            assert cg is not None and cg.replicas >= replicas, "Can not complete the replicas scaling-up"
+            cg.replicas -= replicas
+            if cg.replicas == 0:
+                node.cgs.remove(cg)
+
             # Find a container group with the final replicas
-            found_cg = None
-            for cg in node.cgs:
-                if cg.cc == final_cc:
-                    found_cg = cg
-                    found_cg.replicas += replicas
-                    break
-            # If it is not found, create a new container group with the final replicas
-            if not found_cg:
+            cg = compact_similar_cgs(node, final_cc)
+            if cg is not None:
+                cg.replicas += replicas
+            else:
                 node.cgs.append(ContainerGroup(final_cc, replicas))
 
         self.log(f'Completed the scaling of {replicas} replicas {initial_cc} x {multiplier:1.2f} on node {node}')
