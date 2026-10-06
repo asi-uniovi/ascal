@@ -363,64 +363,30 @@ class Transition(ABC):
             obsolete_cc_replicas = []
             for node, cc, replicas in command.remove_containers:
                 obsolete_cc_replicas.append((node, cc))
-                op_str = f'Command #{command_index}. Remove containers ({node}, {cc}, {replicas})'
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
-                node_vmt.replicas[cc] -= replicas
-                if node_vmt.replicas[cc] == 0:
-                    del node_vmt.replicas[cc]
-                elif node_vmt.replicas[cc] < 0:
-                    raise ValueError(f'{op_str} -> Invalid container removal. Replicas < 0')
+                node_vmt.remove_similar_ccs_replicas(cc, replicas)
                 app_perf_surplus[cc.app] -= cc.perf * replicas
                 if app_perf_surplus[cc.app].magnitude < -TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. app surplus < 0')
-                node_vmt.free_cores += cc.cores * replicas
-                if (node_vmt.free_cores - node_vmt.ic.cores).magnitude > TransitionRBT._DELTA:
-                    raise ValueError(f'{op_str} -> Invalid container removal. Too many cores')
-                node_vmt.free_mem += cc.memv * replicas
-                if (node_vmt.free_mem - node_vmt.ic.mem).magnitude > TransitionRBT._DELTA:
-                    raise ValueError(f'{op_str} -> Invalid container removal. Too many mem')
                 
-            # Container scale-down commands and next container scale-up containers.
+            # Container scale-downs followed by container scale-ups.
             # Note that command.scale_containers are sorted by incresing multipliers
             for node, cc, replicas, multiplier in command.scale_containers:
                 op_str = f'Command #{command_index}. Scale containers ({node}, {cc}, {replicas}, {multiplier})'
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
-                if node_vmt.replicas[cc] < replicas:
-                    raise ValueError(f'{op_str} -> Invalid container scale. Replicas to scale > allocated replicas')
-                # Remove scaled replicas
-                node_vmt.replicas[cc] -= replicas
-                if node_vmt.replicas[cc] == 0:
-                    del node_vmt.replicas[cc]
-                # Add the replicas after the scaling. Note that other replicas of the same container class
-                # may be allocated
-                scaled_cc = cc * multiplier
-                close_cc_found = False # Dealing with floats may introduce runding errors
-                for other_cc in node_vmt.replicas:
-                    if similar_ccs(scaled_cc, other_cc):
-                        node_vmt.replicas[other_cc] += replicas
-                        close_cc_found = True
-                        break
-                if not close_cc_found:
-                    node_vmt.replicas[scaled_cc] = replicas
-                # Update the node free cores
-                node_vmt.free_cores += cc.cores * replicas * (1 - multiplier)
+                node_vmt.scale_similar_ccs_replicas(cc, replicas, multiplier)
                 if multiplier > 1:
                     # The performance increment is delayed until the command termination
                     app_perf_increment[cc.app] += cc.perf * replicas * (multiplier - 1)
-                    if node_vmt.free_cores.magnitude < -TransitionRBT._DELTA:
-                        raise ValueError(f'{op_str} -> Invalid container scale-up. Not enough cores are available')
                 else:
                     # The performance surplus is inmediately reduced
                     app_perf_surplus[cc.app] -= cc.perf * replicas * (1 - multiplier)
                     if app_perf_surplus[cc.app].magnitude < -Transition._DELTA:
                         raise ValueError(f'{op_str} -> Invalid container scale down. app surplus < 0')
-                    if (node_vmt.free_cores - node_vmt.ic.cores).magnitude > TransitionRBT._DELTA:
-                        raise ValueError(f'{op_str} -> Invalid container scale-down. Too many cores')
-                # Memory is no checked as it does not change in scale operations
 
             # Add node commands
             for node in command.create_nodes:
@@ -433,25 +399,18 @@ class Transition(ABC):
 
             # Allocate container commands
             for node, cc, replicas in command.allocate_containers:
-                op_str = f'Command #{command_index}. Allocate containers ({node}, {cc}, {replicas})'
                 if (node, cc) in obsolete_cc_replicas:
                     raise ValueError(f'{op_str} -> Removing and adding identical containers in same command')
                 if node not in vm_to_vmt:
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
-                node_vmt.replicas[cc] += replicas
+                node_vmt.alloc_similar_ccs_replicas(cc, replicas)
                 app_perf_increment[cc.app] += cc.perf * replicas
-                node_vmt.free_cores -= cc.cores * replicas
-                if node_vmt.free_cores.magnitude < -TransitionRBT._DELTA:
-                    raise ValueError(f'{op_str} -> Invalid container addition. Not enough cores are available')
-                node_vmt.free_mem -= cc.memv * replicas
-                if node_vmt.free_mem.magnitude < -TransitionRBT._DELTA:
-                    raise ValueError(f'{op_str} -> Invalid container removal. Not enough memory is available')
             
             # Remove node commands
             for node in command.remove_nodes:
                 node_vmt = vm_to_vmt[node]
-                op_str = f'Command #{command_index}. Remove node ({node})'
+                op_str = f'Command #{command_index}. Remove node {node}'
                 if node_vmt not in initial_alloc_vmt:
                     raise ValueError(f'{op_str} -> Invalid node')
                 for _ in node_vmt.replicas:

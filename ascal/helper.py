@@ -9,7 +9,7 @@ from cloudmodel.unified.units import CurrencyPerTime
 from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, InstanceClass, ContainerGroup, System
 from ascal.recycling import Recycling
 
-_DELTA_VAL = 0.000001
+_DELTA = 0.000001
 
 class Vmt:
     """
@@ -60,6 +60,96 @@ class Vmt:
             if replicas > 0:
                 return False
         return True
+
+    def get_similar_ccs(self, cc: ContainerClass) -> list[ContainerClass]:
+        """
+        Get the similar container classes allocated in the node.
+        :param cc: The container class of reference.
+        :return: A list of similar container classes allocated in the node.
+        """
+        return [cc1 for cc1 in self.replicas if similar_ccs(cc, cc1) and self.replicas[cc1] > 0]
+
+    def compact_similar_ccs_replicas(self, cc: ContainerClass) -> int:
+        """
+        Compact the replicas of similar container classes allocated in the node.
+        :param cc: The container class of reference.
+        :return: The number of replicas compacted.
+        """
+        similar_ccs = self.get_similar_ccs(cc)
+        if len(similar_ccs) == 0:
+            return 0
+        if len(similar_ccs) > 1 or similar_ccs[0] != cc:
+            compacted_replicas = 0
+            for cc1 in similar_ccs:
+                compacted_replicas += self.replicas[cc1]
+                del self.replicas[cc1]
+            self.replicas[cc] = compacted_replicas
+        return self.replicas[cc]
+
+    def remove_similar_ccs_replicas(self, cc: ContainerClass, replicas: int):
+        """
+        Remove replicas of similar container classes allocated in the node.
+        :param cc: The container class of reference.
+        :param replicas: Number of replicas to remove.
+        """
+        if replicas < 1:
+            return
+        self.compact_similar_ccs_replicas(cc)
+        if self.replicas[cc] < replicas:
+            op_str = f'Remove containers ({self}, {cc}, {replicas})'
+            raise ValueError(f'{op_str} -> Invalid container removal. Not enough similar containers are allocated')
+        elif self.replicas[cc] == replicas:
+            del self.replicas[cc]
+        else:
+            self.replicas[cc] -= replicas
+        self.free_cores += replicas * cc.cores
+        self.free_mem += replicas * cc.memv
+        if (self.free_cores - self.ic.cores).magnitude > _DELTA:
+            raise ValueError(f'{op_str} -> Invalid container removal. Too many cores')
+        if (self.free_mem - self.ic.mem).magnitude > _DELTA:
+            raise ValueError(f'{op_str} -> Invalid container removal. Too many mem')
+
+    def alloc_similar_ccs_replicas(self, cc: ContainerClass, replicas: int):
+        """
+        Allocate replicas to a similar container class allocated in the node.
+        :param cc: The container class of reference.
+        :param replicas: Number of replicas to allocate.
+        """
+        if replicas < 1:
+            return
+        self.compact_similar_ccs_replicas(cc)
+        if cc in self.replicas:
+            self.replicas[cc] += replicas
+        else:
+            self.replicas[cc] = replicas
+        self.free_cores -= cc.cores * replicas
+        self.free_mem -= cc.memv * replicas
+        op_str = f'Allocate containers ({self}, {cc}, {replicas})'
+        if self.free_cores.magnitude < -_DELTA:
+            raise ValueError(f'{op_str} -> Invalid container addition. Not enough cores are available')
+        if self.free_mem.magnitude < -_DELTA:
+            raise ValueError(f'{op_str} -> Invalid container removal. Not enough memory is available')
+
+    def scale_similar_ccs_replicas(self, cc: ContainerClass, replicas: int, multiplier:float):
+        """
+        Scale replicas of similar container classes allocated in the node.
+        :param cc: The container class of reference.
+        :param replicas: Number of replicas to scale.
+        :param multiplier: Multiplier to scale the replicas.
+        """
+        if replicas < 1:
+            return
+        op_str = f'Scale containers ({self}, {cc}, {replicas}, {multiplier})'
+        # Remove the replicas to scale
+        try:
+            self.remove_similar_ccs_replicas(cc, replicas)
+        except ValueError as e:
+            raise ValueError(f'{op_str} -> Invalid container scale. Not enough similar containers are allocated')
+        # Add the replicas after the scaling
+        try:
+            self.alloc_similar_ccs_replicas(cc * multiplier, replicas)
+        except ValueError as e:
+            raise ValueError(f'{op_str} -> Invalid container scale. Not enough resources are available')
 
     def upgrade(self, other: 'Vmt'):
         """
@@ -128,9 +218,9 @@ def similar_ccs(cc1: ContainerClass, cc2: ContainerClass)->bool:
     :param cc2: Another container class.
     :return: True if the container classes are similar.
     """
-    return cc1.fm == cc2.fm and cc1.app == cc2.app and abs(cc1.cores - cc2.cores).magnitude < _DELTA_VAL and \
-        abs(cc1.memv - cc2.memv).magnitude < _DELTA_VAL and\
-        abs(cc1.perf.to("req/s") - cc2.perf.to("req/s")).magnitude < _DELTA_VAL
+    return cc1.fm == cc2.fm and cc1.app == cc2.app and abs(cc1.cores - cc2.cores).magnitude < _DELTA and \
+        abs(cc1.memv - cc2.memv).magnitude < _DELTA and\
+        abs(cc1.perf.to("req/s") - cc2.perf.to("req/s")).magnitude < _DELTA
 
 def get_min_max_perf(alloc1: Allocation, alloc2: Allocation) ->\
         tuple[dict[App, RequestsPerTime], dict[App, RequestsPerTime]]:
@@ -203,7 +293,7 @@ def get_app_perf_surplus(min_perf: dict[App, RequestsPerTime], alloc: list[Vmt])
         for cc, replicas in node.replicas.items():
             app_perf_surplus[cc.app] += replicas * cc.perf
     for app, surplus in app_perf_surplus.items():
-        if -_DELTA_VAL <= surplus.to("req/s").magnitude < _DELTA_VAL:
+        if -_DELTA <= surplus.to("req/s").magnitude < _DELTA:
             app_perf_surplus[app] = RequestsPerTime("0 req/s")
     return app_perf_surplus
 
@@ -287,7 +377,7 @@ def get_required_nodes(ic_list: list[InstanceClass], cgs: list[ContainerGroup], 
     """
 
     # Constant used to deal with numerical approximations
-    delta = _DELTA_VAL
+    delta = _DELTA
 
     required_nodes = []
 
