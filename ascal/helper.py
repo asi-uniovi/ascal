@@ -86,9 +86,9 @@ class Vmt:
         """
         if replicas < 1:
             return
+        op_str = f'Remove containers ({self}, {cc}, {replicas})'
         self.compact_similar_ccs_replicas(cc)
         if self.replicas[cc] < replicas:
-            op_str = f'Remove containers ({self}, {cc}, {replicas})'
             raise ValueError(f'{op_str} -> Invalid container removal. Not enough similar containers are allocated')
         elif self.replicas[cc] == replicas:
             del self.replicas[cc]
@@ -201,35 +201,44 @@ class RecyclingVmt:
         self.node_recycling_level: float = recycling.node_recycling_level
         self.container_recycling_level: float = recycling.container_recycling_level
 
-def similar_ccs(cc1: ContainerClass, cc2: ContainerClass)->bool:
+def similar_ccs(cc1: ContainerClass, cc2: ContainerClass, ignore_perf: bool=False)->bool:
     """
     Check if the similarity of two container classes. Two container classes are similar when the are associated
     to the same instance class family and application, require the same computational resources and provide
     the same performance. 
     :param cc1: One container class.
     :param cc2: Another container class.
+    :param ignore_perf: If True, ignore the performance of the container classes when checking for similarity.
     :return: True if the container classes are similar.
     """
     return cc1.fm == cc2.fm and cc1.app == cc2.app and abs(cc1.cores - cc2.cores).magnitude < _DELTA and \
         abs(cc1.memv - cc2.memv).magnitude < _DELTA and\
-        abs(cc1.perf.to("req/s") - cc2.perf.to("req/s")).magnitude < _DELTA
+        (abs(cc1.perf.to("req/s") - cc2.perf.to("req/s")).magnitude < _DELTA or ignore_perf)
 
-def compact_similar_cgs(node: Vm, cc: ContainerClass) -> ContainerGroup:
+def compact_similar_cgs(node: Vm, cc: ContainerClass, ignore_perf: bool=False) -> ContainerGroup:
     """
     Compact the replicas of similar container groups allocated in the node.
     :param vm: The node where the container groups are allocated.
     :param cc: The container class of reference.
+    :param ignore_perf: If True, ignore the performance of the container classes when checking for similarity.
     :return: The container group with the compacted replicas of similar container classes.
     """
     cgs = [cg for cg in node.cgs if similar_ccs(cg.cc, cc)]
     if len(cgs) == 0:
-        return None
+        same_perf_cgs = False
+        if ignore_perf:
+            cgs = [cg for cg in node.cgs if similar_ccs(cg.cc, cc, ignore_perf=True)]
+        if len(cgs) == 0:
+            return None
+    else:
+        same_perf_cgs = True
     if len(cgs) > 1 or cgs[0].cc != cc:
         compacted_replicas = 0
         for cg in cgs:
             compacted_replicas += cg.replicas
             node.cgs.remove(cg)
-        cg = ContainerGroup(cc, compacted_replicas)
+        if same_perf_cgs:
+            cg = ContainerGroup(cc, compacted_replicas)
         node.cgs.append(cg)
         return cg
     else:

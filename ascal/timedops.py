@@ -4,11 +4,10 @@ It defines the TimedOps class to create/remove/scale container and nodes using a
 
 from dataclasses import dataclass, replace
 from enum import Enum
-from sched import Event
 from typing import Callable
 from fcma import ContainerGroup, ContainerClass, Vm, RequestsPerTime, InstanceClass
 from ascal.nodestates import NodeStates
-from ascal.helper import similar_ccs, compact_similar_cgs
+from ascal.helper import compact_similar_cgs
 
 class TimedOps:
     """
@@ -353,50 +352,15 @@ class TimedOps:
         """
         replicas, node, cc = event.containers # The exact number of replicas to remove
 
-        # Check the number of replicas that can be removed and get the related container group
-        removable_replicas = 0
-        cg_with_replicas = None
-        for cg in node.cgs:
-            # Replicas that are in the process of being created can not be removed
-            if (cc.app, cc.cores, cc.memv) == (cg.cc.app, cg.cc.cores, cg.cc.memv):
-                removable_replicas = min(cg.replicas, replicas)
-                cg_with_replicas = cg
-                break
-        if removable_replicas == 0:
-            return
-
-        self.log(f'Removing {removable_replicas} replicas {str(cc)} from node {node}')
-
-        # Move the replicas to remove to a new container group with zero performance
-        # replicas and None application (None application means replicas being removed)
-        zero_perf_cc = ContainerClass(None, cc.ic, cc.fm, cc.cores, cc.mem,
-                                      RequestsPerTime("0 req/s"), cc.aggs, cc.agg_level)
-        cg_with_replicas.replicas -= removable_replicas
-        if cg_with_replicas.replicas == 0:
-            node.cgs.remove(cg_with_replicas)
-        node.cgs.append(ContainerGroup(zero_perf_cc, removable_replicas))
-
-        # Create the related event to complete the containers removal
-        event = TimedOps.Event(TimedOps.EventTypes.REMOVE_CONTAINER_REPLICAS_END,
-                               containers=(removable_replicas, node, cc, zero_perf_cc),
-                               callback=self._at_remove_container_replicas_end)
-        self._add_event(self._last_dispatched_time + self.time_args.container_removal_time, event)
-
-    def _at_remove_container_replicas_begin2(self, event: Event):
-        """
-        Start the removal of container replicas when the event is fired.
-        :param event: Event that has just being fired.
-        """
-        replicas, node, cc = event.containers # The exact number of replicas to remove
-
         # Compact similar container classes and return the container group with the compacted replicas
-        cg = compact_similar_cgs(node, cc)
+        # The ignore_perf argument is set to True to allow the removal of replicas with different performance levels
+        # if there are not replicas with the same performace level as the container class to remove. 
+        # This is useful when removing replicas of a container class that change from the state of being
+        # created (zero performance) to the state of being active (non-zero performance).
+        cg = compact_similar_cgs(node, cc, ignore_perf=True)
         if cg is not None:
             removable_replicas = min(cg.replicas, replicas)
         else:
-            # The replicas at the beginning of the removal process may being waiting for creation,
-            # so at theto remove may have changed from zero performance 
-            # to non-zero performance after completing their creation
             return
 
         self.log(f'Removing {removable_replicas} replicas {str(cc)} from node {node}')
@@ -412,7 +376,7 @@ class TimedOps:
 
         # Create the related event to complete the containers removal
         event = TimedOps.Event(TimedOps.EventTypes.REMOVE_CONTAINER_REPLICAS_END,
-                               containers=(removable_replicas, node, cc, zero_perf_cc),
+                               containers=(removable_replicas, node, cg.cc, zero_perf_cc),
                                callback=self._at_remove_container_replicas_end)
         self._add_event(self._last_dispatched_time + self.time_args.container_removal_time, event)
 
@@ -426,12 +390,12 @@ class TimedOps:
         # Update free computational resources in the node
         node.free_cores += replicas * cc.cores
         node.free_mem += replicas * cc.memv
-        for cg in node.cgs[:]:
-            if cg.cc == zero_perf_cc and cg.replicas >= replicas:
-                cg.replicas -= replicas
-                if cg.replicas == 0:
-                    node.cgs.remove(cg)
-                break
+
+        cg = compact_similar_cgs(node, zero_perf_cc)
+        assert cg is not None and cg.replicas >= replicas, "Can not find the replicas to remove"
+        cg.replicas -= replicas
+        if cg.replicas == 0:
+            node.cgs.remove(cg)
         self.log(f'Completed the removal of {replicas} replicas {cc} from node {node}')
         # Update the count of removed containers at the current time
         self.removed_containers_ratio_sum += replicas * (cc.cores.magnitude / node.ic.cores.magnitude)
@@ -505,7 +469,7 @@ class TimedOps:
 
         event = TimedOps.Event(eventType, containers=(replicas, node, initial_cc, final_cc),
                                callback=self._at_scale_container_replicas_end)
-        if multiplier > 0:
+        if multiplier > 1.0:
             self._add_event(self._last_dispatched_time + self.time_args.hot_container_scale_up_time, event)
         else:
             self._add_event(self._last_dispatched_time + self.time_args.hot_container_scale_down_time, event)

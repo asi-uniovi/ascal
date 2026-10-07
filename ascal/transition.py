@@ -61,8 +61,7 @@ from ascal.helper import (
     Vmt,
     RecyclingVmt,
     get_vmt_allocation_signature,
-    get_app_perf_surplus,
-    similar_ccs
+    get_app_perf_surplus
 )
 
 class TransitionAlgorithm(Enum):
