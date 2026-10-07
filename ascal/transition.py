@@ -296,14 +296,6 @@ class Transition(ABC):
         """
         return self._recycling.node_recycling_level, self._recycling.container_recycling_level
 
-    @abstractmethod
-    def get_recycled_node_pairs(self) -> dict[Vm, Vm]|None:
-        """
-        Get the recycled node pairs.
-        :return: Recycled node pairs or None if the transition algorithm does not use recycling.
-        """
-        pass
-
     @abstractmethod    
     def calculate_transition_plan_sync(self, initial_alloc: Allocation, 
                                        final_alloc: Allocation) -> tuple[list[Command], int]:
@@ -546,14 +538,6 @@ class TransitionBaseline(Transition):
         :return: A tuple with node and container recycling levels.
         """
         return Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING
-
-    def get_recycled_node_pairs(self) -> None:
-        """
-        Get the recycled node pairs.
-        :return: Recycled node pairs.
-        """
-        # In the baseline transition there is no node recycling, so None is returned.
-        return None
 
     @staticmethod
     def compare_vm_nodes(node1: Vm, node2: Vm) -> bool:
@@ -1905,12 +1889,12 @@ class TransitionRBT(Transition):
         """
         return self._recycling.node_recycling_level, self._recycling.container_recycling_level
 
-    def get_recycled_node_pairs(self) -> dict[Vm, Vm]:
+    def get_node_pairs(self) -> dict[Vm, Vm]:
         """
-        Get the recycled node pairs.
-        :return: Recycled node pairs.
+        Get the recycled and upgraded node pairs used by this transition.
+        :return: Recycled and upgraded node pairs.
         """
-        return self._recycling_vm.recycled_node_pairs
+        return self._recycling_vm.recycled_node_pairs | self._recycling_vm.upgraded_node_pairs
 
     def _debug_check_copy_label_obsolete_containers(self) -> bool:            
         """ 

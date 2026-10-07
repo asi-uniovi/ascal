@@ -259,8 +259,8 @@ class HVPredictiveAutoscaler(Autoscaler):
             # Recycling levels coming from the first transition
             node_recycling_level1, container_recycling_level1 = self._transition.get_recycling_levels()
 
-            # Get a dictionary with the initial node corresponding to each recycled node.
-            recycled_node_pairs1 = self._transition.get_recycled_node_pairs()
+            # Get a dictionary with the initial node corresponding to each recycled or upgraded node
+            recycled_node_pairs1 = self._transition.get_node_pairs()
             inverse_recycled_node_pairs1 = {
                 final_node: initial_node
                 for initial_node, final_node in recycled_node_pairs1.items()
@@ -288,7 +288,7 @@ class HVPredictiveAutoscaler(Autoscaler):
                 node.free_cores, node.free_mem, node.cgs, node.history = removed_nodes_backup[node]
 
             # Commands of the second transition work with the intermediate nodes, but need to work
-            # with the same nodes as the first transition
+            # with the same nodes as the first transition when they are recycled
             commands2 = [command2.replace_nodes(inverse_recycled_node_pairs1) for command2 in commands2]
 
             # Recycling levels coming from the second transition

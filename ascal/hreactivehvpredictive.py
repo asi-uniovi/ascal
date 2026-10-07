@@ -208,8 +208,8 @@ class HReactiveHVPredictiveAutoscaler(HReactiveAutoscaler):
             # Recycling levels coming from the first transition
             node_recycling_level1, container_recycling_level1 = self._transition.get_recycling_levels()
 
-            # Get a dictionary with the initial node corresponding to each recycled node
-            recycled_node_pairs1 = self._transition.get_recycled_node_pairs()
+            # Get a dictionary with the initial node corresponding to each recycled or upgraded node
+            recycled_node_pairs1 = self._transition.get_node_pairs()
             inverse_recycled_node_pairs1 = {
                 final_node: initial_node
                 for initial_node, final_node in recycled_node_pairs1.items()
