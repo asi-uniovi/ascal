@@ -9,9 +9,9 @@ from math import ceil
 from fcma import (
     App,
     Allocation,
+    InstanceClassFamily,
     Vm,
     ContainerClass,
-    InstanceClass,
     ContainerGroup,
     RequestsPerTime,
 )
@@ -57,7 +57,7 @@ class HReactiveAutoscaler(Autoscaler):
         self._node_scale_down_stabilization_time = node_scale_down_stabilization_time
         self._tolerance_replicas = tolerance_replicas
         self._app_loads: dict[App, list[RequestsPerTime]] = {} # Application workloads in a time period
-        self._ics: list[InstanceClass] = [] # Instance class family
+        self._fm: InstanceClassFamily = None # Instance class family
         self._app_ccs: dict[App, list[ContainerClass]] = {} # Application container classes
         self._desired_app_replicas: dict[App, int] = {} # Desired application replicas
         self._enable_node_creation = True # Set to enable node creation
@@ -234,7 +234,7 @@ class HReactiveAutoscaler(Autoscaler):
 
         # Create the nodes
         if len(cgs_to_allocate) > 0 and self._enable_node_creation:
-            new_nodes = get_required_nodes(self._ics, cgs)
+            new_nodes = get_required_nodes(self._fm, cgs)
             # Change node IDs so that they are new
             current_ids = defaultdict(lambda: [])
             for node in self.allocation:
@@ -395,7 +395,7 @@ class HReactiveAutoscaler(Autoscaler):
         if self.time == 0:
             # Prepare data required in the next times
             self._app_loads = {app: [workload] for app, workload in app_workloads.items()}
-            self._ics = list(self.system.keys())[0][1].ics # Available instance classes
+            self._fm = list(self.system.keys())[0][1] # Instance class family
             # Application container classes sorted by decreasing aggregation level
             self._app_ccs = get_app_ccs(self.system, self._aggs)
             for app in self._app_ccs:

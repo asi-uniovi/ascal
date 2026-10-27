@@ -78,7 +78,7 @@ class Recycling:
         final_containers.sort(key = lambda x: x[0].cores.magnitude, reverse=scale_up)
         i = 0
         j = 0
-        scaled_up_pairs = []
+        scaled_pairs = []
         while i < len(initial_containers) and j < len(final_containers):
             if scale_up:
                 scale_condition = initial_containers[i][0].cores.magnitude < final_containers[j][0].cores.magnitude  
@@ -86,7 +86,7 @@ class Recycling:
                 scale_condition = initial_containers[i][0].cores.magnitude > final_containers[j][0].cores.magnitude
             if scale_condition:
                 scaled_replicas = min(initial_containers[i][1], final_containers[j][1])
-                scaled_up_pairs.append((initial_containers[i][0], final_containers[j][0], scaled_replicas))
+                scaled_pairs.append((initial_containers[i][0], final_containers[j][0], scaled_replicas))
                 initial_containers[i] = (initial_containers[i][0], initial_containers[i][1] - scaled_replicas)
                 final_containers[j] = (final_containers[j][0], final_containers[j][1] - scaled_replicas)
                 if initial_containers[i][1] == 0:
@@ -99,7 +99,7 @@ class Recycling:
         initial_containers[:] = [c for c in initial_containers if c[1] > 0]
         final_containers[:] = [c for c in final_containers if c[1] > 0]
 
-        return scaled_up_pairs
+        return scaled_pairs
 
     def __init__(self, initial_alloc: Allocation, final_alloc: Allocation, 
                  hot_scale_up_nodes: list[Vm] = [], hot_container_scale: bool = False):

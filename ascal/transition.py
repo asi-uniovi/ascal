@@ -1308,6 +1308,10 @@ class TransitionRBT(Transition):
         fcma_problem = Fcma(self._system, workloads=app_performance)
         solving_pars = SolvingPars(speed_level=3)
         solution = fcma_problem.solve(solving_pars)
+        # Change the instance class family of the nodes to the family in the solution
+        for fm, nodes in solution.allocation.items():
+            for node in nodes:
+                node.ic = replace(node.ic, family=fm)
         allocation = []
         for _, nodes in solution.allocation.items():
             allocation.extend(nodes)

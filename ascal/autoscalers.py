@@ -2,7 +2,7 @@
 Implement a base class for autoscalers
 """
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from abc import ABC, abstractmethod
 from numpy import percentile
 from fcma import Fcma, SolvingPars, Allocation, App, RequestsPerTime
@@ -95,9 +95,14 @@ class Autoscaler(ABC):
             fcma_speed_level = solver.value
             problem = Fcma(self.system, workloads=workloads)
             solution = problem.solve(SolvingPars(speed_level=fcma_speed_level))
+            # Change the instance class family of the nodes to the family in the solution
+            for fm, nodes in solution.allocation.items():
+                for node in nodes:
+                    node.ic = replace(node.ic, family=fm)
+            # vm_before_promotion will be used to store the node before upgrade in the transition
             for _, nodes in solution.allocation.items():
                 for node in nodes:
-                    node.vm_before_promotion = None # It will be used to store the node before upgrade in the transition
+                    node.vm_before_promotion = None 
             return [node for _, nodes in solution.allocation.items() for node in nodes]
         elif solver == AllocationSolver.MNCF:
             return mncf_allocation(self.system, workloads)

@@ -3,10 +3,11 @@ A bunch of auxiliary methods for atoscaling
 """
 from copy import deepcopy
 from math import ceil
+from dataclasses import replace
 from json import dumps
 from collections import defaultdict, Counter
 from cloudmodel.unified.units import CurrencyPerTime
-from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, InstanceClass, ContainerGroup, System
+from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, InstanceClassFamily, ContainerGroup, System
 from ascal.recycling import Recycling
 
 _DELTA = 0.000001
@@ -389,10 +390,10 @@ def get_cgs_from_workload(system: System, workloads: dict[App, RequestsPerTime],
                 break
     return cgs
 
-def get_required_nodes(ic_list: list[InstanceClass], cgs: list[ContainerGroup], allocate:bool = False) -> Allocation:
+def get_required_nodes(fm: InstanceClassFamily, cgs: list[ContainerGroup], allocate:bool = False) -> Allocation:
     """
     Get the required nodes to allocate the containers.
-    :param ic_list: List of available instance classes to allocate containers.
+    :param fm: The instance class family for the nodes.
     :param cgs: Container groups, defined by container classes and number of replicas.
     :param allocate: In addition to get the required nodes, allocate containers on the nodes.
     :return: A list with the required nodes.
@@ -404,12 +405,13 @@ def get_required_nodes(ic_list: list[InstanceClass], cgs: list[ContainerGroup], 
     required_nodes = []
 
     # Sort available instance classes by increasing prices
-    ics = list(ic_list)
+    ics = list(fm.ics)
     ics.sort(key=lambda i: i.price)
 
     # Simulate allocation using the minimum number of nodes of the more expensive instance class
     more_expensive_ic = ics[-1]
     new_node = Vm(more_expensive_ic)
+    new_node.ic = replace(more_expensive_ic, family=fm)
     required_nodes.append(new_node)
     for cg in deepcopy(cgs):
         while cg.replicas > 0:
@@ -440,6 +442,7 @@ def get_required_nodes(ic_list: list[InstanceClass], cgs: list[ContainerGroup], 
             if ic.cores >= cpu_usage and ic.mem >= mem_usage and ic.price < node_price:
                 lowest_cost_ic = ic
                 cheaper_node = Vm(lowest_cost_ic)
+                cheaper_node.ic = replace(lowest_cost_ic, family=fm)
                 cheaper_node.cgs = node.cgs
                 cheaper_node.free_cores = cheaper_node.ic.cores - cpu_usage
                 cheaper_node.free_mem = cheaper_node.ic.mem - mem_usage
@@ -478,7 +481,7 @@ def mncf_allocation(system: System, workloads: dict[App, RequestsPerTime]) -> Al
         fm_cgs[cg.cc.fm].append(cg)
 
     # Calculate allocations using a single family
-    allocations = {fm: get_required_nodes(fm.ics, cgs, allocate=True) for fm, cgs in fm_cgs.items()}
+    allocations = {fm: get_required_nodes(fm, cgs, allocate=True) for fm, cgs in fm_cgs.items()}
     allocations_cost = {fm: sum((node.ic.price for node in allocation)) for fm, allocation in allocations.items()}
 
     # We are interested in the family with the lowest cost
