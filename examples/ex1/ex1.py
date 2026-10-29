@@ -4,7 +4,7 @@ Example of autoscaling problem
 
 from numpy import mean
 from ascal import AscalConfig, Ascal
-from examples import aws_eu_west_1_c5m5r5
+from examples import aws_eu_west_1_c5_m5_r5, aws_eu_west_1_c7a_m7a_r7a 
 
 import os
 
@@ -19,8 +19,12 @@ if not os.path.exists(config_file):
     raise FileNotFoundError(f"{config_file} not found in {os.getcwd()}")
 
 # Read the problem configuration file and validate it.
-# It is possible to validate any configuration with method validate_config().
-ascal_config = AscalConfig.get_from_config_yaml(config_file, aws_eu_west_1_c5m5r5.c5_m5_r5_fm)
+# It is possible to validate any configuration with method validate_config()
+ic_families = [
+    aws_eu_west_1_c5_m5_r5.c5_m5_r5_fm, 
+    aws_eu_west_1_c7a_m7a_r7a.c7a_m7a_r7a_fm
+]
+ascal_config = AscalConfig.get_from_config_yaml(config_file, ic_families)
 
 # Create the autoscaling problem
 ascal_problem = Ascal(ascal_config, log=log_file)

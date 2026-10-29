@@ -1,16 +1,27 @@
 """
 A bunch of auxiliary methods for atoscaling
 """
-from copy import deepcopy
+from copy import copy, deepcopy
 from math import ceil
 from dataclasses import replace
 from json import dumps
 from collections import defaultdict, Counter
 from cloudmodel.unified.units import CurrencyPerTime
-from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, InstanceClassFamily, ContainerGroup, System
+from fcma import Allocation, App, RequestsPerTime, Vm, ContainerClass, InstanceClass, InstanceClassFamily, ContainerGroup, System
 from ascal.recycling import Recycling
 
 _DELTA = 0.000001
+
+def set_class_family(ic: InstanceClass, fm: InstanceClassFamily) -> InstanceClass:
+    """
+    Return a copy of an instance class with the given family. Note that using replace(ic, family=fm)
+    would execute the _post_init method that woul add a new instance class to the instance class family.
+    :param ic: An instance class.
+    :param family: An instance class family.
+    :return: A copy of the instance class with the given family."""
+    result = copy(ic)
+    object.__setattr__(result, "family", fm)
+    return result
 
 class Vmt:
     """
@@ -411,7 +422,7 @@ def get_required_nodes(fm: InstanceClassFamily, cgs: list[ContainerGroup], alloc
     # Simulate allocation using the minimum number of nodes of the more expensive instance class
     more_expensive_ic = ics[-1]
     new_node = Vm(more_expensive_ic)
-    new_node.ic = replace(more_expensive_ic, family=fm)
+    new_node.ic = set_class_family(more_expensive_ic, fm)
     required_nodes.append(new_node)
     for cg in deepcopy(cgs):
         while cg.replicas > 0:

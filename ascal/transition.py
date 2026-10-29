@@ -61,7 +61,8 @@ from ascal.helper import (
     Vmt,
     RecyclingVmt,
     get_vmt_allocation_signature,
-    get_app_perf_surplus
+    get_app_perf_surplus,
+    set_class_family
 )
 
 class TransitionAlgorithm(Enum):
@@ -1311,7 +1312,7 @@ class TransitionRBT(Transition):
         # Change the instance class family of the nodes to the family in the solution
         for fm, nodes in solution.allocation.items():
             for node in nodes:
-                node.ic = replace(node.ic, family=fm)
+                node.ic = set_class_family(node.ic, fm)
         allocation = []
         for _, nodes in solution.allocation.items():
             allocation.extend(nodes)

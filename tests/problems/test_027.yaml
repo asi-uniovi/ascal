@@ -29,10 +29,11 @@ apps:
       load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
-      cpu: 260 mcores
-      mem: 0.420 GiB
-      perf: 1 req/s
-      aggs: [1, 2, 4]
+      c5_m5_r5:
+        cpu: 260 mcores
+        mem: 0.420 GiB
+        perf: 1 req/s
+        aggs: [1, 2, 4]
   app1:
     load:
       file: ../../traces/trace-app1-24h-rand-10.csv # Integer load samples in req/s
@@ -42,10 +43,11 @@ apps:
       load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
-      cpu: 300 mcores
-      mem: 0.500 GiB
-      perf: 1 req/s
-      aggs: [1, 2, 4]
+      c5_m5_r5:
+        cpu: 300 mcores
+        mem: 0.500 GiB
+        perf: 1 req/s
+        aggs: [1, 2, 4]
   app2:
     load:
       file: ../../traces/trace-app2-24h-rand-10.csv # Integer load samples in req/s
@@ -55,10 +57,11 @@ apps:
       load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
-      cpu: 400 mcores
-      mem: 0.580 GiB
-      perf: 1 req/s
-      aggs: [1, 2, 4]
+      c5_m5_r5:
+        cpu: 400 mcores
+        mem: 0.580 GiB
+        perf: 1 req/s
+        aggs: [1, 2, 4]
   app3:
     load:
       file: ../../traces/trace-app3-24h-rand-10.csv # Integer load samples in req/s
@@ -68,10 +71,11 @@ apps:
       load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
-      cpu: 350 mcores
-      mem: 0.540 GiB
-      perf: 1 req/s
-      aggs: [1, 2, 4]
+      c5_m5_r5:
+        cpu: 350 mcores
+        mem: 0.540 GiB
+        perf: 1 req/s
+        aggs: [1, 2, 4]
   app4:
     load:
       file: ../../traces/trace-app4-24h-rand-10.csv # Integer load samples in req/s
@@ -81,10 +85,11 @@ apps:
       load_mult: 1 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
-      cpu: 650 mcores
-      mem: 0.540 GiB
-      perf: 1 req/s
-      aggs: [1, 2, 4]
+      c5_m5_r5:
+        cpu: 650 mcores
+        mem: 0.540 GiB
+        perf: 1 req/s
+        aggs: [1, 2, 4]
 
 # Simulation time in seconds.
 # If application traces are short, the last load in the trace is repeated.

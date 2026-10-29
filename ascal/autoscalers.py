@@ -8,7 +8,7 @@ from numpy import percentile
 from fcma import Fcma, SolvingPars, Allocation, App, RequestsPerTime
 from ascal.timedops import TimedOps
 from ascal.transition import Command, Vmt
-from ascal.helper import mncf_allocation
+from ascal.helper import mncf_allocation, set_class_family
 
 
 class AutoscalerTypes(Enum):
@@ -98,7 +98,7 @@ class Autoscaler(ABC):
             # Change the instance class family of the nodes to the family in the solution
             for fm, nodes in solution.allocation.items():
                 for node in nodes:
-                    node.ic = replace(node.ic, family=fm)
+                    node.ic = set_class_family(node.ic, fm)
             # vm_before_promotion will be used to store the node before upgrade in the transition
             for _, nodes in solution.allocation.items():
                 for node in nodes:

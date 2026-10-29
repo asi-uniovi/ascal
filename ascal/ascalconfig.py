@@ -2,6 +2,7 @@
 Get and check Ascal configuration from a YAML file.
 """
 
+from collections.abc import Sequence
 from yaml import safe_load
 import csv
 from fcma import (
@@ -48,13 +49,24 @@ class AscalConfig:
             self.autoscaler = HReactiveHVPredictiveAutoscaler()
 
     @staticmethod
-    def get_from_config_yaml(yaml_file:str, ic_family: InstanceClassFamily) -> 'AscalConfig':
+    def get_from_config_yaml(yaml_file: str, ic_families: InstanceClassFamily | Sequence[InstanceClassFamily]) \
+            -> 'AscalConfig':
         """
         Get Ascal configuration from a YAML file and a family of instance classes.
         :param yaml_file: YAML file with the configuration.
-        :param ic_family: Family containing instance classes for nodes with the same base hardware.
+        :param ic_families: Family or sequence of families containing instance classes for nodes.
         :return: An Ascal configuration object.
         """
+        if isinstance(ic_families, InstanceClassFamily):
+            root_families = [ic_families]
+        elif isinstance(ic_families, Sequence):
+            root_families = list(ic_families)
+        else:
+            raise TypeError("Instance class families must be an InstanceClassFamily or a sequence of families")
+        if not root_families or any(not isinstance(family, InstanceClassFamily) for family in root_families):
+            raise TypeError("Instance class families must contain one or more InstanceClassFamily objects")
+        families = AscalConfig._get_instance_class_families(root_families)
+        
         with open(yaml_file, "r") as file:
             data = safe_load(file)
             AscalConfig.validate_config(data)
@@ -62,18 +74,33 @@ class AscalConfig:
 
             config.system = {}
             config.apps = []
-            app_names = []
             for app_name in data['apps']:
                 app = App(app_name)
                 config.apps.append(app)
-                app_names.append(app.name)
-                aggs = tuple(data['apps'][app_name]['container']['aggs'])
-                cores = ComputationalUnits(data['apps'][app_name]['container']['cpu'])
-                mem_agg1 = Storage(data['apps'][app_name]['container']['mem'])
-                gib = tuple(mem_agg1 for _ in aggs)
-                perf = RequestsPerTime(data['apps'][app_name]['container']['perf'])
-                app_family_perf = AppFamilyPerf(cores=cores, mem=gib, perf=perf, aggs=aggs)
-                config.system[(app, ic_family)] = app_family_perf
+                container_configs = AscalConfig._get_container_configs(data, app_name)
+                for family_name, container_config in container_configs.items():
+                    if family_name is None:
+                        if len(root_families) == 1:
+                            family = root_families[0]
+                        else:
+                            raise ValueError(
+                                f"Legacy container configuration for app '{app_name}' "
+                                "requires exactly one instance class family"
+                            )
+                    else:
+                        try:
+                            family = families[family_name]
+                        except KeyError as error:
+                            raise ValueError(
+                                f"Unknown instance class family '{family_name}' for app '{app_name}'"
+                            ) from error
+                    aggs = tuple(container_config['aggs'])
+                    cores = ComputationalUnits(container_config['cpu'])
+                    mem_agg1 = Storage(container_config['mem'])
+                    gib = tuple(mem_agg1 for _ in aggs)
+                    perf = RequestsPerTime(container_config['perf'])
+                    app_family_perf = AppFamilyPerf(cores=cores, mem=gib, perf=perf, aggs=aggs)
+                    config.system[(app, family)] = app_family_perf
 
         config.autoscaler.system = config.system
 
@@ -101,6 +128,39 @@ class AscalConfig:
             raise ValueError("Error reading the workload file")
 
         return config
+
+    @staticmethod
+    def _get_instance_class_families(root_families: Sequence[InstanceClassFamily]) -> dict[str, InstanceClassFamily]:
+        """
+        Resolve family names from YAML to the supplied family objects.
+        :param root_families: A sequence of root instance class families.
+        :return: A dictionary mapping family names to family objects.
+        """
+        families = {}
+        pending = list(root_families)
+        while pending:
+            family = pending.pop()
+            if family.name in families:
+                continue
+            families[family.name] = family
+            pending.extend(family.parent_fms)
+            pending.extend(ic.family for ic in family.ics)
+        return families
+
+    @staticmethod
+    def _get_container_configs(data, app_name: str) -> dict[str | None, dict]:
+        """Return container settings keyed by family, normalizing the legacy flat format."""
+        container = data['apps'][app_name]['container']
+        container_properties = {"cpu", "mem", "perf", "aggs"}
+        if set(container) == container_properties:
+            return {None: container}
+        return container
+
+    @staticmethod
+    def _get_app_aggs(data, app_name: str) -> set[int]:
+        """Get aggregation levels supported by every configured family for an app."""
+        container_configs = AscalConfig._get_container_configs(data, app_name).values()
+        return set.intersection(*(set(container["aggs"]) for container in container_configs))
 
     @staticmethod
     def validate_config(config):
@@ -143,13 +203,14 @@ class AscalConfig:
         if isinstance(aggs, int):  # Aggregations in the autoscaler can be a single integer
             agg = aggs  # Aggregations are in fact a single aggregation
             for app in apps:
-                if agg not in data['apps'][app.name]['container']['aggs']:
+                if agg not in AscalConfig._get_app_aggs(data, app.name):
                     raise ValueError("Invalid aggregation level in h_autoscaler")
                 aggs_dict[app] = [agg]
         elif isinstance(aggs, list):  # Aggregations in the autoscaler can be a list of integers
             for app in apps:
+                available_aggs = AscalConfig._get_app_aggs(data, app.name)
                 for agg in aggs:
-                    if agg not in data['apps'][app.name]['container']['aggs']:
+                    if agg not in available_aggs:
                         raise ValueError("Invalid aggregation level in h_autoscaler")
                 aggs_dict[app] = aggs
         elif isinstance(aggs, dict):  # Aggregations in the autoscaler can be a dictionary
@@ -161,14 +222,15 @@ class AscalConfig:
                     app = apps[app_names.index(app_name)]
                 except ValueError:
                     raise ValueError("Invalid app in agg field of h_autoscaler")
+                available_aggs = AscalConfig._get_app_aggs(data, app_name)
                 if isinstance(aggs, int):
                     agg = aggs  # Aggregations are in fact a single aggregation
-                    if agg not in data['apps'][app.name]['container']['aggs']:
+                    if agg not in available_aggs:
                         raise ValueError("Invalid aggregation level in h_autoscaler")
                     aggs_dict[app] = [agg]
                 elif isinstance(aggs, list):
                     for agg in aggs:
-                        if agg not in data['apps'][app_name]['container']['aggs']:
+                        if agg not in available_aggs:
                             raise ValueError("Invalid aggregation level in h_autoscaler")
                     aggs_dict[app] = aggs
                 else:
@@ -628,15 +690,30 @@ class AscalConfig:
             AscalConfig._check_fields(config["apps"][key]["load"],
                          ["file", "time_interval", "repeat", "load_offset", "load_mult", "time_offset"],
                          [str, int, int, int, (int, float), int])
-            container_properties = ["cpu", "mem", "perf", "aggs"]
-            if set(container_properties) != set(val["container"]):
+            container_properties = {"cpu", "mem", "perf", "aggs"}
+            container = val["container"]
+            if not isinstance(container, dict) or not container:
                 raise ValueError(f"Invalid or missing property in apps: {key}: container")
-            AscalConfig._check_fields(config["apps"][key]["container"],
-                         ["cpu", "mem", "perf", "aggs"],
-                         [str, str, str, list])
-            for v in config["apps"][key]["container"]["aggs"]:
-                if not (isinstance(v, int) and v >= 1):
-                    raise ValueError(f"{key}: Aggregations must be integer equal to or higher than zero")
-            if len(set(config["apps"][key]["container"]["aggs"])) != len(config["apps"][key]["container"]["aggs"]):
-                raise ValueError(f"{key}: Repeated aggregations")
+            if set(container) == container_properties:
+                container_configs = [container]
+            else:
+                if any(not isinstance(family, str) or not family for family in container):
+                    raise ValueError(f"Invalid family in apps: {key}: container")
+                container_configs = list(container.values())
 
+            for container_config in container_configs:
+                if not isinstance(container_config, dict) or \
+                        set(container_properties) != set(container_config):
+                    raise ValueError(f"Invalid or missing property in apps: {key}: container")
+                AscalConfig._check_fields(
+                    container_config,
+                    ["cpu", "mem", "perf", "aggs"],
+                    [str, str, str, list]
+                )
+                for aggregation in container_config["aggs"]:
+                    if not (isinstance(aggregation, int) and aggregation >= 1):
+                        raise ValueError(
+                            f"{key}: Aggregations must be integer equal to or higher than zero"
+                        )
+                if len(set(container_config["aggs"])) != len(container_config["aggs"]):
+                    raise ValueError(f"{key}: Repeated aggregations")

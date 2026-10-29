@@ -32,10 +32,11 @@ apps:
       load_mult: 1
       time_offset: 0
     container:
-      cpu: 400 mcores
-      mem: 0.420 GiB
-      perf: 1 req/s
-      aggs: [1, 2]
+      c5_m5_r5:
+        cpu: 400 mcores
+        mem: 0.420 GiB
+        perf: 1 req/s
+        aggs: [1, 2]
 
 # Simulation time in seconds.
 # If application traces are short, the last load in the trace is repeated.

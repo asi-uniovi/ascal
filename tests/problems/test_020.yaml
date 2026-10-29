@@ -31,10 +31,11 @@ apps:
       load_mult: 4 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 0 # Advance this number of samples and complete with the last value
     container:
-      cpu: 260 mcores
-      mem: 0.420 GiB
-      perf: 1 req/s
-      aggs: [1, 2, 4]
+      c5_m5_r5:
+        cpu: 260 mcores
+        mem: 0.420 GiB
+        perf: 1 req/s
+        aggs: [1, 2, 4]
   app1:
     load:
       file: ../../traces/triangle_rand.csv # Integer load samples in req/s
@@ -44,10 +45,11 @@ apps:
       load_mult: 3 # Multiplier for the load samples (multiplies also the load offset)
       time_offset: 100 # Advance this number of samples and complete with the last value
     container:
-      cpu: 300 mcores
-      mem: 0.500 GiB
-      perf: 1 req/s
-      aggs: [1, 2, 4]
+      c5_m5_r5:
+        cpu: 300 mcores
+        mem: 0.500 GiB
+        perf: 1 req/s
+        aggs: [1, 2, 4]
 
 # Simulation time in seconds.
 # If application traces are short, the last load in the trace is repeated.
