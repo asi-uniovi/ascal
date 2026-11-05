@@ -19,7 +19,7 @@ from ascal.recycling import Recycling
 from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
 from ascal.autoscalers import Autoscaler, AutoscalerStatistics
-from ascal.helper import get_app_ccs, get_required_nodes, mncf_allocation
+from ascal.helper import get_icf_app_ccs, get_required_nodes, mncf_allocation
 
 
 class HReactiveAutoscaler(Autoscaler):
@@ -57,8 +57,8 @@ class HReactiveAutoscaler(Autoscaler):
         self._node_scale_down_stabilization_time = node_scale_down_stabilization_time
         self._tolerance_replicas = tolerance_replicas
         self._app_loads: dict[App, list[RequestsPerTime]] = {} # Application workloads in a time period
-        self._fm: InstanceClassFamily = None # Instance class family
-        self._app_ccs: dict[App, list[ContainerClass]] = {} # Application container classes
+        self._families: list[InstanceClassFamily] = [] # Valid Instance class families for all the apps
+        self._app_ccs: dict[App, list[ContainerClass]] = {} # Application classes for the active family
         self._desired_app_replicas: dict[App, int] = {} # Desired application replicas
         self._enable_node_creation = True # Set to enable node creation
         self._enable_node_removal = True # Set to enable node removal
@@ -77,7 +77,11 @@ class HReactiveAutoscaler(Autoscaler):
         incremented_workloads = {}
         for app in workloads:
             incremented_workloads[app] = workloads[app] / self._desired_cpu_utilization
-        allocation = mncf_allocation(self.system, incremented_workloads)
+        icf_app_aggs = (
+            {icf: self._aggs for icf in self._families}
+            if self._aggs is not None else None
+        )
+        allocation = mncf_allocation(self.system, incremented_workloads, icf_app_aggs)
         for node in allocation:
             NodeStates.set_state(node, NodeStates.READY)
         self.log(f'Initial allocation with {tuple(str(node) for node in allocation)}')
@@ -234,7 +238,8 @@ class HReactiveAutoscaler(Autoscaler):
 
         # Create the nodes
         if len(cgs_to_allocate) > 0 and self._enable_node_creation:
-            new_nodes = get_required_nodes(self._fm, cgs)
+            # The required nodes come the first valid instance class family
+            new_nodes = get_required_nodes(self._families[0], cgs)
             # Change node IDs so that they are new
             current_ids = defaultdict(lambda: [])
             for node in self.allocation:
@@ -364,7 +369,8 @@ class HReactiveAutoscaler(Autoscaler):
         """
         Set the desired number of equivalent agg=1 replicas for each application.
         """
-        for app, icf in self.system:
+        icf = self._families[0]
+        for app in self.apps:
             replica_perf = self.system[(app, icf)].perf
             current_replicas = self._get_replicas(app)
             average_load = sum(self._app_loads[app][-self._time_period:]) / self._time_period
@@ -395,13 +401,31 @@ class HReactiveAutoscaler(Autoscaler):
         if self.time == 0:
             # Prepare data required in the next times
             self._app_loads = {app: [workload] for app, workload in app_workloads.items()}
-            self._fm = list(self.system.keys())[0][1] # Instance class family
+            apps = {app for app, _ in self.system}
+            families = dict.fromkeys(family for _, family in self.system)
+            self._families = [
+                family
+                for family in families
+                if all((app, family) in self.system for app in apps)
+            ]
+            if not self._families:
+                raise ValueError("No instance class family supports all applications")
+   
             # Application container classes sorted by decreasing aggregation level
-            self._app_ccs = get_app_ccs(self.system, self._aggs)
-            for app in self._app_ccs:
-                self._app_ccs[app].sort(key=lambda c: c.agg_level, reverse=True)
+            icf_app_aggs = (
+                {icf: self._aggs for icf in self._families}
+                if self._aggs is not None else None
+            )
+            icf_app_ccs = get_icf_app_ccs(self.system, icf_app_aggs)
+            for app_ccs_by_app in icf_app_ccs.values():
+                for app_ccs in app_ccs_by_app.values():
+                    app_ccs.sort(key=lambda c: c.agg_level, reverse=True)
+   
             # Node creation time and container allocation time are assumed to be zero for the initial allocation
             self.allocation = self._initial_allocation(app_workloads)
+            active_family = self.allocation[0].ic.family
+            self._families = [active_family]
+            self._app_ccs = icf_app_ccs[active_family]
             self.time += 1
             statistics = AutoscalerStatistics(True, True, 0, 0, current_time() - initial_time,
                                               Recycling.INVALID_RECYCLING, Recycling.INVALID_RECYCLING)
@@ -443,4 +467,3 @@ class HReactiveAutoscaler(Autoscaler):
             self.removed_containers_ratio_sum = self._timedops.removed_containers_ratio_sum
 
             return statistics
-

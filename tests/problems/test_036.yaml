@@ -2,7 +2,7 @@ autoscalers:
   hv_reactive: # Horizontal/vertical+reactive autoscaling
     time_period: 150 # Time period to evaluate autoscaling
     desired_cpu_utilization: 0.7  # Desired CPU utilization
-    algorithm: fcma, rbt1 # Allocation/transition algorithm
+    algorithm: fcma, rbt2 # Allocation/transition algorithm
     hot_node_scale_up: True # True if hot scaling-up of nodes is possible
     hot_container_scale: True # True if hot scaling-up and scaling-down of containers is possible
 

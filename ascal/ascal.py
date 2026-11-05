@@ -10,12 +10,14 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
+import warnings
 from fcma import RequestsPerTime, Allocation, App, Vm
 from ascal.autoscalers import Autoscaler
 from ascal.hvpredictive import HVPredictiveAutoscaler
 from ascal.hreactivehvpredictive import HReactiveHVPredictiveAutoscaler
 from ascal.nodestates import NodeStates
 from ascal.ascalconfig import AscalConfig
+from ascal.transition import TransitionAlgorithm
 
 # Constant used to deal with numerical approximations
 
@@ -36,6 +38,15 @@ class Ascal:
         self._autoscaler.system = ascal_config.system
         self._autoscaler.apps = ascal_config.apps
         self._autoscaler.log_path = log # A string with the path of the log file
+        if (getattr(self._autoscaler, "_hot_container_scale", False) and
+                getattr(self._autoscaler, "_transition_algorithm", None) == TransitionAlgorithm.RBT1):
+            warning_message = (
+                "Hot container scaling is incompatible with RBT1; switching the transition "
+                "algorithm to RBT2."
+            )
+            warnings.warn(warning_message, UserWarning, stacklevel=2)
+            self._autoscaler.log(f"WARNING: {warning_message}")
+            self._autoscaler._transition_algorithm = TransitionAlgorithm.RBT2
         self._metrics_period = metrics_period # Subsamples in each CPU utilization and queue waiting time sample
 
         # Samples of node CPU utilization. Samples are averaged in the metrics period
@@ -217,8 +228,9 @@ class Ascal:
             if current_node not in self._cpu_util_samples:
                 self._cpu_util_samples[current_node] = []
         # Remove the oldest subsample when the number of subsamples is equal to the metrics period
-        if len(self._cpu_util_samples) == self._metrics_period:
-            self._cpu_util_samples.pop(0)
+        for node in self._cpu_util_samples:
+            if len(self._cpu_util_samples[node]) == self._metrics_period:
+                self._cpu_util_samples[node].pop(0)
         for node in current_nodes:
             assert round(cpu_util_sample[node], 6) <= 1.0 # Check the validity of CPU utilizations
             self._cpu_util_samples[node].append(cpu_util_sample[node])
@@ -588,4 +600,3 @@ class Ascal:
         plt.legend()
 
         plt.show()
-

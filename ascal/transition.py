@@ -53,7 +53,7 @@ from json import loads
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
-from fcma import Fcma, SolvingPars, System, Allocation, App, Vm, ContainerClass, RequestsPerTime, InstanceClass
+from fcma import Fcma, SolvingPars, System, Allocation, App, Vm, ContainerClass, RequestsPerTime, InstanceClass, Storage
 from ascal.timedops import TimedOps
 from ascal.recycling import Recycling
 from ascal.helper import (
@@ -62,7 +62,7 @@ from ascal.helper import (
     RecyclingVmt,
     get_vmt_allocation_signature,
     get_app_perf_surplus,
-    set_class_family
+    copy_set_class_family
 )
 
 class TransitionAlgorithm(Enum):
@@ -651,7 +651,7 @@ class TransitionRBT(Transition):
         self._rbt1 = transition_algorithm == TransitionAlgorithm.RBT1 
         self._rbt2 = transition_algorithm == TransitionAlgorithm.RBT2 
         self._rbt3 = transition_algorithm == TransitionAlgorithm.RBT3
-        self.new_cc_id = 0
+        self._new_cc_id = 0
 
     def _remove_allocate(self, cc: ContainerClass, replicas: int, node: Vmt, command: Command, 
                          obsolete: bool=False) -> tuple[int, list[tuple[ContainerClass, int, Vmt]]]:
@@ -675,7 +675,9 @@ class TransitionRBT(Transition):
 
         # Required computational resources to allocate the replicas
         required_cores = replicas * cc.cores
-        required_mem = replicas * cc.memv
+        required_mem = node.get_cc_mem(cc, node.replicas[cc] + replicas) -\
+                       node.get_cc_mem(cc, node.replicas[cc])
+        total_required_mem = required_mem
 
         # Obsolete replicas in the node to be removed in order to allocate the replicas
         obsolete_replicas = []
@@ -689,7 +691,7 @@ class TransitionRBT(Transition):
                 # Number of required obsolete replicas of the container class to remove
                 required_replicas = max(
                     ceil((required_cores - node.free_cores) / obsolete_cc.cores),
-                    ceil((required_mem - node.free_mem) / obsolete_cc.memv)
+                    node.get_replicas_to_free_mem(obsolete_cc, required_mem - node.free_mem)[0]
                 )
                 if required_replicas == 0:
                     break
@@ -701,18 +703,18 @@ class TransitionRBT(Transition):
                     available_perf_surplus[obsolete_cc.app] -= obsolete_cc.perf * obsolete_replicas_count
                     obsolete_replicas.append((obsolete_cc, obsolete_replicas_count))
                     required_cores -= obsolete_replicas_count * obsolete_cc.cores
-                    required_mem -= obsolete_replicas_count * obsolete_cc.memv
+                    current_replicas = node.replicas[obsolete_cc]
+                    required_mem -= (
+                        node.get_cc_mem(obsolete_cc, current_replicas) -
+                        node.get_cc_mem(obsolete_cc, current_replicas - obsolete_replicas_count)
+                    )
 
         # Calculate the number of cores and memory obtained from the removal of obsolete containers in the node
         removed_cores = replicas * cc.cores - required_cores
-        removed_mem = replicas * cc.memv - required_mem
+        removed_mem = total_required_mem - required_mem
 
         # Calculate how many new container replicas could be allocated after the removals
-        allocatable_replicas = min(
-            replicas,
-            int((node.free_cores.magnitude + removed_cores.magnitude + TransitionRBT._DELTA) / cc.cores.magnitude),
-            int((node.free_mem.magnitude + removed_mem.magnitude + TransitionRBT._DELTA) / cc.memv.magnitude)
-        )
+        allocatable_replicas = min(node.get_allocatable_replicas(cc, removed_cores, removed_mem), replicas)
 
         # Allocate the replicas. At this point, the removals and allocations are actually performed
         if allocatable_replicas > 0:
@@ -734,24 +736,17 @@ class TransitionRBT(Transition):
         :param obsolete: Set to True if the replicas to allocate are obsolete replicas.
         :return: The number of actually allocated replicas.
         """
-        allocatable_replicas = min(
-            replicas,
-            int((node.free_cores.magnitude + TransitionRBT._DELTA) / cc.cores.magnitude),
-            int((node.free_mem.magnitude + TransitionRBT._DELTA) / cc.memv.magnitude)
-        )
+        # The number of allocatable replicas is limited by the number of free cores and memory in 
+        # the node
+        allocatable_replicas = min(replicas, node.get_allocatable_replicas(cc))
+
         if allocatable_replicas == 0:
             return 0
-        node.replicas[cc] += allocatable_replicas
         node.free_cores = node.free_cores - allocatable_replicas * cc.cores
+        node.free_mem -= node.get_cc_mem(cc, node.replicas[cc] + allocatable_replicas) - \
+                         node.get_cc_mem(cc, node.replicas[cc])
+        node.replicas[cc] += allocatable_replicas
         assert node.free_cores.magnitude > - TransitionRBT._DELTA, "Node free cores cannot not be negative"
-        # If hot scaling of containers is disabled
-        if not self._hot_container_scale:  
-            node.free_mem -= allocatable_replicas * cc.memv
-        else:
-            # Allocatable replicas are fragments that are aggregated for scaling purposes.
-            # Thus, memory is reclaimed when the first fragment of an aggregation is allocated.
-            # Memory handling is delayed until combining the fragments at appending command time.
-            pass
         assert node.free_mem.magnitude > - TransitionRBT._DELTA, "Node free memory cannot not be negative"
         command.allocate_containers.append((node, cc, allocatable_replicas))
         if not obsolete:
@@ -814,20 +809,14 @@ class TransitionRBT(Transition):
                 prev_r = r
                 break 
         command.remove_containers.append((node, cc, prev_r + removable_replicas))
+        node.free_cores += cc.cores * removable_replicas
+        node.free_mem += node.get_cc_mem(cc, node.replicas[cc]) - \
+                         node.get_cc_mem(cc, node.replicas[cc] - removable_replicas)
+        assert (node.free_cores - node.ic.cores).magnitude < TransitionRBT._DELTA, "Invalid node free cores"
+        assert (node.free_mem - node.ic.mem).magnitude < TransitionRBT._DELTA, "Invalid node free mem"
         node.replicas[cc] -= removable_replicas
         if node.replicas[cc] == 0:
             del node.replicas[cc]
-        node.free_cores += cc.cores * removable_replicas
-        assert (node.free_cores - node.ic.cores).magnitude < TransitionRBT._DELTA, "Invalid node free cores"
-        if not self._hot_container_scale:
-            node.free_mem += cc.memv * removable_replicas
-        else:
-            # Removable replicas are fragments that are aggregated for scaling purposes. 
-            # Thus, memory is released when the last fragment of an aggregation is removed.
-            # Memory handling is delayed until combining the fragments at appending command time.
-            pass
-
-        assert (node.free_mem - node.ic.mem).magnitude < TransitionRBT._DELTA, "Invalid node free mem"
         performance_surplus[cc.app] -= cc.perf * removable_replicas
         if -TransitionRBT._DELTA <= performance_surplus[cc.app].to("req/s").magnitude < 0:
             performance_surplus[cc.app] = RequestsPerTime("0 req/s")
@@ -872,22 +861,18 @@ class TransitionRBT(Transition):
                     (node.ic.mem - node.free_mem).magnitude < Transition._DELTA:
                 empty_nodes.append(node)
                 continue
-            free_cores = node.free_cores
-            free_mem = node.free_mem
-            app_perf_surplus = dict(self._app_perf_surplus) # Copy of application's performance surplus
-            for cc, replicas in node.replicas.items():
-                if node in self._recycling.obsolete_containers and cc in self._recycling.obsolete_containers[node]:
-                    app = cc.app
-                    cc_perf_surplus = min(app_perf_surplus[app], cc.perf * replicas)
-                    surplus_replicas = floor(cc_perf_surplus / cc.perf + Transition._DELTA)
-                    free_cores += surplus_replicas * cc.cores
-                    free_mem += surplus_replicas * cc.memv
-                    app_perf_surplus[app] -= cc_perf_surplus
-            if free_cores.magnitude > Transition._DELTA and free_mem.magnitude > Transition._DELTA:
+            # Check if node has free or freeable capacity
+            if (node.free_cores.magnitude > Transition._DELTA and node.free_mem.magnitude > Transition._DELTA):
                 allocated_nodes.append(node)
+                continue
+            for cc in node.replicas:
+                if node in self._recycling.obsolete_containers and cc in self._recycling.obsolete_containers[node]:
+                    if self._app_perf_surplus[cc.app].magnitude >= cc.perf.magnitude - Transition._DELTA:
+                        allocated_nodes.append(node)
+                        break
         sorted_empty_nodes = sorted(empty_nodes, key=lambda n: n.ic.price)
         return allocated_nodes + sorted_empty_nodes
-        
+
     def _remove_last_obsolete_containers(self, command: Command):
         """
         Remove the last obsolete containers of applications with all its new containers allocated.
@@ -967,7 +952,7 @@ class TransitionRBT(Transition):
                            copied_obsolete_replicas: list[tuple[ContainerClass, int, Vmt]], 
                            removed_obsolete_replicas: list[tuple[ContainerClass, int, Vmt]],
                            available_obsolete_replicas: dict[Vmt, dict[ContainerClass, int]], 
-                           available_node_free_resources: list[Vmt, tuple[float, float]]) -> Command:
+                           available_node_free_resources: dict[Vmt, tuple[float, float]]) -> Command:
         """
         Update the state for the next copy of obsolete containers within the remove-allocate-copy algorithm.
         The state is defined by: 
@@ -1312,7 +1297,7 @@ class TransitionRBT(Transition):
         # Change the instance class family of the nodes to the family in the solution
         for fm, nodes in solution.allocation.items():
             for node in nodes:
-                node.ic = set_class_family(node.ic, fm)
+                node.ic = copy_set_class_family(node.ic, fm)
         allocation = []
         for _, nodes in solution.allocation.items():
             allocation.extend(nodes)
@@ -1438,12 +1423,9 @@ class TransitionRBT(Transition):
         if prev_cc.agg_level == 0: 
             if new_cc.agg_level > 0:
                 command.allocate_containers.append((node, new_cc, replicas))
-                node.free_mem -= replicas * new_cc.memv
-
         elif new_cc.agg_level == 0:
             if prev_cc.agg_level > 0:
                 command.remove_containers.append((node, prev_cc, replicas))
-                node.free_mem += replicas * prev_cc.memv
         else:
             if new_cc.agg_level != prev_cc.agg_level:
                 multiplier = new_cc.agg_level / prev_cc.agg_level
@@ -1666,8 +1648,8 @@ class TransitionRBT(Transition):
         """
         Get a new container class id.
         """
-        self.new_cc_id += 1
-        return self.new_cc_id
+        self._new_cc_id += 1
+        return self._new_cc_id
 
     def _fragment_containers(self):
         """
@@ -1677,31 +1659,41 @@ class TransitionRBT(Transition):
         by tuples (number of replicas to scale, number of fragments). 
         Fragments are assumed to be distributed equally among all the replicas in the group.
         """  
+        self._fragment_id_mem_mapping = defaultdict(dict)
+
         # Replace new containers by sets of scalable fragments
         for node in self._recycling.new_containers:
             for cc, replicas in dict(self._recycling.new_containers[node]).items():
                 cc_fragment = replace(cc * (1/cc.agg_level), id=self._get_new_cc_id())
                 nfragments = int(round(replicas * cc.agg_level))
                 # Set the number of replicas and the total number of fragments for each escalable container
-                node.fragments[cc_fragment.id] = (replicas, 0)                    
+                node.fragments[cc_fragment.id] = (replicas, 0)
                 del self._recycling.new_containers[node][cc]
                 self._recycling.new_containers[node][cc_fragment] = nfragments
 
-        # Replace the recycled and obsolete containers by sets of scalable fragments
-        for containers_dict in (self._recycling.recycled_containers, self._recycling.obsolete_containers): 
-            for node in containers_dict:
-                for cc, replicas in dict(containers_dict[node]).items():
-                    cc_fragment = replace(cc * (1/cc.agg_level), id=self._get_new_cc_id())
-                    nfragments = int(round(replicas * cc.agg_level))
-                    # Set the number of replicas and the total number of fragments for each escalable container
-                    node.fragments[cc_fragment.id] = (replicas, nfragments)                    
-                    del containers_dict[node][cc]
-                    containers_dict[node][cc_fragment] = nfragments
-                    # Obsolete replicas are allocated, so replace the replicas in the allocation with fragments
-                    node.replicas[cc] -= replicas
-                    if node.replicas[cc] == 0:
-                        del node.replicas[cc]
-                    node.replicas[cc_fragment] = nfragments
+        # Replace recycled containers by sets of scalable fragments
+        for node, cc_replicas in self._recycling.recycled_containers.items():
+            for cc, replicas in dict(cc_replicas).items():
+                cc_fragment = replace(cc * (1/cc.agg_level), id=self._get_new_cc_id())
+                nfragments = int(round(replicas * cc.agg_level))
+                node.fragments[cc_fragment.id] = (replicas, nfragments)
+                del self._recycling.recycled_containers[node][cc]
+                self._recycling.recycled_containers[node][cc_fragment] = nfragments
+
+        # Replace obsolete containers by sets of scalable fragments
+        for node, cc_replicas in self._recycling.obsolete_containers.items():
+            for cc, replicas in dict(cc_replicas).items():
+                cc_fragment = replace(cc * (1/cc.agg_level), id=self._get_new_cc_id())
+                nfragments = int(round(replicas * cc.agg_level))
+                # Set the number of replicas and the total number of fragments for each scalable container
+                node.fragments[cc_fragment.id] = (replicas, nfragments)
+                del self._recycling.obsolete_containers[node][cc]
+                self._recycling.obsolete_containers[node][cc_fragment] = nfragments
+                # Obsolete replicas are allocated, so replace the replicas in the allocation with fragments
+                node.replicas[cc] -= replicas
+                if node.replicas[cc] == 0:
+                    del node.replicas[cc]
+                node.replicas[cc_fragment] = nfragments
 
         # Replace the scalable containers by sets of scalable fragments
         for node, cc1_cc2_replicas in dict(self._recycling.scaled_containers).items():
@@ -1776,6 +1768,10 @@ class TransitionRBT(Transition):
         # the upgrading of nodes
         self._sync_on_next_alloc_upgraded_nodes = True
 
+        # The memory for each group of replicas a function of the number of replicas
+        
+
+
         return True
 
     def calculate_transition_plan_sync(self, initial_alloc: Allocation, 
@@ -1783,7 +1779,7 @@ class TransitionRBT(Transition):
         """
         Calculate a synchronous transition plan from the initial allocation to the final allocation, 
         while fulfilling the application's minimum performance requirement. It is based on the 
-        remove-allocate algorithm.
+        RBT algorithm.
         :param initial_alloc: Initial allocation.
         :param final_alloc: Final allocation.
         :return: A list of commands and the time to perform the transition.
