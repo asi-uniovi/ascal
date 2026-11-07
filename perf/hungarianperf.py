@@ -2,12 +2,12 @@ import random
 import csv
 import time
 from scipy.stats import truncnorm
-from aws_eu_west_1_c5m5r5 import c5_9xlarge, c5_m5_r5_fm
+from examples.aws_eu_west_1_c5_m5_r5 import c5_9xlarge, c5_m5_r5_fm
 from ascal.recycling import Recycling, RecyclingSolverType
 from fcma import Vm, ContainerClass, App, ContainerGroup, RequestsPerTime
 
 # Default solver for recycling.
-# Options: Recycling.hungarian_solver, Recycling.greedy_solver, Recycling.ilp_solver
+# Options: Recycling.hungarian_solver, Recycling.gready_solver
 RECYCLING_SOLVER = Recycling.hungarian_solver
 
 CONTAINER_CLASSES_RAND_IN = range(1, 101) 
@@ -111,22 +111,20 @@ def random_nodes(m: int, ccs: list[ContainerClass]) -> list[Vm]:
     return nodes
 
 def reclying_experiment(initial_nodes, final_nodes, partition: int = 1,
-                        solver: RecyclingSolverType = Recycling.hungarian_solver) -> tuple[float, float]:
+                        solver: RecyclingSolverType = Recycling.hungarian_solver) -> float:
     """
     Run a single experiment with the given initial and final nodes.
     :param initial_nodes: The initial nodes.
     :param final_nodes: The final nodes.
     :param  solver: Solver for the recycleing problem.
     :param partition: The partition value for the recycling algorithm.
-    :return: A tuple with the duration in seconds and the recycling value of the experiment.
+    :return: The duration in seconds.
     """
     start = time.time()
-    nodes_recycling = Recycling.calculate_node_recycling(initial_nodes, final_nodes,
-                                                         solver=solver,
-                                                         partitions=partition)
+    recycling_vm = Recycling(initial_nodes, final_nodes)
+    recycling_vm.calculate_node_recycling(initial_nodes, final_nodes, solver=solver, partitions=partition)
     duration = time.time() - start
-    return duration, nodes_recycling["level"]
-
+    return duration
 
 def main():
     # Experiments to get calculation time statistics and estimate optimality using hungarian algorithm
@@ -143,7 +141,7 @@ def main():
                 for m in M_VALUES_CC:
                     initial_nodes = random_nodes(m, ccs)
                     final_nodes = random_nodes(m, ccs)
-                    duration_opt, _ = reclying_experiment(initial_nodes, final_nodes)
+                    duration_opt = reclying_experiment(initial_nodes, final_nodes)
                     durations[m].append(duration_opt)
             avgs = {m: sum(durations[m]) / N_EXP_PER_VALUE for m in M_VALUES_CC}
             writer.writerow([number_ccs] + [f"\t\t{avgs[m]:.4f}" for m in M_VALUES_CC])
@@ -161,7 +159,7 @@ def main():
                 ccs = random_ccs()
                 initial_nodes = random_nodes(m, ccs)
                 final_nodes = random_nodes(m, ccs)
-                duration_opt, _ = reclying_experiment(initial_nodes, final_nodes)
+                duration_opt = reclying_experiment(initial_nodes, final_nodes)
                 durations.append(duration_opt) 
             min_p = min(durations)
             avg_p = sum(durations) / N_EXP_PER_VALUE

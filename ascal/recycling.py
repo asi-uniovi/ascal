@@ -13,32 +13,12 @@ from collections.abc import Callable
 from typing import TypeAlias
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from pulp import (
-    LpVariable,
-    lpSum,
-    LpProblem,
-    LpMaximize,
-    LpBinary,
-    COIN_CMD,
-    PULP_CBC_CMD,
-    PulpSolverError,
-    LpStatusOptimal,
-)
-from pulp import value as pulp_value
 from fcma import Allocation, Vm, ContainerClass, ContainerGroup, InstanceClass
-from fcma.helper import _solve_cbc_patched
 
-COIN_CMD.solve_CBC = _solve_cbc_patched
 RecyclingSolverType: TypeAlias = Callable[
     [list[Vm], list[Vm], bool, int],
     tuple[list[tuple[Vm, Vm]], float]
 ]
-MAX_ILP_TIME_SECS = 100
-MAX_ILP_ERROR = 0.02
-
-# The node recycling level between one node and its scale-up version is multiplied by this factor
-# to favour recycling between nodes with identical instance classes
-UP_SCALE_PENALTY_FACTOR = 0.000001
 
 class Recycling:
     """
@@ -111,16 +91,12 @@ class Recycling:
         :param hot_scale_up_nodes: Nodes for which hot node scaling-up is possible.
         :param hot_container_scale: Set when hot container scaling is possible.
         """
-
-        # Check that we are working with a single instance class family
-        assert len(set(node.ic.family for node in initial_alloc + final_alloc)) == 1, "Invalid recycling problem"
-
         self._hot_scale_up_nodes = hot_scale_up_nodes
         self._hot_container_scale = hot_container_scale
         self._initialize_fields()
 
         if self._hot_scale_up_nodes:
-            # Calculate a recycling that includes all the nodes
+            # Calculate a recycling that includes all the nodes in the same instance class family
             node_recyclings = self.calculate_node_recycling(initial_alloc, final_alloc)
             self.obsolete_nodes.extend(node_recyclings["obsolete"])
             self.new_nodes.extend(node_recyclings["new"])
@@ -262,7 +238,7 @@ class Recycling:
         return recycling_level
 
     def hungarian_solver(self, initial_nodes: list[Vm], final_nodes: list[Vm], partitions: int = 1) \
-                            -> tuple[list[tuple[Vm, Vm]], float]:
+                            -> list[tuple[Vm, Vm]]:
         """
         Calculate the recyclings between the list of initial nodes and the list of final nodes using the
         Hungarian algorithm.
@@ -311,20 +287,17 @@ class Recycling:
             for i, j in valid_index_pairs
         ]
 
-        # Get the sum of node recyclings for the optimal solution
-        total_node_recycling = sum([benefit_matrix[i][j] for i, j in valid_index_pairs])
-
-        return node_recyclings, total_node_recycling / len(initial_nodes)
+        return node_recyclings
 
     def greedy_solver(self, initial_nodes: list[Vm], final_nodes: list[Vm], dummy: int = 1) \
-                        -> tuple[list[tuple[Vm, Vm]], float]:
+                        -> list[tuple[Vm, Vm]]:
         """
         Calculate the recyclings between the list of initial nodes and the list of final nodes using a
         greedy algorithm. In each  step, it selects the node pair with the highest recycling value, removes
         the nodes from the list and repeats until no more node pairs can be recycled.
         :param initial_nodes: Initial nodes.
         :param final_nodes: Final nodes.
-        :return: A list of pairs (initial node, final node) that recycle each other, as well as the recycling level.
+        :return: A list of pairs (initial node, final node) that recycle each other.
         """
         # Calculate recycling levels for each node pair
         node_pair_recycling_levels = [
@@ -356,67 +329,7 @@ class Recycling:
         # Get the recycled node pairs
         node_recyclings = [(r[0], r[1]) for r in node_pair_recycling_levels]
 
-        # Get the sum of node recyclings for the solution
-        total_node_recycling = sum(node_pair_recycling_levels[i][2] for i in range(len(node_pair_recycling_levels)))
-
-        return node_recyclings, total_node_recycling / len(initial_nodes)
-
-    def ilp_solver(self, initial_nodes: list[Vm], final_nodes: list[Vm], partitions: int = 1) \
-                    -> tuple[list[tuple[Vm, Vm]], float]:
-        """
-        Calculate the recyclings between the list of initial nodes and the list of final nodes using an
-        Integer Linear Programming (ILP) solver.
-        :param initial_nodes: Initial nodes.
-        :param final_nodes: Final nodes.
-        :param partitions: Number of problem partitions.
-        :return: A list of pairs (initial node, final node) that recycle each other, as well as the recycling level.
-        """
-        if type(partitions) is not int or partitions < 1:
-            raise ValueError("Invalid partition value")
-        if partitions > 1:
-            return self._partition_solver(initial_nodes, final_nodes, partitions, self.ilp_solver)
-
-        # Define the ILP problem and variables
-        prob = LpProblem('Node recycling', LpMaximize)
-        var_indexes = [
-            (i, j)
-            for i in range(len(initial_nodes))
-            for j in range(len(final_nodes))
-            if self._valid_node_recycling(initial_nodes[i], final_nodes[j])
-        ]
-        z_vars = LpVariable.dicts('Z', indices=var_indexes, cat=LpBinary)
-
-        # Calculate recycling level for each node pair
-        node_pair_recycling_levels = {
-            (i, j): self.node_pair_recycling_level(initial_nodes[i], final_nodes[j])
-            for (i, j) in var_indexes
-        }
-
-        # Objective function
-        prob += (lpSum(node_pair_recycling_levels[(i, j)] * z_vars[(i, j)] for (i, j) in var_indexes), "Sum_recyclings")
-
-        # Constraints on initial nodes: a node can be recycled only once
-        for i in range(len(initial_nodes)):
-            prob += (lpSum(z_vars[(i, j)] for m, j in var_indexes if m == i) <= 1, f"Recycle_initial_node_{i}_once")
-        for j in range(len(final_nodes)):
-            prob += (lpSum(z_vars[(i, j)] for i, n in var_indexes if n == j) <= 1, f"Recycle_final_node_{j}_once")
-
-        # Solve the ILP problem using CBC
-        try:
-            prob.solve(PULP_CBC_CMD(msg=0, gapRel=MAX_ILP_ERROR, timeLimit=MAX_ILP_TIME_SECS), use_mps=False)
-        # If the solver failed to solve
-        except PulpSolverError as _:
-            return None, 0
-        if prob.status != LpStatusOptimal or prob.sol_status != LpStatusOptimal:
-            return None, 0
-
-        # If the solver has succeded
-        best_node_pairs = [
-            (initial_nodes[index_pair[0]], final_nodes[index_pair[1]])
-            for index_pair in var_indexes
-            if z_vars[(index_pair[0], index_pair[1])].value() > 0
-        ]
-        return best_node_pairs, pulp_value(prob.objective) / len(initial_nodes)
+        return node_recyclings
 
     def _split_nodes(self, initial_nodes: list[Vm], final_nodes: list[Vm], n_partitions: int = 2) \
                         -> list[tuple[list[Vm], list[Vm]]]:
@@ -454,18 +367,17 @@ class Recycling:
 
     def _partition_solver(self, initial_nodes: list[Vm], final_nodes: list[Vm], 
                           base_solver: RecyclingSolverType = hungarian_solver, n_partitions: int = 2) \
-                                -> tuple[list[tuple[Vm, Vm]], float]:
+                                -> list[tuple[Vm, Vm]]:
         """
         Calculate the recyclings between the list of initial nodes and the list of final nodes using the partition
         simplification and the given base solver.
         :param initial_nodes: Initial nodes.
         :param final_nodes: Final nodes.
         :param partitions: Number of problem partitions.
-        :return: A list of pairs (initial node, final node) that recycle each other, as well as the recycling level.
+        :return: A list of pairs (initial node, final node) that recycle each other.
         """
         partitions = self._split_nodes(initial_nodes, final_nodes, n_partitions)
         recycling_node_pairs = []
-        recycling_sum = 0
         partition_initial_nodes = []
         partition_final_nodes = []
         for partition in partitions:
@@ -476,8 +388,7 @@ class Recycling:
             # same number of initial and final nodes
             recycling = base_solver(partition[0], partition[1], 1)
             recycling_node_pairs.extend(recycling[0])
-            recycling_sum += recycling[1] * len(partition[0])
-        return recycling_node_pairs, recycling_sum / len(initial_nodes)
+        return recycling_node_pairs
 
     def calculate_node_recycling(self, initial_nodes: list[Vm], final_nodes: list[Vm],
                                  solver: RecyclingSolverType = hungarian_solver,
@@ -488,17 +399,28 @@ class Recycling:
         :param final_nodes: Final nodes.
         :param solver: Solver to calculate node recycling.
         :param partitions: Number of problem partitions.
-        :return: A dictionary with "obsolete", "recycled", "new" and "level" keys storing: a list of obsolete nodes
-        (initial nodes not recycled), a list of tuples (initial node, final node) that are recycled, a list of
-        new nodes (final nodes not recycled) and a measurement of node recycling.
+        :return: A dictionary with "obsolete", "recycled" and "new" keys storing: a list of obsolete nodes
+        (initial nodes not recycled), a list of tuples (initial node, final node) that are recycled and a list of
+        new nodes (final nodes not recycled).
         """
-        recycling_node_pairs, recycling_level = \
-            solver(self, initial_nodes, final_nodes, partitions)
+        # Split the problem into instance class families to reduce complexity
+        icf = defaultdict(lambda: ([], []))
+        for node in initial_nodes:
+            icf[node.ic.family][0].append(node)
+        for node in final_nodes:
+            icf[node.ic.family][1].append(node)
+
+        recycling_node_pairs = []
+        for fm in icf:
+            fm_node_pairs = solver(self, icf[fm][0], icf[fm][1], partitions)
+            recycling_node_pairs.extend(fm_node_pairs)
+            
         if recycling_node_pairs is not None:
-            obsolete_nodes = [node for node in initial_nodes if node not in [pair[0] for pair in recycling_node_pairs]]
-            new_nodes = [node for node in final_nodes if node not in [pair[1] for pair in recycling_node_pairs]]
-            return {"obsolete": obsolete_nodes, "recycled_pairs": recycling_node_pairs, "new": new_nodes,
-                    "level": recycling_level}
+            recycled_initial_nodes = [pair[0] for pair in recycling_node_pairs]
+            recycled_final_nodes = [pair[1] for pair in recycling_node_pairs]
+            obsolete_nodes = [node for node in initial_nodes if node not in recycled_initial_nodes]
+            new_nodes = [node for node in final_nodes if node not in recycled_final_nodes]
+            return {"obsolete": obsolete_nodes, "recycled_pairs": recycling_node_pairs, "new": new_nodes}
 
     def _calculate_container_recycling(self):
         """
