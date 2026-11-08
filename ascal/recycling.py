@@ -31,7 +31,7 @@ class Recycling:
     @staticmethod
     def _group_nodes_by_ic(alloc: Allocation) -> dict:
         """
-        Group nodes in an allocation by their instance class (IC).
+        Group nodes in an allocation by their instance class.
         :param alloc: List of VM nodes.
         :return: Dictionary mapping instance class to list of nodes with that class.
         """
@@ -39,6 +39,17 @@ class Recycling:
         for node in alloc:
             ic_nodes.setdefault(node.ic, []).append(node)
         return ic_nodes
+
+    @staticmethod
+    def _group_nodes_by_fm(alloc: Allocation) -> dict:
+        """
+        Group nodes by instance class family (FM) in an allocation.
+        :param alloc: List of VM nodes.
+        :return: Dictionary mapping instance class family to list of nodes with that family."""
+        fm_nodes = {}
+        for node in alloc:
+            fm_nodes.setdefault(node.ic.family, []).append(node)
+        return fm_nodes
 
     @staticmethod
     def _get_scaled_pairs(initial_containers: list[tuple[ContainerClass, int]],
@@ -95,27 +106,22 @@ class Recycling:
         self._hot_container_scale = hot_container_scale
         self._initialize_fields()
 
-        if self._hot_scale_up_nodes:
-            # Calculate a recycling that includes all the nodes in the same instance class family
-            node_recyclings = self.calculate_node_recycling(initial_alloc, final_alloc)
+        if not self._hot_scale_up_nodes:
+            initial_nodes = Recycling._group_nodes_by_ic(initial_alloc)
+            final_nodes = Recycling._group_nodes_by_ic(final_alloc)
+        else:
+            initial_nodes = Recycling._group_nodes_by_fm(initial_alloc)
+            final_nodes = Recycling._group_nodes_by_fm(final_alloc)
+        initial_recyclable, final_recyclable = \
+            self._classify_nodes_by_recycling(initial_nodes, final_nodes)
+        for ic_fm in initial_recyclable:
+            node_recyclings = self.calculate_node_recycling(initial_recyclable[ic_fm], final_recyclable[ic_fm])
             self.obsolete_nodes.extend(node_recyclings["obsolete"])
             self.new_nodes.extend(node_recyclings["new"])
             for initial_node, final_node in node_recyclings["recycled_pairs"]:
                 if initial_node.ic != final_node.ic:
                     self.upgraded_node_pairs[initial_node] = final_node
                 else:
-                    self.recycled_node_pairs[initial_node] = final_node
-        else:
-            # Calculate one recycling by instance class
-            initial_ic_nodes = Recycling._group_nodes_by_ic(initial_alloc)
-            final_ic_nodes = Recycling._group_nodes_by_ic(final_alloc)
-            initial_recyclable, final_recyclable = \
-                self._classify_nodes_by_recycling(initial_ic_nodes, final_ic_nodes)
-            for ic in initial_recyclable:
-                node_recyclings = self.calculate_node_recycling(initial_recyclable[ic], final_recyclable[ic])
-                self.obsolete_nodes.extend(node_recyclings["obsolete"])
-                self.new_nodes.extend(node_recyclings["new"])
-                for initial_node, final_node in node_recyclings["recycled_pairs"]:
                     self.recycled_node_pairs[initial_node] = final_node
 
         self._calculate_container_recycling()
@@ -461,50 +467,41 @@ class Recycling:
         Calculate node and container recycling levels.
         :param initial_alloc: Initial allocation.
         """
-        initial_node_cores = sum(
-            initial_node.ic.cores
+        initial_node_prices = sum(
+            initial_node.ic.price.magnitude
             for initial_node in initial_alloc
         )
-        initial_node_mem = sum(
-            initial_node.ic.mem
-            for initial_node in initial_alloc
+        recycled_node_prices = sum(
+            initial_node.ic.price.magnitude
+            for initial_node, _ in self.recycled_node_pairs.items()
         )
+        self.node_recycling_level = recycled_node_prices / initial_node_prices if initial_node_prices > 0 else 0
+     
         initial_container_cores = sum(
-            cg.cc.cores * cg.replicas
+            cg.cc.cores.magnitude * cg.replicas
             for initial_node in initial_alloc
             for cg in initial_node.cgs
         )
         initial_container_mem = sum(
-            cg.cc.memv * cg.replicas
+            cg.cc.memv.magnitude * cg.replicas
             for initial_node in initial_alloc
             for cg in initial_node.cgs
         )
-        recycled_node_cores = sum(
-            initial_node.ic.cores
-            for initial_node, _ in self.recycled_node_pairs.items()
-        )
-        recycled_node_mem = sum(
-            initial_node.ic.mem
-            for initial_node, _ in self.recycled_node_pairs.items()
-        )
         recycled_container_cores = sum(
-            cc.cores * replicas
+            cc.cores.magnitude * replicas
             for _, cc_replicas in self.recycled_containers.items()
             for cc, replicas in cc_replicas.items()
         )
         recycled_container_mem = sum(
-            cc.memv * replicas
+            cc.memv.magnitude * replicas
             for _, cc_replicas in self.recycled_containers.items()
             for cc, replicas in cc_replicas.items()
         )
-        if len(self.recycled_node_pairs) == 0:
-            self.node_recycling_level = 0
+        if initial_container_cores == 0 or initial_container_mem == 0:
             self.container_recycling_level = 0
         else:
-            self.node_recycling_level = 0.5 * (recycled_node_cores / initial_node_cores +
-                                               recycled_node_mem / initial_node_mem).magnitude
-            self.container_recycling_level = 0.5 * ((recycled_container_cores / initial_container_cores).magnitude +
-                                                    (recycled_container_mem / initial_container_mem).magnitude)
+            self.container_recycling_level = 0.5 * ((recycled_container_cores / initial_container_cores) +
+                                                    (recycled_container_mem / initial_container_mem))
 
     def _initialize_fields(self):
         """
@@ -522,29 +519,29 @@ class Recycling:
         self.node_recycling_level: float = 0
         self.container_recycling_level: float = 0
 
-    def _classify_nodes_by_recycling(self, initial_ic_nodes: dict[InstanceClass, Vm],
-                                     final_ic_nodes: dict[InstanceClass, Vm]) -> tuple[dict, dict]:
+    def _classify_nodes_by_recycling(self, initial_nodes: dict[InstanceClass, Vm],
+                                     final_nodes: dict[InstanceClass, Vm]) -> tuple[dict, dict]:
         """
         Determine which nodes are:
             - Obsolete: present only in initial allocation.
             - New: present only in final allocation.
             - Recyclable: present in both.
-        :param initial_ic_nodes: Dict of initial nodes grouped by instance class.
-        :param final_ic_nodes: Dict of final nodes grouped by instance class.
+        :param initial_nodes: Dict of initial nodes.
+        :param final_ic_nodes: Dict of final nodes.
         :return: Tuple with two dicts: recyclable initial and recyclable final nodes.
         """
         initial_recyclable = {}
         final_recyclable = {}
-        for ic, nodes in initial_ic_nodes.items():
-            if ic not in final_ic_nodes:
+        for ic_fm, nodes in initial_nodes.items():
+            if ic_fm not in final_nodes:
                 self.obsolete_nodes.extend(nodes)
             else:
-                initial_recyclable[ic] = nodes
-        for ic, nodes in final_ic_nodes.items():
-            if ic not in initial_ic_nodes:
+                initial_recyclable[ic_fm] = nodes
+        for ic_fm, nodes in final_nodes.items():
+            if ic_fm not in initial_nodes:
                 self.new_nodes.extend(nodes)
             else:
-                final_recyclable[ic] = nodes
+                final_recyclable[ic_fm] = nodes
         return initial_recyclable, final_recyclable
 
     def _assign_final_node_ids(self):

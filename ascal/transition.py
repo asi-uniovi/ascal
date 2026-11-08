@@ -1768,10 +1768,6 @@ class TransitionRBT(Transition):
         # the upgrading of nodes
         self._sync_on_next_alloc_upgraded_nodes = True
 
-        # The memory for each group of replicas a function of the number of replicas
-        
-
-
         return True
 
     def calculate_transition_plan_sync(self, initial_alloc: Allocation, 
