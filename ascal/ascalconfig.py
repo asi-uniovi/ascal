@@ -96,8 +96,7 @@ class AscalConfig:
                             ) from error
                     aggs = tuple(container_config['aggs'])
                     cores = ComputationalUnits(container_config['cpu'])
-                    mem_agg1 = Storage(container_config['mem'])
-                    gib = tuple(mem_agg1 for _ in aggs)
+                    gib = AscalConfig._get_container_memories(container_config)
                     perf = RequestsPerTime(container_config['perf'])
                     app_family_perf = AppFamilyPerf(cores=cores, mem=gib, perf=perf, aggs=aggs)
                     config.system[(app, family)] = app_family_perf
@@ -155,6 +154,36 @@ class AscalConfig:
         if set(container) == container_properties:
             return {None: container}
         return container
+
+    @staticmethod
+    def _get_container_memories(container_config: dict) -> tuple[Storage, ...]:
+        """
+        Parse and validate memory values aligned with the configured aggregation levels.
+        :param container_config: The container configuration dictionary.
+        :return: A tuple of Storage objects representing memory values for each aggregation level.
+        """
+        aggs = container_config["aggs"]
+        memory_values = [value.strip() for value in container_config["mem"].split(",")]
+        if any(not value for value in memory_values):
+            raise ValueError("Container memory values must not be empty")
+
+        memories = tuple(Storage(value) for value in memory_values)
+        memory_varies_by_aggregation = len(memories) > 1
+        if not memory_varies_by_aggregation:
+            memories *= len(aggs)
+        elif len(memories) != len(aggs):
+            raise ValueError(
+                "The number of container memory values must be one or match the number of aggregation levels"
+            )
+
+        for index in range(1, len(memories)):
+            if memory_varies_by_aggregation and memories[index] <= memories[index - 1]:
+                raise ValueError("Container memory must increase with the aggregation level")
+            if memories[index] / aggs[index] >= memories[0]:
+                raise ValueError(
+                    "Container memory divided by its aggregation level must be less than memory at level 1"
+                )
+        return memories
 
     @staticmethod
     def _get_app_aggs(data, app_name: str) -> set[int]:
@@ -711,9 +740,15 @@ class AscalConfig:
                     [str, str, str, list]
                 )
                 for aggregation in container_config["aggs"]:
-                    if not (isinstance(aggregation, int) and aggregation >= 1):
+                    if type(aggregation) is not int or aggregation < 1:
                         raise ValueError(
-                            f"{key}: Aggregations must be integer equal to or higher than zero"
+                            f"{key}: Aggregations must be positive integers"
                         )
-                if len(set(container_config["aggs"])) != len(container_config["aggs"]):
-                    raise ValueError(f"{key}: Repeated aggregations")
+                aggs = container_config["aggs"]
+                if not aggs or aggs[0] != 1 or any(
+                    current <= previous for previous, current in zip(aggs, aggs[1:])
+                ):
+                    raise ValueError(
+                        f"{key}: Aggregations must include 1 and be ordered from smallest to largest"
+                    )
+                AscalConfig._get_container_memories(container_config)

@@ -33,12 +33,12 @@ apps:
     container:
       c5_m5_r5:
         cpu: 260 mcores
-        mem: 0.420 GiB
+        mem: 0.480 GiB, 0.620 GiB, 0.820 GiB
         perf: 1 req/s
         aggs: [1, 2, 4]
       c7a_m7a_r7a:
         cpu: 300 mcores
-        mem: 0.520 GiB
+        mem: 0.380 GiB, 0.520 GiB
         perf: 3 req/s
         aggs: [1, 2]
   app1:

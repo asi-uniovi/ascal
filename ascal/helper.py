@@ -85,6 +85,9 @@ class Vmt:
         :param replicas_fragments: The number of replicas/fragments to consider.
         :return: The memory allocated to the container class.
         """
+        if replicas_fragments == 0:
+            return Storage("0 gibibytes")
+
         # If the replicas are not fragmented
         if cc.id == 0:
             replicas = replicas_fragments
@@ -99,6 +102,7 @@ class Vmt:
         aggs = [0] + list(cc.aggs)
         mem = [0] + [mem.to("gibibytes").magnitude for mem in cc.mem]
         avg_agg_level = fragments / replicas
+
         return Storage(f"{interp(avg_agg_level, aggs, mem) * replicas} gibibytes")
 
     def get_replicas_to_free_mem(self, cc: ContainerClass, free_mem:Storage) -> tuple[int, Storage]:
@@ -454,6 +458,7 @@ def get_icf_app_ccs(system: System,
                 f"Invalid aggregation levels for {app} in {icf}"
         else:
             aggs = perf.aggs
+        mem = tuple(perf.mem[perf.aggs.index(agg)] for agg in aggs)
         if icf not in icf_app_ccs:
             icf_app_ccs[icf] = {}
         if app not in icf_app_ccs[icf]:
@@ -466,7 +471,7 @@ def get_icf_app_ccs(system: System,
                 cores=system[(app, icf)].cores * agg,
                 perf=system[(app, icf)].perf * agg,
                 agg_level=agg,
-                mem=system[(app, icf)].mem[perf.aggs.index(agg)],
+                mem=mem,
                 aggs=aggs
             )
             icf_app_ccs[icf][app].append(cc)

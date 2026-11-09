@@ -2,65 +2,65 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 61:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 2
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 2
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 161:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
 181:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
 281:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
 401:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 407:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
@@ -68,13 +68,13 @@
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 521:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
@@ -82,16 +82,16 @@
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c5.xlarge-1:
-    app0-c5_m5_r5(0.26C, 0.42G, 0.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 0.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 0.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 0.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 0.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 522:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
@@ -99,16 +99,16 @@
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c5.xlarge-1:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 541:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
@@ -116,16 +116,16 @@
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c5.xlarge-1:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 701:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
@@ -136,17 +136,17 @@
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c5.xlarge-1:
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 721:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
@@ -157,15 +157,15 @@
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 821:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
@@ -174,15 +174,15 @@
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 941:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
@@ -192,13 +192,13 @@
   c5.xlarge-1:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 1061:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -209,15 +209,15 @@
   c5.xlarge-1:
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 1067:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -226,18 +226,18 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 1081:
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
@@ -245,92 +245,92 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 1087:
   c5.2xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 3
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 1093:
   c5.2xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 3
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.78C, 0.42G, 3.0RPS): 1
+    app0-c5_m5_r5(0.78C, 0.48G, 3.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 1181:
   c5.2xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 3
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    app0-c5_m5_r5(1.04C, 0.48G, 4.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 1301:
   c5.2xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 3
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    app0-c5_m5_r5(1.04C, 0.48G, 4.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 1307:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -338,21 +338,21 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 0.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 0.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 0.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 0.0RPS): 1
   c5.xlarge-0:
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    app0-c5_m5_r5(1.04C, 0.48G, 4.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 1308:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -360,41 +360,41 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
   c5.xlarge-0:
-    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.48G), 0.0RPS: 1
   c7a.2xlarge-0:
-    None-c7a_m7a_r7a(0.3C, 0.52G), 0.0RPS: 1
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 6
+    None-c7a_m7a_r7a(0.3C, 0.38G), 0.0RPS: 1
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 6
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.xlarge-0:
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 3
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 3
   c7a.xlarge-1:
-    None-c7a_m7a_r7a(0.3C, 0.52G), 0.0RPS: 1
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 2
+    None-c7a_m7a_r7a(0.3C, 0.38G), 0.0RPS: 1
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 2
 1481:
   c5.12xlarge-0:
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
+    app0-c5_m5_r5(1.04C, 0.48G, 4.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 18
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 3
   c5.large-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
 1601:
   c5.12xlarge-0:
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
-    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 18
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -402,14 +402,14 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 1621:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -417,15 +417,15 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 1721:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -437,11 +437,11 @@
   c5.xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 1741:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -449,14 +449,14 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    None-c7a_m7a_r7a(0.3C, 0.52G), 0.0RPS: 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    None-c7a_m7a_r7a(0.3C, 0.38G), 0.0RPS: 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 1800:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -465,13 +465,13 @@
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 1806:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -479,14 +479,14 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 2
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 2
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 1901:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -494,18 +494,18 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 2021:
   c5.12xlarge-0:
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 18
@@ -513,19 +513,19 @@
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 3
   c5.xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 2141:
   c5.12xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 18
   c5.2xlarge-0:
@@ -534,14 +534,14 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 2160:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -549,14 +549,14 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 2220:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -566,11 +566,11 @@
   c5.large-0:
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    None-c7a_m7a_r7a(0.3C, 0.52G), 0.0RPS: 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    None-c7a_m7a_r7a(0.3C, 0.38G), 0.0RPS: 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 2280:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -581,10 +581,10 @@
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 2286:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -592,13 +592,13 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 2381:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -606,37 +606,37 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 2501:
   c5.12xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(1.04C, 0.48G, 4.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 18
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 3
   c5.xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
   c7a.large-0:
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 1
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 1
 2621:
   c5.12xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
-    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 18
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -644,12 +644,12 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c7a.8xlarge-0:
-    None-c7a_m7a_r7a(0.3C, 0.52G), 0.0RPS: 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    None-c7a_m7a_r7a(0.3C, 0.38G), 0.0RPS: 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
 2640:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -657,11 +657,11 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
   c7a.8xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 26
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 26
 2801:
   c5.2xlarge-0:
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
@@ -669,20 +669,20 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.8xlarge-0:
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 26
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 26
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 2820:
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
@@ -690,144 +690,144 @@
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 2826:
   c5.2xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 3
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.large-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
-    None-c5_m5_r5(0.52C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
+    None-c5_m5_r5(0.52C, 0.48G), 0.0RPS: 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 2880:
   c5.2xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 3
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    None-c7a_m7a_r7a(0.3C, 0.52G), 0.0RPS: 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    None-c7a_m7a_r7a(0.3C, 0.38G), 0.0RPS: 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 2940:
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(0.9C, 0.5G, 12.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 2
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 2946:
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 2
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 2952:
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 2
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 3041:
   c5.2xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 2
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
   c7a.xlarge-1:
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 3
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 3
 3060:
   c5.2xlarge-0:
-    None-c5_m5_r5(0.26C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(0.26C, 0.48G), 0.0RPS: 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 2
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 1
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 3161:
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
@@ -841,14 +841,14 @@
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 3181:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
@@ -859,17 +859,17 @@
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
   c7a.xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 3
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 3
 3281:
   c5.2xlarge-0:
-    app0-c5_m5_r5(1.04C, 0.42G, 4.0RPS): 1
+    app0-c5_m5_r5(1.04C, 0.48G, 4.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 2
   c5.9xlarge-0:
@@ -878,105 +878,105 @@
     None-c5_m5_r5(0.6C, 0.5G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    None-c7a_m7a_r7a(0.3C, 0.52G), 0.0RPS: 1
+    None-c7a_m7a_r7a(0.3C, 0.38G), 0.0RPS: 1
   c7a.xlarge-0:
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 2
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 2
 3401:
   c5.2xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    None-c5_m5_r5(1.04C, 0.42G), 0.0RPS: 1
+    None-c5_m5_r5(1.04C, 0.48G), 0.0RPS: 1
     None-c5_m5_r5(1.2C, 0.5G), 0.0RPS: 2
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
   c5.xlarge-1:
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
   c7a.xlarge-0:
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 2
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 2
 3420:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
     None-c5_m5_r5(0.3C, 0.5G), 0.0RPS: 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c5.xlarge-1:
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 1
 3426:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c5.xlarge-1:
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    None-c7a_m7a_r7a(0.3C, 0.52G), 0.0RPS: 1
-    None-c7a_m7a_r7a(0.6C, 0.52G), 0.0RPS: 1
+    None-c7a_m7a_r7a(0.3C, 0.38G), 0.0RPS: 1
+    None-c7a_m7a_r7a(0.6C, 0.38G), 0.0RPS: 1
 3581:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c5.xlarge-1:
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
 3599:
   c5.9xlarge-0:
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 15
   c5.xlarge-0:
-    app0-c5_m5_r5(0.26C, 0.42G, 1.0RPS): 1
-    app0-c5_m5_r5(0.52C, 0.42G, 2.0RPS): 1
+    app0-c5_m5_r5(0.26C, 0.48G, 1.0RPS): 1
+    app0-c5_m5_r5(0.52C, 0.48G, 2.0RPS): 1
     app1-c5_m5_r5(0.3C, 0.5G, 4.0RPS): 1
   c5.xlarge-1:
     app1-c5_m5_r5(0.6C, 0.5G, 8.0RPS): 1
     app1-c5_m5_r5(1.2C, 0.5G, 16.0RPS): 1
   c7a.2xlarge-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 6
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 6
   c7a.4xlarge-0:
-    app0-c7a_m7a_r7a(0.6C, 0.52G, 6.0RPS): 13
+    app0-c7a_m7a_r7a(0.6C, 0.38G, 6.0RPS): 13
   c7a.large-0:
-    app0-c7a_m7a_r7a(0.3C, 0.52G, 3.0RPS): 1
+    app0-c7a_m7a_r7a(0.3C, 0.38G, 3.0RPS): 1
