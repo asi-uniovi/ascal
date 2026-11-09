@@ -39,16 +39,20 @@ Four transition algorithms are implemented:
  algorithm.
 - RBT2. It extends the RBT1 allowing transition operations until new/temporal nodes are created, or recycled nodes 
 are upgraded.
-- RBT1. It extends the RBT2 enabling the copy part of the remove-allocate-copy algorithm. 
+- RBT1. It extends the RBT2 enabling the copy part of the remove-allocate-copy algorithm. The development of this
+transition algorithm has been discontinued, as the improvements in transition cost and time are not significant
+with regard to the RBT2 algorithm, and the implementation is more complex. Thus, hot scaling of containers
+is not possible in the RBT1 algorithm (see ascal constructor for more details). In addition, the copy of 
+obsolete containers is restricted to nodes of the same instance class family when working with multiple 
+instance class families.
 
 Limitations of the current implementation:
-- All the nodes belong to instance classes of the same family.
 - All the containers of a given application are configured with the same amount of memory. Nevertheless, CPU 
 and performance parameters can be different for different container classes of the same application.
 """
 
 from enum import Enum
-from math import ceil, floor
+from math import ceil
 from json import loads
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
@@ -1102,8 +1106,9 @@ class TransitionRBT(Transition):
 
             # Try copying the obsolete replicas from the source node to destination nodes
             for dest_node in dest_nodes:
-                if dest_node == src_node:
-                    # Cannot copy obsolete containers to the same node
+                # Ignore nodes of different instance class family. Ignore also the source 
+                # node, to avoid copying obsolete containers to the same node
+                if dest_node.ic.family != src_node.ic.family or dest_node == src_node:
                     continue
                 obsolete_replicas, removed_replicas = self._remove_allocate(removable_cc, replicas_to_remove,
                                                                             dest_node, command, obsolete=True)
@@ -1198,7 +1203,7 @@ class TransitionRBT(Transition):
                 # of copies of obsolete containers in elegible nodes 
                 allocatable_replicas, command2 = \
                     self._copy_obsolete_containers(unalloc_node_cc, available_obsolete_containers, 
-                                                available_node_free_resources, elegible_nodes)
+                                                   available_node_free_resources, elegible_nodes)
                 # Copies of obsolete containers appear at the end of the allocation command, 
                 # after the allocations of new containers
                 command.extend(command2)
@@ -1333,27 +1338,20 @@ class TransitionRBT(Transition):
             compacted_fragments[(node, fcc)] += fr
         command.remove_containers = [(node, fcc, fr) for (node, fcc), fr in compacted_fragments.items()]
         for node, fcc, fr in command.remove_containers[:]:
-            # If the container is a fragment
+            # If the container class is a fragment, combine the fragments to scale-down containers
             if fcc.id > 0:
-                # The removal command will be replaced
                 command.remove_containers.remove((node, fcc, fr))
-                ext_fcc = replace(fcc, id=-fcc.id) # Extended group of fragments           
-                for cc in (ext_fcc, fcc): # Firstly, remove the fragments from the extended group it it exists
-                    if cc.id not in node.fragments:
-                        continue
-                    # Maximum number of replicas and previous fragments of the group
-                    max_r, f = node.fragments[cc.id] 
-                    removable_fragments = min(f, fr)
-                    fr -= removable_fragments
-                    new_command = self.combine_fragments(node, cc, removable_fragments, up_down=-1)
-                    command.scale_containers.extend(new_command.scale_containers)
-                    command.remove_containers.extend(new_command.remove_containers)
-                    if f - removable_fragments > 0:
-                        node.fragments[cc.id] = (max_r, f - removable_fragments)
-                    else:
-                        del node.fragments[cc.id]
-                    if fr == 0:
-                        break
+                assert fcc.id in node.fragments, "Fragment group does not exist"
+                max_r, f = node.fragments[fcc.id]
+                removable_fragments = min(f, fr)
+                fr -= removable_fragments
+                new_command = self.combine_fragments(node, fcc, removable_fragments, up_down=-1)
+                command.scale_containers.extend(new_command.scale_containers)
+                command.remove_containers.extend(new_command.remove_containers)
+                if f - removable_fragments > 0:
+                    node.fragments[fcc.id] = (max_r, f - removable_fragments)
+                else:
+                    del node.fragments[fcc.id]
                 assert fr == 0, "Can not remove all the requested fragments"
 
         # Combine fragments to create/scale-up containers
@@ -1362,46 +1360,19 @@ class TransitionRBT(Transition):
             compacted_fragments[(node, fcc)] += fr
         command.allocate_containers = [(node, fcc, fr) for (node, fcc), fr in compacted_fragments.items()]
         for node, fcc, fr in command.allocate_containers[:]:
-            if fcc.id > 0: # If the container is a fragment
-                # The allocation of fragments will be replaced by allocations and scaling-ups of replicas
+            # If the container class is a fragment, combine the fragments to scale-up containers
+            if fcc.id > 0:
                 command.allocate_containers.remove((node, fcc, fr))
-                if fcc.id not in node.fragments:
-                    # Create a new group of fragments. This happens when the first fragments are
-                    # copies coming from another node
-                    max_r = int(ceil(fr / fcc.aggs[-1])) 
-                    node.fragments[fcc.id] = (max_r, 0) # Group of fragments before the allocation
-                # First, try to scale-up fragments in a group with the same ID. New containers can 
-                # always be allocated in this way. Copies of obsolete containers may require another try,
-                # using an extension group (negative id) if the principal group is full. 
-                # Note: "previous" refers to the fragments before the allocation
-                ext_fcc = replace(fcc, id=-fcc.id) # Extended group of fragments           
-                for cc in (fcc, ext_fcc):
-                    if cc.id in node.fragments:
-                        # Maximum number of replicas and previous number of fragments in the group
-                        max_r, f = node.fragments[cc.id] 
-                        allocatable_fragments = min(max_r * fcc.aggs[-1] - f, fr) # Allocatable fragments 
-                        if allocatable_fragments > 0:
-                            fr -= allocatable_fragments 
-                            new_command = self.combine_fragments(node, cc, allocatable_fragments, up_down=1)
-                            command.scale_containers.extend(new_command.scale_containers)
-                            command.allocate_containers.extend(new_command.allocate_containers)
-                            node.fragments[cc.id] = (max_r, f + allocatable_fragments) # Update the node fragments
-                        if fr == 0:
-                            break
-                # If there are still unallocated fragments
-                if fr > 0:
-                    # At this point, if an extension group exists, this means that it is full
-                    if ext_fcc.id in node.fragments:
-                        # Integrate the extension group replicas and fragments into the standard group
-                        max_r, f = node.fragments[fcc.id]
-                        ext_max_r, ext_f = node.fragments[ext_fcc.id]
-                        node.fragments[fcc.id] = (max_r + ext_max_r, f + ext_f)
-                    # Create/replace the extension group to allocate the unallocated fragments, fr
-                    max_r = int(ceil(fr / ext_fcc.aggs[-1])) 
-                    node.fragments[ext_fcc.id] = (max_r, 0) # Fragments before the allocation
-                    new_command = self.combine_fragments(node, ext_fcc, fr, up_down=1)
+                assert fcc.id in node.fragments, "Fragment group does not exist"
+                max_r, f = node.fragments[fcc.id]
+                allocatable_fragments = min(max_r * fcc.aggs[-1] - f, fr)
+                if allocatable_fragments > 0:
+                    fr -= allocatable_fragments
+                    new_command = self.combine_fragments(node, fcc, allocatable_fragments, up_down=1)
+                    command.scale_containers.extend(new_command.scale_containers)
                     command.allocate_containers.extend(new_command.allocate_containers)
-                    node.fragments[ext_fcc.id] = (max_r, fr) # Update the node fragments
+                    node.fragments[fcc.id] = (max_r, f + allocatable_fragments)
+                assert fr == 0, "Can not allocate all the requested fragments"
 
         # Sort scaled containers in the command by increasing multiplier, so scaling-downs appear before
         command.scale_containers.sort(key=lambda s: s[3])

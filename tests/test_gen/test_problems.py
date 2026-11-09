@@ -10,6 +10,7 @@ import pytest
 from fcma import Allocation, Vm
 from ascal import AscalConfig, Ascal
 import aws_eu_west_1_c5_m5_r5
+from examples import aws_eu_west_1_c7a_m7a_r7a
 
 PROBLEMS_DIR = "../problems"
 SOLUTIONS_DIR = "../solutions"
@@ -56,7 +57,11 @@ def test_problem_allocation(problem_file_name):
     """
     file_path = f"{PROBLEMS_DIR}/{problem_file_name}"
     Vm.reset_ids()
-    ascal_config = AscalConfig.get_from_config_yaml(file_path, aws_eu_west_1_c5_m5_r5.c5_m5_r5_fm)
+    ic_families = [
+        aws_eu_west_1_c5_m5_r5.c5_m5_r5_fm, 
+        aws_eu_west_1_c7a_m7a_r7a.c7a_m7a_r7a_fm
+    ]
+    ascal_config = AscalConfig.get_from_config_yaml(file_path, ic_families)
     ascal_problem = Ascal(ascal_config)
     ascal_problem.run()
     calculated_allocs = allocations_to_serializable_dict(ascal_problem.allocation_changes)
