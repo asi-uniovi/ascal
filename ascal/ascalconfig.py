@@ -14,7 +14,12 @@ from fcma import (
     App,
     System
 )
-from ascal.autoscalers import AllocationSolver, AutoscalerTypes, TimedOps
+from ascal.autoscalers import (
+    AllocationSolver,
+    AutoscalerTypes,
+    TimedOps,
+    linear_memory_container_constrained,
+)
 from ascal.transition import TransitionAlgorithm
 from ascal.hreactive import HReactiveAutoscaler
 from ascal.hvreactive import HVReactiveAutoscaler
@@ -175,15 +180,24 @@ class AscalConfig:
             raise ValueError(
                 "The number of container memory values must be one or match the number of aggregation levels"
             )
-
-        for index in range(1, len(memories)):
-            if memory_varies_by_aggregation and memories[index] <= memories[index - 1]:
-                raise ValueError("Container memory must increase with the aggregation level")
-            if memories[index] / aggs[index] >= memories[0]:
-                raise ValueError(
-                    "Container memory divided by its aggregation level must be less than memory at level 1"
-                )
         return memories
+
+    @staticmethod
+    def _validate_linear_memory_container_constraint(container_config: dict,
+            allocation_solver: AllocationSolver | None) -> None:
+        """ 
+        Validate the linear-memory assumption for algorithms that require it.
+        :param container_config: The container configuration dictionary.
+        :param allocation_solver: The allocation solver being used.
+        :raises ValueError: If the linear memory constraint is violated.
+        """
+        if allocation_solver not in linear_memory_container_constrained:
+            return
+        aggs = container_config["aggs"]
+        memories = AscalConfig._get_container_memories(container_config)
+        for index in range(1, len(memories)):
+            if memories[index] / aggs[index] >= memories[0]:
+                raise ValueError("Linear memory container constraint violated")
 
     @staticmethod
     def _get_app_aggs(data, app_name: str) -> set[int]:
@@ -306,6 +320,26 @@ class AscalConfig:
         else:
             raise ValueError("Valid transition algorithms are 'rbt', 'rbt1', 'rbt2', 'rbt3' and 'baseline'")
         return allocation, transition
+
+    @staticmethod
+    def _get_selected_allocation_solver(config: dict) -> AllocationSolver | None:
+        """Get the allocation solver used by the selected autoscaler."""
+        autoscaler_name = config["autoscaler"]
+        autoscaler_config = config["autoscalers"][autoscaler_name]
+
+        if autoscaler_name == "hv_reactive":
+            algorithm_str = autoscaler_config["algorithm"]
+        elif autoscaler_name == "hv_predictive":
+            algorithm_str = autoscaler_config["algorithm"]
+        elif autoscaler_name == "h_reactive_hv_reactive":
+            algorithm_str = autoscaler_config["hv_algorithm"]
+        elif autoscaler_name == "h_reactive_hv_predictive":
+            algorithm_str = autoscaler_config["hv_algorithm"]
+        else:
+            return None
+
+        allocation_solver, _ = AscalConfig._get_algorithm(algorithm_str)
+        return allocation_solver
 
     @staticmethod
     def _set_autoscaler(config, data:dict, timing_args: TimedOps.TimingArgs):
@@ -752,3 +786,7 @@ class AscalConfig:
                         f"{key}: Aggregations must include 1 and be ordered from smallest to largest"
                     )
                 AscalConfig._get_container_memories(container_config)
+                AscalConfig._validate_linear_memory_container_constraint(
+                    container_config,
+                    AscalConfig._get_selected_allocation_solver(config),
+                )

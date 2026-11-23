@@ -1542,7 +1542,7 @@ class TransitionRBT(Transition):
         Repeat remove-allocate-copy operations, adding the commands to the command list. The method returns
         when the algorithm can not advance, or the total time required to perform the removals and allocations
         of containers may be higher than the time limit in the next iteration.
-        :param max_time: Time limit to peform remove-allocate-copy operations.
+        :param max_time: Time limit to perform remove-allocate-copy operations.
         :return: The time required to execute the added commands.
         """
         elapsed_time = 0
@@ -1776,12 +1776,11 @@ class TransitionRBT(Transition):
 
         # Allocation loop until node creation completes for RBT1 and RBT2 variants.
         # Upgraded nodes can be used in the allocation of new containers meanwhile
-        if (self._rbt1 or self._rbt2) and elapsed_time < self._timing_args.node_creation_time:
+        if self._rbt1 or self._rbt2:
             max_time = self._timing_args.node_creation_time - elapsed_time
             elapsed_time += self._remove_allocate_copy_loop(max_time)
 
-        # Update the elapsed time and current allocation after completing the node creation
-        elapsed_time = self._timing_args.node_creation_time
+        # Update the current allocation after completing the node creation
         self._current_alloc.extend(self._recycling.new_nodes)
 
         # The copy part in the remove-allocate-copy algorithm will not be used again, 

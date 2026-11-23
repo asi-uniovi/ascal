@@ -26,6 +26,16 @@ class AllocationSolver(Enum):
     FCMA  = FCMA1     # Default FCMA algorithm
     MNCF  = 4         # Minimum Node Cost Fit allocation
 
+# Algorithms assuming mem(l) <= l * mem(1), where l and 1 are container aggregation levels
+linear_memory_container_constrained = {
+    AllocationSolver.FCMA1, AllocationSolver.FCMA2, AllocationSolver.FCMA3, AllocationSolver.MNCF
+}
+
+# Algorithms assuming perf(l) = l * perf(1), where l and 1 are container aggregation levels
+linear_perf_container_constrained = {
+    AllocationSolver.FCMA1, AllocationSolver.FCMA2, AllocationSolver.FCMA3, AllocationSolver.MNCF
+}
+
 @dataclass(frozen=True)
 class AutoscalerStatistics:
     """
