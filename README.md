@@ -168,17 +168,21 @@ apps:
 ```
 
 In this example, `app0` can be placed on either family, with separate
-performance and resource requirements for each. `cpu` and `perf` describe the
-aggregation-1 container; at aggregation levels 2 and 4, those values are
-multiplied by the aggregation level.
+performance and resource requirements for each. `cpu` describes the
+aggregation-1 container and is multiplied by the aggregation level. `perf`
+can be a single aggregation-1 value, which is multiplied by the aggregation
+level, or a comma-separated list with one value per entry in `aggs`. Performance
+values must be positive and must not decrease with the aggregation level.
+Performance does not need to be proportional to CPU or aggregation level; the
+allocation algorithms use the configured performance at each level.
 
 `aggs` is an ascending list of positive integers that starts with `1`. `mem`
 can be a single memory value, in which case that value is used at every
 aggregation level, or a comma-separated list with one value per entry in
 `aggs`, in the same order. For example, the three memory values above
-correspond to aggregation levels 1, 2, and 4. When providing separate values,
-they must increase with the aggregation level, and the per-replica memory at
-each level must be less than the level-1 value.
+correspond to aggregation levels 1, 2, and 4. Per-replica memory must not
+increase with the aggregation level; FCMA and MNCF require it to be strictly
+less than the level-1 value at higher levels.
 
 The workload `file` is a CSV trace with an integer sample in its first column
 on each row (the first row is treated as a header). `time_interval` is the

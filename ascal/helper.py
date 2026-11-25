@@ -2,7 +2,7 @@
 A bunch of auxiliary methods for atoscaling
 """
 from copy import copy, deepcopy
-from math import ceil
+from math import ceil, floor
 from dataclasses import replace
 from numpy import interp
 from collections import defaultdict, Counter
@@ -104,6 +104,65 @@ class Vmt:
         avg_agg_level = fragments / replicas
 
         return Storage(f"{interp(avg_agg_level, aggs, mem) * replicas} gibibytes")
+
+    def get_cc_perf(self, cc: ContainerClass, replicas_fragments) -> RequestsPerTime:
+        """
+        Get the performance allocated to a container class for the given number of replicas/fragments.
+        It assumes fragments are evenly distributed among all the replicas.
+        :param cc: A container/fragment class.
+        :param replicas_fragments: The number of replicas/fragments to consider.
+        :return: The performance allocated to the container class.
+        """
+        if replicas_fragments == 0:
+            return RequestsPerTime("0 req/s")
+
+        if cc.id == 0:
+            replicas = replicas_fragments
+            assert replicas >= 0, "Invalid number of replicas"
+            return replicas * cc.perfv
+
+        replicas, _ = self.fragments[cc.id]
+        fragments = replicas_fragments
+        assert replicas > 0 and 0 <= fragments <= replicas * cc.aggs[-1], \
+            "Invalid number of replicas/fragments"
+        avg_agg_level = fragments / replicas
+        aggs = [0] + list(cc.aggs)
+        performances = [0] + [perf.to("req/hour").magnitude for perf in cc.perf]
+        return interp(avg_agg_level, aggs, performances) * replicas * RequestsPerTime("1 req/hour")
+
+    def get_replicas_to_free_perf(
+        self,
+        cc: ContainerClass,
+        free_perf: RequestsPerTime,
+    ) -> tuple[int, RequestsPerTime]:
+        """
+        Get the minimum number of replicas/fragments that must be removed to free a given performance.
+        """
+        if free_perf.magnitude <= 0:
+            return 0, RequestsPerTime("0 req/s")
+
+        if cc.id == 0:
+            replicas = int(ceil((free_perf / cc.perfv).magnitude - _DELTA))
+            replicas = min(replicas, self.replicas[cc])
+            return replicas, replicas * cc.perfv
+
+        replicas, initial_fragments = self.fragments[cc.id]
+        assert 0 <= initial_fragments <= replicas * cc.aggs[-1], \
+            "Invalid number of replicas/fragments"
+        if initial_fragments == 0:
+            return 0, RequestsPerTime("0 req/s")
+
+        initial_cc_perf = self.get_cc_perf(cc, initial_fragments)
+        if initial_cc_perf <= free_perf:
+            return initial_fragments, initial_cc_perf
+
+        aggs = [0] + list(cc.aggs)
+        performances = [0] + [perf.to("req/hour").magnitude for perf in cc.perf]
+        remaining_perf = (initial_cc_perf - free_perf).to("req/hour").magnitude
+        remaining_fragments = int(replicas * interp(remaining_perf, performances, aggs) + _DELTA)
+        remaining_fragments = min(initial_fragments, max(0, remaining_fragments))
+        removed_fragments = initial_fragments - remaining_fragments
+        return removed_fragments, initial_cc_perf - self.get_cc_perf(cc, remaining_fragments)
 
     def get_replicas_to_free_mem(self, cc: ContainerClass, free_mem:Storage) -> tuple[int, Storage]:
         """
@@ -319,7 +378,7 @@ def similar_ccs(cc1: ContainerClass, cc2: ContainerClass, ignore_perf: bool=Fals
     """
     return cc1.fm == cc2.fm and cc1.app == cc2.app and abs(cc1.cores - cc2.cores).magnitude < _DELTA and \
         abs(cc1.memv - cc2.memv).magnitude < _DELTA and\
-        (abs(cc1.perf.to("req/s") - cc2.perf.to("req/s")).magnitude < _DELTA or ignore_perf)
+        (abs(cc1.perfv.to("req/s") - cc2.perfv.to("req/s")).magnitude < _DELTA or ignore_perf)
 
 def compact_similar_cgs(node: Vm, cc: ContainerClass, ignore_perf: bool=False) -> ContainerGroup:
     """
@@ -368,7 +427,7 @@ def get_min_max_perf(alloc1: Allocation, alloc2: Allocation) ->\
         perf = defaultdict(lambda: RequestsPerTime("0 req/s"))
         for n in alloc:
             for cgg in n.cgs:
-                perf[cgg.cc.app] += cgg.replicas * cgg.cc.perf
+                perf[cgg.cc.app] += cgg.replicas * cgg.cc.perfv
         return perf
 
     perf1 = _get_alloc_perf(alloc1)
@@ -411,7 +470,7 @@ def get_vmt_allocation_signature(alloc: list[Vmt]) -> Counter:
                     float(cc.agg_level),
                     float(cc.cores.to("core").magnitude),
                     float(cc.memv.to("gibibytes").magnitude),
-                    float(cc.perf.to("req/s").magnitude),
+                    float(cc.perfv.to("req/s").magnitude),
                 )
                 container_replicas[container_signature] += replicas
         node_signature = (node.ic.name, tuple(sorted(container_replicas.items())))
@@ -428,7 +487,7 @@ def get_app_perf_surplus(min_perf: dict[App, RequestsPerTime], alloc: list[Vmt])
     app_perf_surplus = {app: -min_perf[app] for app in min_perf}
     for node in alloc:
         for cc, replicas in node.replicas.items():
-            app_perf_surplus[cc.app] += replicas * cc.perf
+            app_perf_surplus[cc.app] += node.get_cc_perf(cc, replicas)
     for app, surplus in app_perf_surplus.items():
         if -_DELTA <= surplus.to("req/s").magnitude < _DELTA:
             app_perf_surplus[app] = RequestsPerTime("0 req/s")
@@ -459,6 +518,7 @@ def get_icf_app_ccs(system: System,
         else:
             aggs = perf.aggs
         mem = tuple(perf.mem[perf.aggs.index(agg)] for agg in aggs)
+        perfs = tuple(perf.perf[perf.aggs.index(agg)] for agg in aggs)
         if icf not in icf_app_ccs:
             icf_app_ccs[icf] = {}
         if app not in icf_app_ccs[icf]:
@@ -469,7 +529,7 @@ def get_icf_app_ccs(system: System,
                 ic=None,
                 fm=icf,
                 cores=system[(app, icf)].cores * agg,
-                perf=system[(app, icf)].perf * agg,
+                perf=perfs,
                 agg_level=agg,
                 mem=mem,
                 aggs=aggs
@@ -505,21 +565,51 @@ def get_cgs_from_workload(system: System, workloads: dict[App, RequestsPerTime],
         workload = workloads[app]
         for icf in cgs:
             app_ccs = icf_app_ccs[icf][app]
-            agg1_perf = app_ccs[-1].perf / app_ccs[-1].agg_level
-            agg1_replicas = int(ceil(workload.to('req/s') / agg1_perf.to('req/s')))
-            if agg1_replicas <= app_ccs[-1].agg_level:
+            if workload.to("req/s").magnitude <= _DELTA:
                 cgs[icf].append(ContainerGroup(app_ccs[-1], 1))
                 continue
-            for cc in app_ccs:
-                if cc == app_ccs[-1]:
-                    cc_replicas = int(ceil(agg1_replicas / cc.agg_level))
-                else:
-                    cc_replicas = int(agg1_replicas // cc.agg_level)
+
+            linear_profile = all(
+                abs(
+                    cc.perfv.to("req/s").magnitude -
+                    app_ccs[-1].perfv.to("req/s").magnitude * cc.agg_level /
+                    app_ccs[-1].agg_level
+                ) < _DELTA
+                for cc in app_ccs
+            )
+            if linear_profile:
+                agg1_perf = app_ccs[-1].perfv / app_ccs[-1].agg_level
+                agg1_replicas = int(ceil(workload.to("req/s") / agg1_perf.to("req/s") - _DELTA))
+                if agg1_replicas <= app_ccs[-1].agg_level:
+                    cgs[icf].append(ContainerGroup(app_ccs[-1], 1))
+                    continue
+                for cc in app_ccs:
+                    if cc == app_ccs[-1]:
+                        cc_replicas = int(ceil((agg1_replicas / cc.agg_level) - _DELTA))
+                    else:
+                        cc_replicas = int(floor((agg1_replicas / cc.agg_level) + _DELTA))
+                    if cc_replicas > 0:
+                        cgs[icf].append(ContainerGroup(cc, cc_replicas))
+                        agg1_replicas -= cc_replicas * cc.agg_level
+                    if agg1_replicas == 0:
+                        break
+                continue
+
+            remaining_workload = workload
+            for cc in app_ccs[:-1]:
+                cc_replicas = floor(
+                    (remaining_workload.to("req/s") / cc.perfv.to("req/s")).magnitude + _DELTA
+                )
                 if cc_replicas > 0:
                     cgs[icf].append(ContainerGroup(cc, cc_replicas))
-                    agg1_replicas -= cc_replicas * cc.agg_level
-                if agg1_replicas == 0:
-                    break
+                    remaining_workload -= cc_replicas * cc.perfv
+            if remaining_workload.magnitude > 0:
+                cc = app_ccs[-1]
+                cc_replicas = ceil(
+                    (remaining_workload.to("req/s") / cc.perfv.to("req/s")).magnitude
+                )
+                if cc_replicas > 0:
+                    cgs[icf].append(ContainerGroup(cc, cc_replicas))
     return cgs
 
 def get_required_nodes(fm: InstanceClassFamily, cgs: list[ContainerGroup], allocate:bool = False) -> Allocation:

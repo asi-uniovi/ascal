@@ -1,8 +1,8 @@
 Tests are run with command:
-$> uv run pytest tests/test_gen/test_problems.py
+$> uv run pytest
 
 To run the tests and perform a coverage analysis with an HTML report:
-$> uv run pytest --cov=ascal --cov-report=term-missing --cov-report=html tests/test_gen/test_problems.py
+$> uv run pytest --cov=ascal --cov-report=term-missing --cov-report=html
 
 Tests are based on comparing the sequence of allocations after applying autoscaling to a set of problems.
 

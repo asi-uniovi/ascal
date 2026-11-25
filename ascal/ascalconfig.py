@@ -102,7 +102,7 @@ class AscalConfig:
                     aggs = tuple(container_config['aggs'])
                     cores = ComputationalUnits(container_config['cpu'])
                     gib = AscalConfig._get_container_memories(container_config)
-                    perf = RequestsPerTime(container_config['perf'])
+                    perf = AscalConfig._get_container_performances(container_config)
                     app_family_perf = AppFamilyPerf(cores=cores, mem=gib, perf=perf, aggs=aggs)
                     config.system[(app, family)] = app_family_perf
 
@@ -183,15 +183,36 @@ class AscalConfig:
         return memories
 
     @staticmethod
+    def _get_container_performances(container_config: dict) -> tuple[RequestsPerTime, ...]:
+        """Parse performance values aligned with the configured aggregation levels."""
+        aggs = container_config["aggs"]
+        performance_values = [value.strip() for value in container_config["perf"].split(",")]
+        if any(not value for value in performance_values):
+            raise ValueError("Container performance values must not be empty")
+
+        performances = tuple(RequestsPerTime(value) for value in performance_values)
+        if len(performances) == 1:
+            performances = tuple(performances[0] * agg for agg in aggs)
+        elif len(performances) != len(aggs):
+            raise ValueError(
+                "The number of container performance values must be one or match the number of aggregation levels"
+            )
+        if any(perf.magnitude <= 0.0 for perf in performances):
+            raise ValueError("Container performance values must be positive")
+        if any(current < previous for previous, current in zip(performances, performances[1:])):
+            raise ValueError("Container performance values must not decrease with higher aggregation values")
+        return performances
+
+    @staticmethod
     def _validate_linear_memory_container_constraint(container_config: dict,
-            allocation_solver: AllocationSolver | None) -> None:
-        """ 
+            allocation_solvers: set[AllocationSolver]) -> None:
+        """
         Validate the linear-memory assumption for algorithms that require it.
         :param container_config: The container configuration dictionary.
-        :param allocation_solver: The allocation solver being used.
+        :param allocation_solvers: Allocation solvers used by the selected autoscaler.
         :raises ValueError: If the linear memory constraint is violated.
         """
-        if allocation_solver not in linear_memory_container_constrained:
+        if not allocation_solvers.intersection(linear_memory_container_constrained):
             return
         aggs = container_config["aggs"]
         memories = AscalConfig._get_container_memories(container_config)
@@ -322,24 +343,29 @@ class AscalConfig:
         return allocation, transition
 
     @staticmethod
-    def _get_selected_allocation_solver(config: dict) -> AllocationSolver | None:
-        """Get the allocation solver used by the selected autoscaler."""
+    def _get_selected_allocation_solvers(config: dict) -> set[AllocationSolver]:
+        """Get the allocation solvers used by the selected autoscaler."""
         autoscaler_name = config["autoscaler"]
         autoscaler_config = config["autoscalers"][autoscaler_name]
 
-        if autoscaler_name == "hv_reactive":
-            algorithm_str = autoscaler_config["algorithm"]
-        elif autoscaler_name == "hv_predictive":
-            algorithm_str = autoscaler_config["algorithm"]
-        elif autoscaler_name == "h_reactive_hv_reactive":
-            algorithm_str = autoscaler_config["hv_algorithm"]
-        elif autoscaler_name == "h_reactive_hv_predictive":
-            algorithm_str = autoscaler_config["hv_algorithm"]
-        else:
-            return None
+        allocation_solvers: set[AllocationSolver] = set()
+        if autoscaler_name in {
+            "h_reactive",
+            "h_reactive_hv_reactive",
+            "h_reactive_hv_predictive",
+        }:
+            allocation_solvers.add(AllocationSolver.MNCF)
 
-        allocation_solver, _ = AscalConfig._get_algorithm(algorithm_str)
-        return allocation_solver
+        algorithm_key = {
+            "hv_reactive": "algorithm",
+            "hv_predictive": "algorithm",
+            "h_reactive_hv_reactive": "hv_algorithm",
+            "h_reactive_hv_predictive": "hv_algorithm",
+        }.get(autoscaler_name)
+        if algorithm_key is not None:
+            allocation_solver, _ = AscalConfig._get_algorithm(autoscaler_config[algorithm_key])
+            allocation_solvers.add(allocation_solver)
+        return allocation_solvers
 
     @staticmethod
     def _set_autoscaler(config, data:dict, timing_args: TimedOps.TimingArgs):
@@ -743,6 +769,7 @@ class AscalConfig:
         """
         if len(config["apps"]) == 0:
             raise ValueError("At least one application is required")
+        allocation_solvers = AscalConfig._get_selected_allocation_solvers(config)
         properties = ["load", "container"]
         for key, val in config["apps"].items():
             if set(properties) != set(config["apps"][key]):
@@ -786,7 +813,8 @@ class AscalConfig:
                         f"{key}: Aggregations must include 1 and be ordered from smallest to largest"
                     )
                 AscalConfig._get_container_memories(container_config)
+                AscalConfig._get_container_performances(container_config)
                 AscalConfig._validate_linear_memory_container_constraint(
                     container_config,
-                    AscalConfig._get_selected_allocation_solver(config),
+                    allocation_solvers,
                 )

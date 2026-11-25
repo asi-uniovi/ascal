@@ -3,7 +3,7 @@ Main module of the ascal package. It defines class Ascal to calculate the sequen
 a given autoscaler and applications
 """
 
-from math import ceil, floor
+from math import ceil, floor, isclose
 from copy import deepcopy
 from yaml import dump as yaml_dump
 from collections import defaultdict
@@ -83,15 +83,41 @@ class Ascal:
 
     def _get_perf_per_core(self) -> dict[App, float]:
         """
-        Get application's performance in req/s/core.
+        Get each application's effective performance in req/s/core.
+        Linear profiles retain the existing level-1 rate. Nonlinear profiles use the
+        performance-to-core ratio of the application's current allocation.
         :return: Application's performance in req/s/core.
         """
         perf_per_core = {}
+        nonlinear_apps = set()
         for app_fm in self._autoscaler.system:
-            cores = self._autoscaler.system[app_fm].cores.to("cores").magnitude
-            perf = self._autoscaler.system[app_fm].perf.to("req/s").magnitude
+            app_family_perf = self._autoscaler.system[app_fm]
+            cores = app_family_perf.cores.to("cores").magnitude
+            perf = app_family_perf.perf[0].to("req/s").magnitude
             a, _ = app_fm
             perf_per_core[a] = perf / cores
+            if any(
+                not isclose(
+                    performance.to("req/s").magnitude,
+                    (app_family_perf.perf[0] * agg).to("req/s").magnitude,
+                    rel_tol=1e-9,
+                    abs_tol=1e-9,
+                )
+                for agg, performance in zip(app_family_perf.aggs[1:], app_family_perf.perf[1:])
+            ):
+                nonlinear_apps.add(a)
+
+        allocated_perf = defaultdict(float)
+        allocated_cores = defaultdict(float)
+        for node in self._autoscaler.allocation:
+            for cg in node.cgs:
+                app = cg.cc.app
+                if app in nonlinear_apps:
+                    allocated_perf[app] += cg.cc.perfv.to("req/s").magnitude * cg.replicas
+                    allocated_cores[app] += cg.cc.cores.to("cores").magnitude * cg.replicas
+        for app in nonlinear_apps:
+            if allocated_perf[app] > 0 and allocated_cores[app] > 0:
+                perf_per_core[app] = allocated_perf[app] / allocated_cores[app]
         return perf_per_core
 
     @staticmethod
@@ -386,7 +412,7 @@ class Ascal:
                     for cg in node.cgs:
                         app = cg.cc.app
                         if app is not None:
-                            current_perfs[str(app)] += cg.cc.perf.to('req/s').magnitude * cg.replicas
+                            current_perfs[str(app)] += cg.cc.perfv.to('req/s').magnitude * cg.replicas
                 # Append the current allocation performances
                 for app_name in app_perfs:
                     app_perfs[app_name].append(current_perfs[app_name])

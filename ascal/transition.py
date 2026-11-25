@@ -57,7 +57,17 @@ from json import loads
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
-from fcma import Fcma, SolvingPars, System, Allocation, App, Vm, ContainerClass, RequestsPerTime, InstanceClass, Storage
+from fcma import (
+    Fcma,
+    SolvingPars,
+    System,
+    Allocation,
+    App,
+    Vm,
+    ContainerClass,
+    RequestsPerTime,
+    InstanceClass
+)
 from ascal.timedops import TimedOps
 from ascal.recycling import Recycling
 from ascal.helper import (
@@ -363,7 +373,7 @@ class Transition(ABC):
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
                 node_vmt.remove_similar_ccs_replicas(cc, replicas)
-                app_perf_surplus[cc.app] -= cc.perf * replicas
+                app_perf_surplus[cc.app] -= cc.perfv * replicas
                 if app_perf_surplus[cc.app].magnitude < -TransitionRBT._DELTA:
                     raise ValueError(f'{op_str} -> Invalid container removal. app surplus < 0')
                 
@@ -375,12 +385,13 @@ class Transition(ABC):
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
                 node_vmt.scale_similar_ccs_replicas(cc, replicas, multiplier)
+                performance_change = ((cc * multiplier).perfv - cc.perfv) * replicas
                 if multiplier > 1:
                     # The performance increment is delayed until the command termination
-                    app_perf_increment[cc.app] += cc.perf * replicas * (multiplier - 1)
+                    app_perf_increment[cc.app] += performance_change
                 else:
                     # The performance surplus is inmediately reduced
-                    app_perf_surplus[cc.app] -= cc.perf * replicas * (1 - multiplier)
+                    app_perf_surplus[cc.app] += performance_change
                     if app_perf_surplus[cc.app].magnitude < -Transition._DELTA:
                         raise ValueError(f'{op_str} -> Invalid container scale down. app surplus < 0')
 
@@ -401,7 +412,7 @@ class Transition(ABC):
                     raise ValueError(f'{op_str} -> Invalid node: {node}')
                 node_vmt = vm_to_vmt[node]
                 node_vmt.alloc_similar_ccs_replicas(cc, replicas)
-                app_perf_increment[cc.app] += cc.perf * replicas
+                app_perf_increment[cc.app] += cc.perfv * replicas
             
             # Remove node commands
             for node in command.remove_nodes:
@@ -704,10 +715,13 @@ class TransitionRBT(Transition):
                 obsolete_replicas_count = self._get_obsolete_removable_replicas(obsolete_cc, node, required_replicas,
                                                                        available_perf_surplus[obsolete_cc.app])
                 if obsolete_replicas_count > 0:
-                    available_perf_surplus[obsolete_cc.app] -= obsolete_cc.perf * obsolete_replicas_count
                     obsolete_replicas.append((obsolete_cc, obsolete_replicas_count))
-                    required_cores -= obsolete_replicas_count * obsolete_cc.cores
                     current_replicas = node.replicas[obsolete_cc]
+                    available_perf_surplus[obsolete_cc.app] -= (
+                        node.get_cc_perf(obsolete_cc, current_replicas) -
+                        node.get_cc_perf(obsolete_cc, current_replicas - obsolete_replicas_count)
+                    )
+                    required_cores -= obsolete_replicas_count * obsolete_cc.cores
                     required_mem -= (
                         node.get_cc_mem(obsolete_cc, current_replicas) -
                         node.get_cc_mem(obsolete_cc, current_replicas - obsolete_replicas_count)
@@ -746,6 +760,11 @@ class TransitionRBT(Transition):
 
         if allocatable_replicas == 0:
             return 0
+        current_replicas = node.replicas[cc]
+        performance_change = (
+            node.get_cc_perf(cc, current_replicas + allocatable_replicas) -
+            node.get_cc_perf(cc, current_replicas)
+        )
         node.free_cores = node.free_cores - allocatable_replicas * cc.cores
         node.free_mem -= node.get_cc_mem(cc, node.replicas[cc] + allocatable_replicas) - \
                          node.get_cc_mem(cc, node.replicas[cc])
@@ -755,7 +774,7 @@ class TransitionRBT(Transition):
         command.allocate_containers.append((node, cc, allocatable_replicas))
         if not obsolete:
             # The application's unallocated performance accounts for new containers, not obsolete ones
-            self._app_unalloc_perf[cc.app] -= allocatable_replicas * cc.perf
+            self._app_unalloc_perf[cc.app] -= performance_change
             assert self._app_unalloc_perf[cc.app].magnitude > -TransitionRBT._DELTA, "Invalid performance"
         else:
             if node not in self._recycling.obsolete_containers:
@@ -765,7 +784,7 @@ class TransitionRBT(Transition):
                     self._recycling.obsolete_containers[node][cc] = allocatable_replicas
                 else:
                     self._recycling.obsolete_containers[node][cc] += allocatable_replicas
-        self._app_perf_increment[cc.app] += allocatable_replicas * cc.perf
+        self._app_perf_increment[cc.app] += performance_change
         return allocatable_replicas
 
     def _remove_obsolete_replicas(self, cc: ContainerClass, replicas: int, node: Vmt, command: Command,
@@ -797,13 +816,14 @@ class TransitionRBT(Transition):
             for app in self._app_perf_surplus
         }
         performance_surplus = relaxed_perf_surplus if relaxed_removal else self._app_perf_surplus
-        removable_replicas = min(
-            node.replicas[cc], 
-            replicas, 
-            int(performance_surplus[cc.app]/cc.perf + TransitionRBT._DELTA)
-        )
+        removable_replicas = self._get_obsolete_removable_replicas(cc, node, replicas, performance_surplus[cc.app])
         if removable_replicas == 0:
             return 0
+        current_replicas = node.replicas[cc]
+        performance_change = (
+            node.get_cc_perf(cc, current_replicas) -
+            node.get_cc_perf(cc, current_replicas - removable_replicas)
+        )
         # Append the removal to the command, ading the new removable replicas to a previous similar
         # removal if it exists
         prev_r = 0
@@ -821,7 +841,7 @@ class TransitionRBT(Transition):
         node.replicas[cc] -= removable_replicas
         if node.replicas[cc] == 0:
             del node.replicas[cc]
-        performance_surplus[cc.app] -= cc.perf * removable_replicas
+        performance_surplus[cc.app] -= performance_change
         if -TransitionRBT._DELTA <= performance_surplus[cc.app].to("req/s").magnitude < 0:
             performance_surplus[cc.app] = RequestsPerTime("0 req/s")
         self._recycling.obsolete_containers[node][cc] -= removable_replicas
@@ -840,12 +860,21 @@ class TransitionRBT(Transition):
         :param available_perf_surplus: The available performance surplus for the container application.
         :return: The actual number of removable replicas.
         """
-        n_removable = min(
-            int(available_perf_surplus / cc.perf + TransitionRBT._DELTA),
-            replicas_to_remove,
-            self._recycling.obsolete_containers[node][cc]
-        )
-        return n_removable
+        max_removable = min(node.replicas[cc], replicas_to_remove, self._recycling.obsolete_containers[node][cc])
+        current_replicas = node.replicas[cc]
+        min_removable = 0
+        while min_removable < max_removable:
+            candidate = (min_removable + max_removable + 1) // 2
+            performance_loss = (
+                node.get_cc_perf(cc, current_replicas) -
+                node.get_cc_perf(cc, current_replicas - candidate)
+            )
+            if performance_loss.to("req/s").magnitude <= \
+                    available_perf_surplus.to("req/s").magnitude + TransitionRBT._DELTA:
+                min_removable = candidate
+            else:
+                max_removable = candidate - 1
+        return min_removable
   
     def _get_free_capacity_nodes(self, nodes: list[Vm] = None) -> list[Vmt]:
         """
@@ -871,7 +900,13 @@ class TransitionRBT(Transition):
                 continue
             for cc in node.replicas:
                 if node in self._recycling.obsolete_containers and cc in self._recycling.obsolete_containers[node]:
-                    if self._app_perf_surplus[cc.app].magnitude >= cc.perf.magnitude - Transition._DELTA:
+                    current_replicas = node.replicas[cc]
+                    performance_loss = (
+                        node.get_cc_perf(cc, current_replicas) -
+                        node.get_cc_perf(cc, current_replicas - 1)
+                    )
+                    if self._app_perf_surplus[cc.app].magnitude >= \
+                            performance_loss.magnitude - Transition._DELTA:
                         allocated_nodes.append(node)
                         break
         sorted_empty_nodes = sorted(empty_nodes, key=lambda n: n.ic.price)
@@ -938,9 +973,13 @@ class TransitionRBT(Transition):
 
         # Unallocated application performances. It is calculated from application containers not allocated yet
         self._app_unalloc_perf = defaultdict(lambda : RequestsPerTime("0 req/s"))
-        for _, cc_replicas in self._recycling.new_containers.items():
+        for node, cc_replicas in self._recycling.new_containers.items():
             for cc, replicas in cc_replicas.items():
-                self._app_unalloc_perf[cc.app] += replicas * cc.perf
+                current_replicas = node.replicas[cc]
+                self._app_unalloc_perf[cc.app] += (
+                    node.get_cc_perf(cc, current_replicas + replicas) -
+                    node.get_cc_perf(cc, current_replicas)
+                )
 
         # Initial application's performance surplus
         self._app_perf_surplus = get_app_perf_surplus(min_perf, self._current_alloc)
@@ -1603,7 +1642,7 @@ class TransitionRBT(Transition):
             self._recycling.obsolete_containers[tmp_node] = {}
             for c, r in tmp_node.replicas.items():
                 self._recycling.obsolete_containers[tmp_node][c] = r
-                self._app_perf_surplus[c.app] += r * c.perf
+                self._app_perf_surplus[c.app] += tmp_node.get_cc_perf(c, r)
 
         # The temporary nodes are added to the command with the creation of new nodes
         create_nodes_command.create_nodes.extend(tmp_nodes)
@@ -1793,9 +1832,10 @@ class TransitionRBT(Transition):
         # containers in temporary nodes. It corresponds with the second setup command
         allocate_in_new_nodes_command = Command(allocate_containers=self._unallocated_containers_in_new_nodes[:])
         allocate_in_new_nodes_command.sync_on_nodes_creation = True
-        for _, cc, replicas in self._unallocated_containers_in_new_nodes:
-            self._app_perf_increment[cc.app] += replicas * cc.perf
-            self._app_unalloc_perf[cc.app] -= replicas * cc.perf
+        for node, cc, replicas in self._unallocated_containers_in_new_nodes:
+            performance = node.get_cc_perf(cc, replicas)
+            self._app_perf_increment[cc.app] += performance
+            self._app_unalloc_perf[cc.app] -= performance
             assert self._app_unalloc_perf[cc.app].magnitude >= - TransitionRBT._DELTA, "Invalid performance"
         self._unallocated_containers_in_new_nodes.clear()
         self._append_command(allocate_in_new_nodes_command, append_null_command=True)
@@ -1883,11 +1923,22 @@ class TransitionRBT(Transition):
         balance = dict(self._app_perf_surplus)
         for app, perf in self._app_perf_increment.items():
             balance[app] += perf
-        for _, cc, replicas in self._unalloc_node_cs + self._allocatable_cs_next_step + \
+        pending_replicas = defaultdict(int)
+        for node, cc, replicas in self._unalloc_node_cs + self._allocatable_cs_next_step + \
                                   self._unallocated_containers_in_new_nodes:
-            balance[cc.app] += cc.perf * replicas
-        for _, cc_replicas in self._recycling.obsolete_containers.items():
+            pending_replicas[(node, cc)] += replicas
+        for (node, cc), replicas in pending_replicas.items():
+            current_replicas = node.replicas[cc]
+            balance[cc.app] += (
+                node.get_cc_perf(cc, current_replicas + replicas) -
+                node.get_cc_perf(cc, current_replicas)
+            )
+        for node, cc_replicas in self._recycling.obsolete_containers.items():
             for cc, replicas in cc_replicas.items():
-                balance[cc.app] -= cc.perf * replicas
+                current_replicas = node.replicas[cc]
+                balance[cc.app] -= (
+                    node.get_cc_perf(cc, current_replicas) -
+                    node.get_cc_perf(cc, current_replicas - replicas)
+                )
         return balance
     

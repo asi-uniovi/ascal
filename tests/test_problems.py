@@ -2,18 +2,18 @@
 Test ASCAL based on the sequence of allocations
 """
 
-import os
 from yaml import safe_load as yaml_safe_load
 from collections import defaultdict
 from pathlib import Path
 import pytest
 from fcma import Allocation, Vm
 from ascal import AscalConfig, Ascal
-import aws_eu_west_1_c5_m5_r5
-from examples import aws_eu_west_1_c7a_m7a_r7a
+from test_gen import aws_eu_west_1_c5_m5_r5
+from test_gen import aws_eu_west_1_c7a_m7a_r7a
 
-PROBLEMS_DIR = "../problems"
-SOLUTIONS_DIR = "../solutions"
+TESTS_DIR = Path(__file__).resolve().parent
+PROBLEMS_DIR = TESTS_DIR / "problems"
+SOLUTIONS_DIR = TESTS_DIR / "solutions"
 
 def read_allocations(file_name) -> dict:
     """
@@ -21,7 +21,7 @@ def read_allocations(file_name) -> dict:
     :param file_name: File with the allocations.
     :return: A dictionary obtained from the YAML.
     """
-    with open(f"{SOLUTIONS_DIR}/{file_name}", "r") as f:
+    with open(SOLUTIONS_DIR / file_name, "r") as f:
         allocations = yaml_safe_load(f)
     return allocations
 
@@ -40,22 +40,20 @@ def allocations_to_serializable_dict(allocations: list[(int, Allocation)]):
         time_alloc[current_time] = dict(serializable_alloc)
     return time_alloc
 
-# Change the current directory
-os.chdir("tests/test_gen")
-
 # Generate list of problem file names to feed test_problem_allocation()
 problem_file_names = [
-    f.name for f in Path(PROBLEMS_DIR).glob('*.yaml') if f.is_file()
+    f.name for f in PROBLEMS_DIR.glob("*.yaml") if f.is_file()
 ]
 
 @pytest.mark.parametrize("problem_file_name", problem_file_names)
-def test_problem_allocation(problem_file_name):
+def test_problem_allocation(problem_file_name, monkeypatch):
     """
     Test a problem given by a YAML file.
     :param problem_file_name: YAML file defining a problem
-    :return:
+    :param monkeypatch: Pytest fixture used to change the working directory.
     """
-    file_path = f"{PROBLEMS_DIR}/{problem_file_name}"
+    monkeypatch.chdir(TESTS_DIR / "test_gen")
+    file_path = PROBLEMS_DIR / problem_file_name
     Vm.reset_ids()
     ic_families = [
         aws_eu_west_1_c5_m5_r5.c5_m5_r5_fm, 

@@ -5,7 +5,7 @@ Implement the horizontal reactive autoscaler
 import copy
 from collections import defaultdict
 from time import time as current_time
-from math import ceil
+from math import ceil, isclose
 from fcma import (
     App,
     Allocation,
@@ -20,6 +20,25 @@ from ascal.timedops import TimedOps
 from ascal.nodestates import NodeStates
 from ascal.autoscalers import Autoscaler, AutoscalerStatistics
 from ascal.helper import get_icf_app_ccs, get_required_nodes, mncf_allocation
+
+
+_REPLICA_ROUNDING_ABS_TOLERANCE = 1e-6
+
+def _ceil_required_replicas(required_replicas: float) -> int:
+    """
+    Ceil the required replicas, but if the required replicas is very close to an integer, round it to that integer.
+    :param required_replicas: Required replicas.
+    :return: Ceiled or rounded required replicas.
+    """
+    nearest_replicas = round(required_replicas)
+    if isclose(
+        required_replicas,
+        nearest_replicas,
+        rel_tol=0.0,
+        abs_tol=_REPLICA_ROUNDING_ABS_TOLERANCE,
+    ):
+        return nearest_replicas
+    return ceil(required_replicas)
 
 
 class HReactiveAutoscaler(Autoscaler):
@@ -241,15 +260,12 @@ class HReactiveAutoscaler(Autoscaler):
             # The required nodes come the first valid instance class family
             new_nodes = get_required_nodes(self._families[0], cgs)
             # Change node IDs so that they are new
-            current_ids = defaultdict(lambda: [])
+            current_ids = defaultdict(lambda: -1)
             for node in self.allocation:
-                current_ids[node.ic].append(node.id)
-            for ic in current_ids:
-                current_ids[ic].sort() # Sort IDs by increasing values
+                current_ids[node.ic] = max(current_ids[node.ic], node.id)
             for node in new_nodes:
-                if node.ic in current_ids:
-                    node.id = current_ids[node.ic][-1] + 1
-                    current_ids[node.ic].append(node.id)
+                node.id = current_ids[node.ic] + 1
+                current_ids[node.ic] = node.id
             # Now new nodes are ready to be created
             for new_node in new_nodes:
                 self._timedops.create_node(self.time, new_node)
@@ -369,19 +385,36 @@ class HReactiveAutoscaler(Autoscaler):
         """
         Set the desired number of equivalent agg=1 replicas for each application.
         """
-        icf = self._families[0]
         for app in self.apps:
-            replica_perf = self.system[(app, icf)].perf
             current_replicas = self._get_replicas(app)
             average_load = sum(self._app_loads[app][-self._time_period:]) / self._time_period
-            average_cpu_utilization = (average_load / (replica_perf * current_replicas)).magnitude
-            if average_cpu_utilization == 0:
+            current_performance = sum(
+                (
+                    cg.replicas * cg.cc.perfv
+                    for node in self.allocation
+                    if NodeStates.get_state(node) in (NodeStates.READY, NodeStates.MOVINGC)
+                    for cg in node.cgs
+                    if cg.cc.app == app
+                ),
+                RequestsPerTime("0 req/s"),
+            )
+            if current_replicas == 0 or current_performance.magnitude == 0:
+                average_cpu_utilization = 0.0
+            else:
+                average_load_rps = average_load.to("req/s").magnitude
+                current_performance_rps = current_performance.to("req/s").magnitude
+                average_cpu_utilization = (
+                    average_load_rps / current_performance_rps
+                    if current_performance_rps != 0
+                    else 0.0
+                )
+            if average_load.to("req/s").magnitude == 0:
                 # At least one replica with the minimum aggregation is required
                 self._desired_app_replicas[app] = self._app_ccs[app][-1].agg_level
             else:
                 required_replicas = current_replicas * average_cpu_utilization / self._desired_cpu_utilization
                 if abs(required_replicas - current_replicas) / current_replicas > self._tolerance_replicas: 
-                    self._desired_app_replicas[app] = ceil(required_replicas)
+                    self._desired_app_replicas[app] = _ceil_required_replicas(required_replicas)
                 else:
                     self._desired_app_replicas[app] = current_replicas
             self._timedops.timed_log(self.time,
